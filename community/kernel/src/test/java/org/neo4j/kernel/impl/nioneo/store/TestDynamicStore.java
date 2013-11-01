@@ -178,7 +178,7 @@ public class TestDynamicStore
             long blockId = first( records ).getId();
             for ( DynamicRecord record : records )
             {
-                store.updateRecord( record );
+                store.writeToByteArray( record );
             }
             store.close();
             /*
@@ -222,7 +222,7 @@ public class TestDynamicStore
             Collection<DynamicRecord> records = store.allocateRecords( chars );
             for ( DynamicRecord record : records )
             {
-                store.updateRecord( record );
+                store.writeToByteArray( record );
             }
             // assertEquals( STR, new String( store.getChars( blockId ) ) );
             store.close();
@@ -263,7 +263,7 @@ public class TestDynamicStore
                     for ( DynamicRecord record : records )
                     {
                         record.setInUse( false );
-                        store.updateRecord( record );
+                        store.writeToByteArray( record );
                         set.remove( record.getId() );
                     }
                     currentCount--;
@@ -275,7 +275,7 @@ public class TestDynamicStore
                     for ( DynamicRecord record : records )
                     {
                         assert !set.contains( record.getId() );
-                        store.updateRecord( record );
+                        store.writeToByteArray( record );
                         set.add( record.getId() );
                     }
                     long blockId = first( records ).getId();
@@ -360,7 +360,7 @@ public class TestDynamicStore
         Collection<DynamicRecord> records = store.allocateRecords( arrayToStore );
         for ( DynamicRecord record : records )
         {
-            store.updateRecord( record );
+            store.writeToByteArray( record );
         }
         return first( records ).getId();
     }
@@ -382,7 +382,7 @@ public class TestDynamicStore
             for ( DynamicRecord record : records )
             {
                 record.setInUse( false );
-                store.updateRecord( record );
+                store.writeToByteArray( record );
             }
         }
         finally
@@ -408,7 +408,7 @@ public class TestDynamicStore
             for ( DynamicRecord record : records )
             {
                 record.setInUse( false );
-                store.updateRecord( record );
+                store.writeToByteArray( record );
             }
         }
         finally

@@ -49,10 +49,11 @@ public class DynamicNodeLabels implements NodeLabels
     }
 
     @Override
-    public long[] get( NodeStore nodeStore )
+    public long[] get( Store nodeStore )
     {
-        nodeStore.ensureHeavy( node, getFirstDynamicRecordId() );
-        return nodeStore.getDynamicLabelsArray( node.getUsedDynamicLabelRecords() );
+        throw new RuntimeException( "Implement this" );
+//        nodeStore.ensureHeavy( node, getFirstDynamicRecordId() );
+//        return nodeStore.getDynamicLabelsArray( node.getUsedDynamicLabelRecords() ); // node.getDynamicLabelRecords() );
     }
 
     @Override
@@ -104,7 +105,7 @@ public class DynamicNodeLabels implements NodeLabels
     }
 
     @Override
-    public Collection<DynamicRecord> add( long labelId, NodeStore nodeStore )
+    public Collection<DynamicRecord> add( long labelId, Store nodeStore )
     {
         nodeStore.ensureHeavy( node, parseLabelsBody( labelField ) );
         Collection<DynamicRecord> existingRecords = node.getDynamicLabelRecords();
@@ -117,7 +118,7 @@ public class DynamicNodeLabels implements NodeLabels
     }
 
     @Override
-    public Collection<DynamicRecord> remove( long labelId, NodeStore nodeStore )
+    public Collection<DynamicRecord> remove( long labelId, Store nodeStore )
     {
         nodeStore.ensureHeavy( node, parseLabelsBody( labelField ) );
         Collection<DynamicRecord> existingRecords = node.getDynamicLabelRecords();
@@ -148,9 +149,10 @@ public class DynamicNodeLabels implements NodeLabels
     }
 
     @Override
-    public void ensureHeavy( NodeStore nodeStore )
+    public void ensureHeavy( Store nodeStore )
     {
-        nodeStore.ensureHeavy( node, getFirstDynamicRecordId() );
+        throw new RuntimeException( "Implement this" );
+//        nodeStore.ensureHeavy( node, getFirstDynamicRecordId() );
     }
 
     public static long dynamicPointer( Collection<DynamicRecord> newRecords )

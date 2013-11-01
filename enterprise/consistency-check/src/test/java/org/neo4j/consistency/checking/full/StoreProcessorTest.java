@@ -26,7 +26,7 @@ import org.mockito.stubbing.Answer;
 import org.neo4j.consistency.checking.CheckDecorator;
 import org.neo4j.consistency.report.ConsistencyReport;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
-import org.neo4j.kernel.impl.nioneo.store.RecordStore;
+import org.neo4j.kernel.impl.nioneo.store.OldRecordStore;
 
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
@@ -42,7 +42,7 @@ public class StoreProcessorTest
     {
         // given
         StoreProcessor processor = new StoreProcessor( CheckDecorator.NONE, mock( ConsistencyReport.Reporter.class ) );
-        RecordStore recordStore = mock( RecordStore.class );
+        OldRecordStore recordStore = mock( OldRecordStore.class );
         when( recordStore.getHighId() ).thenReturn( 3L );
         when( recordStore.forceGetRecord( any( Long.class ) ) ).thenReturn( new NodeRecord( 0, 0, 0 ) );
 
@@ -62,7 +62,7 @@ public class StoreProcessorTest
     {
         // given
         final StoreProcessor processor = new StoreProcessor( CheckDecorator.NONE, mock( ConsistencyReport.Reporter.class ) );
-        RecordStore recordStore = mock( RecordStore.class );
+        OldRecordStore recordStore = mock( OldRecordStore.class );
         when( recordStore.getHighId() ).thenReturn( 4L );
         when( recordStore.forceGetRecord( 0L ) ).thenReturn( new NodeRecord( 0, 0, 0 ) );
         when( recordStore.forceGetRecord( 1L ) ).thenReturn( new NodeRecord( 0, 0, 0 ) );

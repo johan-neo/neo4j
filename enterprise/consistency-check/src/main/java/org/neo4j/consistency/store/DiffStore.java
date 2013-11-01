@@ -32,7 +32,7 @@ import org.neo4j.kernel.impl.nioneo.store.PropertyKeyTokenRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyType;
 import org.neo4j.kernel.impl.nioneo.store.Record;
-import org.neo4j.kernel.impl.nioneo.store.RecordStore;
+import org.neo4j.kernel.impl.nioneo.store.OldRecordStore;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeTokenRecord;
 import org.neo4j.kernel.impl.nioneo.store.StoreAccess;
@@ -53,13 +53,13 @@ public class DiffStore extends StoreAccess implements CommandRecordVisitor
     }
 
     @Override
-    protected <R extends AbstractBaseRecord> RecordStore<R> wrapStore( RecordStore<R> store )
+    protected <R extends AbstractBaseRecord> OldRecordStore<R> wrapStore( OldRecordStore<R> store )
     {
         return new DiffRecordStore<>( store );
     }
 
     @Override
-    protected <FAILURE extends Exception> void apply( RecordStore.Processor<FAILURE> processor, RecordStore<?> store ) throws FAILURE
+    protected <FAILURE extends Exception> void apply( OldRecordStore.Processor<FAILURE> processor, OldRecordStore<?> store ) throws FAILURE
     {
         processor.applyById( store, (DiffRecordStore<?>) store );
     }
@@ -179,7 +179,7 @@ public class DiffStore extends StoreAccess implements CommandRecordVisitor
         visitNameStore( getLabelTokenStore(), getLabelNameStore(), record );
     }
 
-    private <R extends TokenRecord> void visitNameStore( RecordStore<R> store, RecordStore<DynamicRecord> nameStore, R record )
+    private <R extends TokenRecord> void visitNameStore( OldRecordStore<R> store, OldRecordStore<DynamicRecord> nameStore, R record )
     {
         store.forceUpdateRecord( record );
         for ( DynamicRecord key : record.getNameRecords() )

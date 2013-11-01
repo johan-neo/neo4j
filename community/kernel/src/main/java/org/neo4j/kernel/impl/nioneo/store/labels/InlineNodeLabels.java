@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 
+import org.neo4j.kernel.impl.nioneo.alt.Store;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeStore;
@@ -51,7 +52,7 @@ public class InlineNodeLabels implements NodeLabels
     }
 
     @Override
-    public long[] get( NodeStore nodeStore )
+    public long[] get( Store nodeStore )
     {
         return getIfLoaded();
     }
@@ -63,7 +64,7 @@ public class InlineNodeLabels implements NodeLabels
     }
 
     @Override
-    public Collection<DynamicRecord> put( long[] labelIds, NodeStore nodeStore )
+    public Collection<DynamicRecord> put( long[] labelIds, Store nodeStore )
     {
         if ( tryInlineInNodeRecord( labelIds, node.getDynamicLabelRecords() ) )
         {
@@ -76,7 +77,7 @@ public class InlineNodeLabels implements NodeLabels
     }
 
     @Override
-    public Collection<DynamicRecord> add( long labelId, NodeStore nodeStore )
+    public Collection<DynamicRecord> add( long labelId, Store nodeStore )
     {
         long[] augmentedLabelIds = labelCount( labelField ) == 0 ? new long[]{labelId} :
                                    concatAndSort( parseInlined( labelField ), labelId );
@@ -85,7 +86,7 @@ public class InlineNodeLabels implements NodeLabels
     }
 
     @Override
-    public Collection<DynamicRecord> remove( long labelId, NodeStore nodeStore )
+    public Collection<DynamicRecord> remove( long labelId, Store nodeStore )
     {
         long[] newLabelIds = filter( parseInlined( labelField ), labelId );
         boolean inlined = tryInlineInNodeRecord( newLabelIds, node.getDynamicLabelRecords() );
@@ -94,7 +95,7 @@ public class InlineNodeLabels implements NodeLabels
     }
 
     @Override
-    public void ensureHeavy( NodeStore nodeStore )
+    public void ensureHeavy( Store nodeStore )
     {
         // no dynamic records
     }

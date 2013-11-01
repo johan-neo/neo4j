@@ -21,20 +21,21 @@ package org.neo4j.kernel.impl.nioneo.store.labels;
 
 import java.util.Collection;
 
+import org.neo4j.kernel.impl.nioneo.alt.Store;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeStore;
 
 public interface NodeLabels
 {
-    long[] get( NodeStore nodeStore );
+    long[] get( Store nodeStore );
 
     long[] getIfLoaded();
 
     Collection<DynamicRecord> put( long[] labelIds, NodeStore nodeStore );
 
-    Collection<DynamicRecord> add( long labelId, NodeStore nodeStore );
+    Collection<DynamicRecord> add( long labelId, Store nodeStore );
 
-    Collection<DynamicRecord> remove( long labelId, NodeStore nodeStore );
+    Collection<DynamicRecord> remove( long labelId, Store nodeStore );
 
     void ensureHeavy( NodeStore nodeStore );
 

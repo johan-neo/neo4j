@@ -32,7 +32,7 @@ import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.RelationshipType;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.factory.GraphDatabaseFactory;
-import org.neo4j.kernel.impl.nioneo.store.RecordStore;
+import org.neo4j.kernel.impl.nioneo.store.OldRecordStore;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 import org.neo4j.kernel.impl.nioneo.store.StoreAccess;
 import org.neo4j.test.TargetDirectory;
@@ -62,7 +62,7 @@ public class RelationshipChainExplorerTest
     public void shouldLoadAllConnectedRelationshipRecordsAndTheirFullChainsOfRelationshipRecords() throws Exception
     {
         // given
-        RecordStore<RelationshipRecord> relationshipStore = store.getRelationshipStore();
+        OldRecordStore<RelationshipRecord> relationshipStore = store.getRelationshipStore();
 
         // when
         int relationshipIdInMiddleOfChain = 10;
@@ -78,7 +78,7 @@ public class RelationshipChainExplorerTest
     public void shouldCopeWithAChainThatReferencesNotInUseZeroValueRecords() throws Exception
     {
         // given
-        RecordStore<RelationshipRecord> relationshipStore = store.getRelationshipStore();
+        OldRecordStore<RelationshipRecord> relationshipStore = store.getRelationshipStore();
         breakTheChain( relationshipStore );
 
         // when
@@ -92,7 +92,7 @@ public class RelationshipChainExplorerTest
         assertEquals( NDegreeTwoNodes * 2 - recordsInaccessibleBecauseOfBrokenChain, records.size() );
     }
 
-    private void breakTheChain( RecordStore<RelationshipRecord> relationshipStore )
+    private void breakTheChain( OldRecordStore<RelationshipRecord> relationshipStore )
     {
         int relationshipTowardsEndOfChain = 16;
         relationshipStore.updateRecord( new RelationshipRecord( relationshipTowardsEndOfChain, 0, 0, 0 ) );

@@ -24,6 +24,12 @@ import java.util.concurrent.Callable;
 
 import org.neo4j.kernel.api.properties.DefinedProperty;
 import org.neo4j.kernel.api.properties.Property;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
+import org.neo4j.kernel.impl.nioneo.alt.NeoArrayStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoDynamicStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoStringStore;
+import org.neo4j.kernel.impl.nioneo.alt.RecordStore;
 
 /**
  * Defines valid property types.
@@ -34,13 +40,13 @@ public enum PropertyType
     BOOL( 1 )
     {
         @Override
-        public DefinedProperty readProperty( int propertyKeyId, PropertyBlock block, PropertyStore store )
+        public DefinedProperty readProperty( int propertyKeyId, PropertyBlock block, FlatNeoStores neoStores )
         {
             return Property.booleanProperty( propertyKeyId, getValue( block.getSingleValueLong() ) );
         }
 
         @Override
-        public Object getValue( PropertyBlock block, PropertyStore store )
+        public Object getValue( PropertyBlock block, RecordStore store )
         {
             return getValue( block.getSingleValueLong() );
         }
@@ -53,13 +59,13 @@ public enum PropertyType
     BYTE( 2 )
     {
         @Override
-        public DefinedProperty readProperty( int propertyKeyId, PropertyBlock block, PropertyStore store )
+        public DefinedProperty readProperty( int propertyKeyId, PropertyBlock block, FlatNeoStores neoStores )
         {
             return Property.byteProperty( propertyKeyId, block.getSingleValueByte() );
         }
 
         @Override
-        public Object getValue( PropertyBlock block, PropertyStore store )
+        public Object getValue( PropertyBlock block, RecordStore store )
         {
             return Byte.valueOf( block.getSingleValueByte() );
         }
@@ -67,13 +73,13 @@ public enum PropertyType
     SHORT( 3 )
     {
         @Override
-        public DefinedProperty readProperty( int propertyKeyId, PropertyBlock block, PropertyStore store )
+        public DefinedProperty readProperty( int propertyKeyId, PropertyBlock block, FlatNeoStores neoStores )
         {
             return Property.shortProperty( propertyKeyId, block.getSingleValueShort() );
         }
 
         @Override
-        public Object getValue( PropertyBlock block, PropertyStore store )
+        public Object getValue( PropertyBlock block, RecordStore store )
         {
             return Short.valueOf( block.getSingleValueShort() );
         }
@@ -81,13 +87,13 @@ public enum PropertyType
     CHAR( 4 )
     {
         @Override
-        public DefinedProperty readProperty( int propertyKeyId, PropertyBlock block, PropertyStore store )
+        public DefinedProperty readProperty( int propertyKeyId, PropertyBlock block, FlatNeoStores neoStores )
         {
             return Property.charProperty( propertyKeyId, (char) block.getSingleValueShort() );
         }
 
         @Override
-        public Object getValue( PropertyBlock block, PropertyStore store )
+        public Object getValue( PropertyBlock block, RecordStore store )
         {
             return Character.valueOf( (char) block.getSingleValueShort() );
         }
@@ -95,13 +101,13 @@ public enum PropertyType
     INT( 5 )
     {
         @Override
-        public DefinedProperty readProperty( int propertyKeyId, PropertyBlock block, PropertyStore store )
+        public DefinedProperty readProperty( int propertyKeyId, PropertyBlock block, FlatNeoStores neoStores )
         {
             return Property.intProperty( propertyKeyId, block.getSingleValueInt() );
         }
 
         @Override
-        public Object getValue( PropertyBlock block, PropertyStore store )
+        public Object getValue( PropertyBlock block, RecordStore store )
         {
             return Integer.valueOf( block.getSingleValueInt() );
         }
@@ -109,7 +115,7 @@ public enum PropertyType
     LONG( 6 )
     {
         @Override
-        public DefinedProperty readProperty( int propertyKeyId, PropertyBlock block, PropertyStore store )
+        public DefinedProperty readProperty( int propertyKeyId, PropertyBlock block, FlatNeoStores neoStores )
         {
             long firstBlock = block.getSingleValueBlock();
             long value = valueIsInlined( firstBlock ) ? (block.getSingleValueLong() >>> 1) : block.getValueBlocks()[1];
@@ -117,7 +123,7 @@ public enum PropertyType
         }
 
         @Override
-        public Object getValue( PropertyBlock block, PropertyStore store )
+        public Object getValue( PropertyBlock block, RecordStore store )
         {
             return Long.valueOf( getLongValue( block ) );
         }
@@ -144,13 +150,13 @@ public enum PropertyType
     FLOAT( 7 )
     {
         @Override
-        public DefinedProperty readProperty( int propertyKeyId, PropertyBlock block, PropertyStore store )
+        public DefinedProperty readProperty( int propertyKeyId, PropertyBlock block, FlatNeoStores neoStores )
         {
             return Property.floatProperty( propertyKeyId, Float.intBitsToFloat( block.getSingleValueInt() ) );
         }
 
         @Override
-        public Object getValue( PropertyBlock block, PropertyStore store )
+        public Object getValue( PropertyBlock block, RecordStore store )
         {
             return Float.valueOf( getValue( block.getSingleValueInt() ) );
         }
@@ -163,13 +169,13 @@ public enum PropertyType
     DOUBLE( 8 )
     {
         @Override
-        public DefinedProperty readProperty( int propertyKeyId, PropertyBlock block, PropertyStore store )
+        public DefinedProperty readProperty( int propertyKeyId, PropertyBlock block, FlatNeoStores neoStores )
         {
             return Property.doubleProperty( propertyKeyId, Double.longBitsToDouble( block.getValueBlocks()[1] ) );
         }
 
         @Override
-        public Object getValue( PropertyBlock block, PropertyStore store )
+        public Object getValue( PropertyBlock block, RecordStore store )
         {
             return Double.valueOf( getValue( block.getValueBlocks()[1] ) );
         }
@@ -188,89 +194,65 @@ public enum PropertyType
     STRING( 9 )
     {
         @Override
-        public DefinedProperty readProperty( int propertyKeyId, final PropertyBlock block, final PropertyStore store )
+        public DefinedProperty readProperty( int propertyKeyId, final PropertyBlock block, final FlatNeoStores neoStores )
         {
             return Property.lazyStringProperty(propertyKeyId, new Callable<String>()
             {
                 @Override
                 public String call() throws Exception
                 {
-                    return getValue( block, store );
+                    return getValue( block, neoStores.getStringStore().getRecordStore() );
                 }
             });
         }
 
         @Override
-        public String getValue( PropertyBlock block, PropertyStore store )
+        public String getValue( PropertyBlock block, RecordStore stringStore )
         {
-            if ( store == null )
+            if ( stringStore == null )
             {
                 return null;
             }
-            return store.getStringFor( block );
-        }
-
-        @Override
-        byte[] readDynamicRecordHeader( byte[] recordBytes )
-        {
-            return EMPTY_BYTE_ARRAY;
+            byte[] byteArray = NeoDynamicStore.readByteArray( stringStore, block.getSingleValueLong() );
+            return NeoStringStore.decodeString( byteArray ); 
         }
     },
     ARRAY( 10 )
     {
         @Override
-        public DefinedProperty readProperty( int propertyKeyId, final PropertyBlock block, final PropertyStore store )
+        public DefinedProperty readProperty( int propertyKeyId, final PropertyBlock block, final FlatNeoStores neoStores )
         {
             return Property.lazyArrayProperty(propertyKeyId, new Callable<Object>()
             {
                 @Override
                 public Object call() throws Exception
                 {
-                    return getValue( block, store );
+                    return getValue( block, neoStores.getArrayStore().getRecordStore() );
                 }
             });
         }
 
         @Override
-        public Object getValue( PropertyBlock block, PropertyStore store )
+        public Object getValue( PropertyBlock block, RecordStore arrayStore )
         {
-            if ( store == null )
+            if ( arrayStore == null )
             {
                 return null;
             }
-            return store.getArrayFor( block );
-        }
-
-        @Override
-        byte[] readDynamicRecordHeader( byte[] recordBytes )
-        {
-            byte itemType = recordBytes[0];
-            if ( itemType == STRING.byteValue() )
-            {
-                return headOf( recordBytes, DynamicArrayStore.STRING_HEADER_SIZE );
-            }
-            else if ( itemType <= DOUBLE.byteValue() )
-            {
-                return headOf( recordBytes, DynamicArrayStore.NUMBER_HEADER_SIZE );
-            }
-            throw new IllegalArgumentException( "Unknown array type " + itemType );
-        }
-
-        private byte[] headOf( byte[] bytes, int length )
-        {
-            return Arrays.copyOf( bytes, length );
+            byte[] byteArray = NeoDynamicStore.readByteArray( arrayStore, block.getSingleValueLong() );
+            return NeoArrayStore.getRightArray( byteArray ); 
         }
     },
     SHORT_STRING( 11 )
     {
         @Override
-        public DefinedProperty readProperty( int propertyKeyId, PropertyBlock block, PropertyStore store )
+        public DefinedProperty readProperty( int propertyKeyId, PropertyBlock block, FlatNeoStores neoStores )
         {
             return Property.stringProperty( propertyKeyId, LongerShortString.decode( block ) );
         }
 
         @Override
-        public Object getValue( PropertyBlock block, PropertyStore store )
+        public Object getValue( PropertyBlock block, RecordStore store )
         {
             return LongerShortString.decode( block );
         }
@@ -284,14 +266,14 @@ public enum PropertyType
     SHORT_ARRAY( 12 )
     {
         @Override
-        public DefinedProperty readProperty( int propertyKeyId, PropertyBlock block, PropertyStore store )
+        public DefinedProperty readProperty( int propertyKeyId, PropertyBlock block, FlatNeoStores neoStores )
         {
             // TODO: Specialize per type
             return Property.property( propertyKeyId, ShortArray.decode(block) );
         }
 
         @Override
-        public Object getValue( PropertyBlock block, PropertyStore store )
+        public Object getValue( PropertyBlock block, RecordStore store )
         {
             return ShortArray.decode( block );
         }
@@ -335,9 +317,9 @@ public enum PropertyType
         return (byte) type;
     }
 
-    public abstract Object getValue( PropertyBlock block, PropertyStore store );
+    public abstract Object getValue( PropertyBlock block, RecordStore store );
 
-    public abstract DefinedProperty readProperty( int propertyKeyId, PropertyBlock block, PropertyStore store );
+    public abstract DefinedProperty readProperty( int propertyKeyId, PropertyBlock block, FlatNeoStores neoStores );
 
     public static PropertyType getPropertyType( long propBlock, boolean nullOnIllegal )
     {
@@ -403,11 +385,6 @@ public enum PropertyType
     public int calculateNumberOfBlocksUsed( long firstBlock )
     {
         return 1;
-    }
-
-    byte[] readDynamicRecordHeader( byte[] recordBytes )
-    {
-        throw new UnsupportedOperationException();
     }
 
     public static final byte[] EMPTY_BYTE_ARRAY = new byte[0];

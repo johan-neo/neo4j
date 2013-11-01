@@ -34,7 +34,7 @@ import org.neo4j.kernel.impl.nioneo.store.LabelTokenRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyKeyTokenRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
-import org.neo4j.kernel.impl.nioneo.store.RecordStore;
+import org.neo4j.kernel.impl.nioneo.store.OldRecordStore;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeTokenRecord;
 import org.neo4j.kernel.impl.nioneo.store.WindowPoolStats;
@@ -42,13 +42,13 @@ import org.neo4j.kernel.impl.nioneo.store.WindowPoolStats;
 /**
  * Not thread safe, intended for single threaded use.
  */
-public class DiffRecordStore<R extends AbstractBaseRecord> implements RecordStore<R>, Iterable<Long>
+public class DiffRecordStore<R extends AbstractBaseRecord> implements OldRecordStore<R>, Iterable<Long>
 {
-    private final RecordStore<R> actual;
+    private final OldRecordStore<R> actual;
     private final Map<Long, R> diff;
     private long highId = -1;
 
-    public DiffRecordStore( RecordStore<R> actual )
+    public DiffRecordStore( OldRecordStore<R> actual )
     {
         this.actual = actual;
         this.diff = new HashMap<>();
@@ -177,7 +177,7 @@ public class DiffRecordStore<R extends AbstractBaseRecord> implements RecordStor
     }
 
     @Override
-    public <FAILURE extends Exception> void accept( RecordStore.Processor<FAILURE> processor, R record ) throws FAILURE
+    public <FAILURE extends Exception> void accept( OldRecordStore.Processor<FAILURE> processor, R record ) throws FAILURE
     {
         actual.accept( new DispatchProcessor<>( this, processor ), record );
     }
@@ -206,76 +206,76 @@ public class DiffRecordStore<R extends AbstractBaseRecord> implements RecordStor
     }
 
     @SuppressWarnings( "unchecked" )
-    private static class DispatchProcessor<FAILURE extends Exception> extends RecordStore.Processor<FAILURE>
+    private static class DispatchProcessor<FAILURE extends Exception> extends OldRecordStore.Processor<FAILURE>
     {
         private final DiffRecordStore<?> diffStore;
-        private final RecordStore.Processor<FAILURE> processor;
+        private final OldRecordStore.Processor<FAILURE> processor;
 
-        DispatchProcessor( DiffRecordStore<?> diffStore, RecordStore.Processor<FAILURE> processor )
+        DispatchProcessor( DiffRecordStore<?> diffStore, OldRecordStore.Processor<FAILURE> processor )
         {
             this.diffStore = diffStore;
             this.processor = processor;
         }
 
         @Override
-        public void processNode( RecordStore<NodeRecord> store, NodeRecord node ) throws FAILURE
+        public void processNode( OldRecordStore<NodeRecord> store, NodeRecord node ) throws FAILURE
         {
-            processor.processNode( (RecordStore<NodeRecord>) diffStore, node );
+            processor.processNode( (OldRecordStore<NodeRecord>) diffStore, node );
         }
 
         @Override
-        public void processRelationship( RecordStore<RelationshipRecord> store, RelationshipRecord rel ) throws FAILURE
+        public void processRelationship( OldRecordStore<RelationshipRecord> store, RelationshipRecord rel ) throws FAILURE
         {
-            processor.processRelationship( (RecordStore<RelationshipRecord>) diffStore, rel );
+            processor.processRelationship( (OldRecordStore<RelationshipRecord>) diffStore, rel );
         }
 
         @Override
-        public void processProperty( RecordStore<PropertyRecord> store, PropertyRecord property ) throws FAILURE
+        public void processProperty( OldRecordStore<PropertyRecord> store, PropertyRecord property ) throws FAILURE
         {
-            processor.processProperty( (RecordStore<PropertyRecord>) diffStore, property );
+            processor.processProperty( (OldRecordStore<PropertyRecord>) diffStore, property );
         }
 
         @Override
-        public void processString( RecordStore<DynamicRecord> store, DynamicRecord string,
-                                   @SuppressWarnings( "deprecation") IdType idType ) throws FAILURE
+        public void processString( OldRecordStore<DynamicRecord> store, DynamicRecord string, 
+                @SuppressWarnings( "deprecation") IdType idType ) throws FAILURE
         {
-            processor.processString( (RecordStore<DynamicRecord>) diffStore, string, idType );
+            processor.processString( (OldRecordStore<DynamicRecord>) diffStore, string, idType );
         }
 
         @Override
-        public void processArray( RecordStore<DynamicRecord> store, DynamicRecord array ) throws FAILURE
+        public void processArray( OldRecordStore<DynamicRecord> store, DynamicRecord array ) throws FAILURE
         {
-            processor.processArray( (RecordStore<DynamicRecord>) diffStore, array );
+            processor.processArray( (OldRecordStore<DynamicRecord>) diffStore, array );
         }
 
         @Override
-        public void processLabelArrayWithOwner( RecordStore<DynamicRecord> store, DynamicRecord array ) throws FAILURE
+        public void processLabelArrayWithOwner( OldRecordStore<DynamicRecord> store, DynamicRecord array ) throws FAILURE
         {
-            processor.processLabelArrayWithOwner( (RecordStore<DynamicRecord>) diffStore, array );
+            processor.processLabelArrayWithOwner( (OldRecordStore<DynamicRecord>) diffStore, array );
         }
 
         @Override
-        public void processSchema( RecordStore<DynamicRecord> store, DynamicRecord schema ) throws FAILURE
+        public void processSchema( OldRecordStore<DynamicRecord> store, DynamicRecord schema ) throws FAILURE
         {
-            processor.processSchema( (RecordStore<DynamicRecord>) diffStore, schema );
+            processor.processSchema( (OldRecordStore<DynamicRecord>) diffStore, schema );
         }
 
         @Override
-        public void processRelationshipTypeToken( RecordStore<RelationshipTypeTokenRecord> store,
+        public void processRelationshipTypeToken( OldRecordStore<RelationshipTypeTokenRecord> store,
                                                   RelationshipTypeTokenRecord record ) throws FAILURE
         {
-            processor.processRelationshipTypeToken( (RecordStore<RelationshipTypeTokenRecord>) diffStore, record );
+            processor.processRelationshipTypeToken( (OldRecordStore<RelationshipTypeTokenRecord>) diffStore, record );
         }
 
         @Override
-        public void processPropertyKeyToken( RecordStore<PropertyKeyTokenRecord> store, PropertyKeyTokenRecord record ) throws FAILURE
+        public void processPropertyKeyToken( OldRecordStore<PropertyKeyTokenRecord> store, PropertyKeyTokenRecord record ) throws FAILURE
         {
-            processor.processPropertyKeyToken( (RecordStore<PropertyKeyTokenRecord>) diffStore, record );
+            processor.processPropertyKeyToken( (OldRecordStore<PropertyKeyTokenRecord>) diffStore, record );
         }
 
         @Override
-        public void processLabelToken(RecordStore<LabelTokenRecord> store, LabelTokenRecord record) throws FAILURE {
-            processor.processLabelToken((RecordStore<LabelTokenRecord>) diffStore, record);
+        public void processLabelToken(OldRecordStore<LabelTokenRecord> store, LabelTokenRecord record) throws FAILURE {
+            processor.processLabelToken((OldRecordStore<LabelTokenRecord>) diffStore, record);
         }
     }
 }

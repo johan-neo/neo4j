@@ -27,6 +27,7 @@ import org.neo4j.kernel.api.exceptions.index.IndexNotFoundKernelException;
 import org.neo4j.kernel.api.exceptions.index.IndexPopulationFailedKernelException;
 import org.neo4j.kernel.api.exceptions.schema.ConstraintVerificationFailedKernelException;
 import org.neo4j.kernel.impl.api.index.IndexingService;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
 import org.neo4j.kernel.impl.nioneo.store.NeoStore;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.Record;
@@ -38,12 +39,12 @@ import org.neo4j.kernel.impl.nioneo.store.UniquenessConstraintRule;
  */
 public class IntegrityValidator
 {
-    private final NeoStore neoStore;
+    private final FlatNeoStores neoStores;
     private final IndexingService indexes;
 
-    public IntegrityValidator( NeoStore neoStore, IndexingService indexes )
+    public IntegrityValidator( FlatNeoStores neoStores, IndexingService indexes )
     {
-        this.neoStore = neoStore;
+        this.neoStores = neoStores;
         this.indexes = indexes;
     }
 
@@ -60,19 +61,20 @@ public class IntegrityValidator
     public void validateTransactionStartKnowledge( long lastCommittedTxWhenTransactionStarted )
             throws XAException
     {
-        if( lastCommittedTxWhenTransactionStarted < neoStore.getLatestConstraintIntroducingTx() )
-        {
-            // Constraints have changed since the transaction begun
-
-            // This should be a relatively uncommon case, window for this happening is a few milliseconds when an admin
-            // explicitly creates a constraint, after the index has been populated. We can improve this later on by
-            // replicating the constraint validation logic down here, or rethinking where we validate constraints.
-            // For now, we just kill these transactions.
-            throw Exceptions.withCause( new XAException( XAException.XA_RBINTEGRITY ),
-                    new ConstraintViolationException(
-                            "Database constraints have changed after this transaction started, which is not yet " +
-                            "supported. Please retry your transaction to ensure all constraints are executed." ) );
-        }
+        throw new RuntimeException( "Implement this" );
+//        if( lastCommittedTxWhenTransactionStarted < neoStores.getLatestConstraintIntroducingTx() )
+//        {
+//            // Constraints have changed since the transaction begun
+//
+//            // This should be a relatively uncommon case, window for this happening is a few milliseconds when an admin
+//            // explicitly creates a constraint, after the index has been populated. We can improve this later on by
+//            // replicating the constraint validation logic down here, or rethinking where we validate constraints.
+//            // For now, we just kill these transactions.
+//            throw Exceptions.withCause( new XAException( XAException.XA_RBINTEGRITY ),
+//                    new ConstraintViolationException(
+//                            "Database constraints have changed after this transaction started, which is not yet " +
+//                            "supported. Please retry your transaction to ensure all constraints are executed." ) );
+//        }
     }
 
     public void validateSchemaRule( SchemaRule schemaRule ) throws XAException

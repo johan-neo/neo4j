@@ -80,7 +80,7 @@ public class PropertyStore extends AbstractRecordStore<PropertyRecord> implement
     }
 
     @Override
-    public <FAILURE extends Exception> void accept( RecordStore.Processor<FAILURE> processor, PropertyRecord record )
+    public <FAILURE extends Exception> void accept( OldRecordStore.Processor<FAILURE> processor, PropertyRecord record )
             throws FAILURE
     {
         processor.processProperty( this, record );
@@ -264,11 +264,11 @@ public class PropertyStore extends AbstractRecordStore<PropertyRecord> implement
         {
             if ( valueRecord.getType() == PropertyType.STRING.intValue() )
             {
-                stringPropertyStore.updateRecord( valueRecord );
+                stringPropertyStore.writeToByteArray( valueRecord );
             }
             else if ( valueRecord.getType() == PropertyType.ARRAY.intValue() )
             {
-                arrayPropertyStore.updateRecord( valueRecord );
+                arrayPropertyStore.writeToByteArray( valueRecord );
             }
             else
             {
@@ -447,7 +447,8 @@ public class PropertyStore extends AbstractRecordStore<PropertyRecord> implement
 
     public Object getValue( PropertyBlock propertyBlock )
     {
-        return propertyBlock.getType().getValue( propertyBlock, this );
+        throw new RuntimeException( "Not implemented anymore" );
+//        return propertyBlock.getType().getValue( propertyBlock, this );
     }
 
     public void makeHeavyIfLight( PropertyBlock record )

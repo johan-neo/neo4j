@@ -30,6 +30,7 @@ import org.neo4j.helpers.UTF8;
 import org.neo4j.kernel.IdGeneratorFactory;
 import org.neo4j.kernel.IdType;
 import org.neo4j.kernel.configuration.Config;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
 import org.neo4j.kernel.impl.nioneo.store.windowpool.WindowPoolFactory;
 import org.neo4j.kernel.impl.storemigration.ConfigMapUpgradeConfiguration;
 import org.neo4j.kernel.impl.storemigration.DatabaseFiles;
@@ -125,6 +126,29 @@ public class StoreFactory
         }
     }
 
+    public FlatNeoStores newFlatNeoStore(String path, File fileName )
+    {
+        try
+        {
+            return attemptNewFlatNeoStores( path ); 
+        }
+        catch ( NotCurrentStoreVersionException e )
+        {
+            tryToUpgradeStores( fileName );
+            return attemptNewFlatNeoStores( path );
+        }
+        catch ( StoreNotFoundException e )
+        {
+            tryToUpgradeStores( fileName );
+            return attemptNewFlatNeoStores( path );
+        }
+    }
+    
+    FlatNeoStores attemptNewFlatNeoStores( String path )
+    {
+        return new FlatNeoStores( path, config, idGeneratorFactory, fileSystemAbstraction, stringLogger ); 
+    }
+    
     NeoStore attemptNewNeoStore( File fileName )
     {
         return new NeoStore( fileName, config, idGeneratorFactory, windowPoolFactory, fileSystemAbstraction,

@@ -42,19 +42,19 @@ import static org.neo4j.helpers.Settings.osIsWindows;
 public class StoreAccess
 {
     // Top level stores
-    private final RecordStore<DynamicRecord> schemaStore;
-    private final RecordStore<NodeRecord> nodeStore;
-    private final RecordStore<RelationshipRecord> relStore;
-    private final RecordStore<RelationshipTypeTokenRecord> relationshipTypeTokenStore;
-    private final RecordStore<LabelTokenRecord> labelTokenStore;
-    private final RecordStore<DynamicRecord> nodeDynamicLabelStore;
-    private final RecordStore<PropertyRecord> propStore;
+    private final OldRecordStore<DynamicRecord> schemaStore;
+    private final OldRecordStore<NodeRecord> nodeStore;
+    private final OldRecordStore<RelationshipRecord> relStore;
+    private final OldRecordStore<RelationshipTypeTokenRecord> relationshipTypeTokenStore;
+    private final OldRecordStore<LabelTokenRecord> labelTokenStore;
+    private final OldRecordStore<DynamicRecord> nodeDynamicLabelStore;
+    private final OldRecordStore<PropertyRecord> propStore;
     // Transitive stores
-    private final RecordStore<DynamicRecord> stringStore, arrayStore;
-    private final RecordStore<PropertyKeyTokenRecord> propertyKeyTokenStore;
-    private final RecordStore<DynamicRecord> relationshipTypeNameStore;
-    private final RecordStore<DynamicRecord> labelNameStore;
-    private final RecordStore<DynamicRecord> propertyKeyNameStore;
+    private final OldRecordStore<DynamicRecord> stringStore, arrayStore;
+    private final OldRecordStore<PropertyKeyTokenRecord> propertyKeyTokenStore;
+    private final OldRecordStore<DynamicRecord> relationshipTypeNameStore;
+    private final OldRecordStore<DynamicRecord> labelNameStore;
+    private final OldRecordStore<DynamicRecord> propertyKeyNameStore;
     // internal state
     private boolean closeable;
     private NeoStore neoStore;
@@ -132,92 +132,92 @@ public class StoreAccess
         return neoStore;
     }
 
-    public RecordStore<DynamicRecord> getSchemaStore()
+    public OldRecordStore<DynamicRecord> getSchemaStore()
     {
         return schemaStore;
     }
 
-    public RecordStore<NodeRecord> getNodeStore()
+    public OldRecordStore<NodeRecord> getNodeStore()
     {
         return nodeStore;
     }
 
-    public RecordStore<RelationshipRecord> getRelationshipStore()
+    public OldRecordStore<RelationshipRecord> getRelationshipStore()
     {
         return relStore;
     }
 
-    public RecordStore<PropertyRecord> getPropertyStore()
+    public OldRecordStore<PropertyRecord> getPropertyStore()
     {
         return propStore;
     }
 
-    public RecordStore<DynamicRecord> getStringStore()
+    public OldRecordStore<DynamicRecord> getStringStore()
     {
         return stringStore;
     }
 
-    public RecordStore<DynamicRecord> getArrayStore()
+    public OldRecordStore<DynamicRecord> getArrayStore()
     {
         return arrayStore;
     }
 
-    public RecordStore<RelationshipTypeTokenRecord> getRelationshipTypeTokenStore()
+    public OldRecordStore<RelationshipTypeTokenRecord> getRelationshipTypeTokenStore()
     {
         return relationshipTypeTokenStore;
     }
 
-    public RecordStore<LabelTokenRecord> getLabelTokenStore()
+    public OldRecordStore<LabelTokenRecord> getLabelTokenStore()
     {
         return labelTokenStore;
     }
 
-    public RecordStore<DynamicRecord> getNodeDynamicLabelStore()
+    public OldRecordStore<DynamicRecord> getNodeDynamicLabelStore()
     {
         return nodeDynamicLabelStore;
     }
 
-    public RecordStore<PropertyKeyTokenRecord> getPropertyKeyTokenStore()
+    public OldRecordStore<PropertyKeyTokenRecord> getPropertyKeyTokenStore()
     {
         return propertyKeyTokenStore;
     }
 
-    public RecordStore<DynamicRecord> getRelationshipTypeNameStore()
+    public OldRecordStore<DynamicRecord> getRelationshipTypeNameStore()
     {
         return relationshipTypeNameStore;
     }
 
-    public RecordStore<DynamicRecord> getLabelNameStore()
+    public OldRecordStore<DynamicRecord> getLabelNameStore()
     {
         return labelNameStore;
     }
 
-    public RecordStore<DynamicRecord> getPropertyKeyNameStore()
+    public OldRecordStore<DynamicRecord> getPropertyKeyNameStore()
     {
         return propertyKeyNameStore;
     }
 
-    public final <F extends Exception, P extends RecordStore.Processor<F>> P applyToAll( P processor ) throws F
+    public final <F extends Exception, P extends OldRecordStore.Processor<F>> P applyToAll( P processor ) throws F
     {
-        for ( RecordStore<?> store : allStores() )
+        for ( OldRecordStore<?> store : allStores() )
         {
             apply( processor, store );
         }
         return processor;
     }
 
-    protected RecordStore<?>[] allStores()
+    protected OldRecordStore<?>[] allStores()
     {
         if ( propStore == null )
         {
             // for when the property store isn't available (e.g. because the contained data in very sensitive)
-            return new RecordStore<?>[]{ // no property stores
+            return new OldRecordStore<?>[]{ // no property stores
                     nodeStore, relStore,
                     relationshipTypeTokenStore, relationshipTypeNameStore,
                     labelTokenStore, labelNameStore, nodeDynamicLabelStore
             };
         }
-        return new RecordStore<?>[]{
+        return new OldRecordStore<?>[]{
                 schemaStore, nodeStore, relStore, propStore, stringStore, arrayStore,
                 relationshipTypeTokenStore, propertyKeyTokenStore, labelTokenStore,
                 relationshipTypeNameStore, propertyKeyNameStore, labelNameStore,
@@ -225,7 +225,7 @@ public class StoreAccess
         };
     }
 
-    private static RecordStore<DynamicRecord> wrapNodeDynamicLabelStore( RecordStore<DynamicRecord> store ) {
+    private static OldRecordStore<DynamicRecord> wrapNodeDynamicLabelStore( OldRecordStore<DynamicRecord> store ) {
         return new DelegatingRecordStore<DynamicRecord>( store ) {
             @Override
             public <FAILURE extends Exception> void accept( Processor<FAILURE> processor, DynamicRecord record)
@@ -236,16 +236,16 @@ public class StoreAccess
         };
     }
 
-    protected <R extends AbstractBaseRecord> RecordStore<R> wrapStore( RecordStore<R> store )
+    protected <R extends AbstractBaseRecord> OldRecordStore<R> wrapStore( OldRecordStore<R> store )
     {
         return store;
     }
 
     @SuppressWarnings("unchecked")
-    protected <FAILURE extends Exception> void apply( RecordStore.Processor<FAILURE> processor, RecordStore<?> store )
+    protected <FAILURE extends Exception> void apply( OldRecordStore.Processor<FAILURE> processor, OldRecordStore<?> store )
             throws FAILURE
     {
-        processor.applyFiltered( store, RecordStore.IN_USE );
+        processor.applyFiltered( store, OldRecordStore.IN_USE );
     }
 
     private static Map<String, String> defaultParams()

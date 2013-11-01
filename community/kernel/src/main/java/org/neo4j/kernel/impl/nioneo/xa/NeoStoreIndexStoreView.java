@@ -34,31 +34,34 @@ import org.neo4j.kernel.impl.api.index.IndexStoreView;
 import org.neo4j.kernel.impl.api.index.StoreScan;
 import org.neo4j.kernel.impl.locking.Lock;
 import org.neo4j.kernel.impl.locking.LockService;
-import org.neo4j.kernel.impl.nioneo.store.NeoStore;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStore;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
-import org.neo4j.kernel.impl.nioneo.store.NodeStore;
+import org.neo4j.kernel.impl.nioneo.store.OldRecordStore;
+import org.neo4j.kernel.impl.nioneo.store.OldRecordStore.Processor;
 import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
-import org.neo4j.kernel.impl.nioneo.store.PropertyStore;
+import org.neo4j.kernel.impl.nioneo.store.PropertyType;
 import org.neo4j.kernel.impl.nioneo.store.Record;
+
 import org.neo4j.kernel.impl.nioneo.store.StoreIdIterator;
 import org.neo4j.kernel.impl.util.PrimitiveLongIterator;
 
 import static org.neo4j.kernel.api.index.NodePropertyUpdate.EMPTY_LONG_ARRAY;
 import static org.neo4j.kernel.api.labelscan.NodeLabelUpdate.labelChanges;
 import static org.neo4j.kernel.impl.nioneo.store.labels.NodeLabelsField.parseLabelsField;
+import org.neo4j.kernel.impl.nioneo.store.RecordLoad;
 
 public class NeoStoreIndexStoreView implements IndexStoreView
 {
-    private final PropertyStore propertyStore;
-    private final NodeStore nodeStore;
     private final LockService locks;
+    private final FlatNeoStores neoStores;
 
-    public NeoStoreIndexStoreView( LockService locks, NeoStore neoStore )
+
+    public NeoStoreIndexStoreView( LockService locks, FlatNeoStores neoStores )
     {
         this.locks = locks;
-        this.propertyStore = neoStore.getPropertyStore();
-        this.nodeStore = neoStore.getNodeStore();
+        this.neoStores = neoStores;
     }
 
     @Override
@@ -86,6 +89,16 @@ public class NeoStoreIndexStoreView implements IndexStoreView
                     }
                 }
                 return null;
+               /* // Create a processor that for each accepted node (containing the desired label) looks through its properties,
+                // getting the desired one (if any) and feeds to the index manipulator.
+                LabelsReference labelsReference = new LabelsReference();
+                OldRecordStore.Processor<FAILURE> processor = new NodePropertyUpdateProcessor<>( singleIntPredicate( descriptor.getPropertyKeyId() ),
+                        labelsReference, visitor );
+
+                // Run the processor for the nodes containing the given label.
+                // TODO When we've got a decent way of getting nodes with a label, use that instead.
+                Predicate<NodeRecord> predicate = new NodeLabelFilterPredicate( singleIntPredicate( descriptor.getLabelId() ), labelsReference );
+            */
             }
 
             @Override
@@ -127,6 +140,18 @@ public class NeoStoreIndexStoreView implements IndexStoreView
                     }
                 }
                 return update;
+   /*             // Create a processor that for each accepted node (containing the desired label) looks through its properties,
+                // getting the desired one (if any) and feeds to the index manipulator.
+                LabelsReference labelsReference = new LabelsReference();
+                NodePropertyUpdateProcessor<FAILURE> propertyUpdateProcessor = new NodePropertyUpdateProcessor<>( multipleIntPredicate( propertyKeyIds ),
+                        labelsReference, propertyUpdateVisitor );
+                Predicate<NodeRecord> predicate = new NodeLabelFilterPredicate( multipleIntPredicate( labelIds ), labelsReference );
+
+                // Wrap the property processor inside another processor that processes everything, produces
+                // label updates and delegates to the property processor.
+                OldRecordStore.Processor<FAILURE> processor =
+                        new NodeProcessor<>( propertyUpdateProcessor, predicate, labelsReference, labelUpdateVisitor );
+     */
             }
 
             @Override

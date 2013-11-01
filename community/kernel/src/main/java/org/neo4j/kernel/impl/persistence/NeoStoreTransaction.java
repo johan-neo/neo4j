@@ -263,7 +263,7 @@ public interface NeoStoreTransaction
      * batch of relationships has been loaded.
      */
     Pair<Map<DirectionWrapper, Iterable<RelationshipRecord>>, Long> getMoreRelationships(
-            long nodeId, long position );
+            long nodeId, long position, int count );
 
     boolean delistResource( Transaction tx, int tmsuccess ) throws SystemException;
 

@@ -27,7 +27,7 @@ import org.neo4j.kernel.impl.nioneo.store.LabelTokenRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyKeyTokenRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
-import org.neo4j.kernel.impl.nioneo.store.RecordStore;
+import org.neo4j.kernel.impl.nioneo.store.OldRecordStore;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeTokenRecord;
 
@@ -37,7 +37,7 @@ import static org.neo4j.consistency.checking.DynamicStore.ARRAY;
 import static org.neo4j.consistency.checking.DynamicStore.NODE_LABEL;
 import static org.neo4j.consistency.checking.DynamicStore.SCHEMA;
 
-public abstract class AbstractStoreProcessor extends RecordStore.Processor<RuntimeException>
+public abstract class AbstractStoreProcessor extends OldRecordStore.Processor<RuntimeException>
 {
     private final RecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> nodeChecker;
     private final RecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> relationshipChecker;
@@ -63,66 +63,66 @@ public abstract class AbstractStoreProcessor extends RecordStore.Processor<Runti
     }
 
     protected abstract void checkNode(
-            RecordStore<NodeRecord> store, NodeRecord node,
+            OldRecordStore<NodeRecord> store, NodeRecord node,
             RecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> checker );
 
     protected abstract void checkRelationship(
-            RecordStore<RelationshipRecord> store, RelationshipRecord rel,
+            OldRecordStore<RelationshipRecord> store, RelationshipRecord rel,
             RecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> checker );
 
     protected abstract void checkProperty(
-            RecordStore<PropertyRecord> store, PropertyRecord property,
+            OldRecordStore<PropertyRecord> store, PropertyRecord property,
             RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport> checker );
 
     protected abstract void checkRelationshipTypeToken(
-            RecordStore<RelationshipTypeTokenRecord> store,
+            OldRecordStore<RelationshipTypeTokenRecord> store,
             RelationshipTypeTokenRecord record,
             RecordCheck<RelationshipTypeTokenRecord, ConsistencyReport.RelationshipTypeConsistencyReport> checker );
 
     protected abstract void checkLabelToken(
-            RecordStore<LabelTokenRecord> store,
+            OldRecordStore<LabelTokenRecord> store,
             LabelTokenRecord record,
             RecordCheck<LabelTokenRecord, ConsistencyReport.LabelTokenConsistencyReport> checker );
 
     protected abstract void checkPropertyKeyToken(
-            RecordStore<PropertyKeyTokenRecord> store, PropertyKeyTokenRecord record,
+            OldRecordStore<PropertyKeyTokenRecord> store, PropertyKeyTokenRecord record,
             RecordCheck<PropertyKeyTokenRecord,
                     ConsistencyReport.PropertyKeyTokenConsistencyReport> checker );
 
     protected abstract void checkDynamic(
-            RecordType type, RecordStore<DynamicRecord> store, DynamicRecord string,
+            RecordType type, OldRecordStore<DynamicRecord> store, DynamicRecord string,
             RecordCheck<DynamicRecord, ConsistencyReport.DynamicConsistencyReport> checker );
 
     protected abstract void checkDynamicLabel(
-            RecordType type, RecordStore<DynamicRecord> store, DynamicRecord string,
+            RecordType type, OldRecordStore<DynamicRecord> store, DynamicRecord string,
             RecordCheck<DynamicRecord, ConsistencyReport.DynamicLabelConsistencyReport> checker );
 
-    public void processSchema( RecordStore<DynamicRecord> store, DynamicRecord schema )
+    public void processSchema( OldRecordStore<DynamicRecord> store, DynamicRecord schema )
     {
         // cf. StoreProcessor
         checkDynamic( RecordType.SCHEMA, store, schema, new DynamicRecordCheck( store, SCHEMA ) );
     }
 
     @Override
-    public final void processNode( RecordStore<NodeRecord> store, NodeRecord node )
+    public final void processNode( OldRecordStore<NodeRecord> store, NodeRecord node )
     {
         checkNode( store, node, nodeChecker );
     }
 
     @Override
-    public final void processRelationship( RecordStore<RelationshipRecord> store, RelationshipRecord rel )
+    public final void processRelationship( OldRecordStore<RelationshipRecord> store, RelationshipRecord rel )
     {
         checkRelationship( store, rel, relationshipChecker );
     }
 
     @Override
-    public final void processProperty( RecordStore<PropertyRecord> store, PropertyRecord property )
+    public final void processProperty( OldRecordStore<PropertyRecord> store, PropertyRecord property )
     {
         checkProperty( store, property, propertyChecker );
     }
 
     @Override
-    public final void processString( RecordStore<DynamicRecord> store, DynamicRecord string, IdType idType )
+    public final void processString( OldRecordStore<DynamicRecord> store, DynamicRecord string, IdType idType )
     {
         RecordType type;
         DynamicStore dereference;
@@ -151,34 +151,34 @@ public abstract class AbstractStoreProcessor extends RecordStore.Processor<Runti
     }
 
     @Override
-    public final void processArray( RecordStore<DynamicRecord> store, DynamicRecord array )
+    public final void processArray( OldRecordStore<DynamicRecord> store, DynamicRecord array )
     {
         checkDynamic( RecordType.ARRAY_PROPERTY, store, array, new DynamicRecordCheck( store, ARRAY ) );
     }
 
     @Override
-    public final void processLabelArrayWithOwner( RecordStore<DynamicRecord> store, DynamicRecord array )
+    public final void processLabelArrayWithOwner( OldRecordStore<DynamicRecord> store, DynamicRecord array )
     {
         checkDynamic( RecordType.NODE_DYNAMIC_LABEL, store, array, new DynamicRecordCheck( store, NODE_LABEL ) );
         checkDynamicLabel( RecordType.NODE_DYNAMIC_LABEL, store, array, new NodeDynamicLabelOrphanChainStartCheck() );
     }
 
     @Override
-    public final void processRelationshipTypeToken( RecordStore<RelationshipTypeTokenRecord> store,
+    public final void processRelationshipTypeToken( OldRecordStore<RelationshipTypeTokenRecord> store,
                                                     RelationshipTypeTokenRecord record )
     {
         checkRelationshipTypeToken( store, record, relationshipTypeTokenChecker );
     }
 
     @Override
-    public final void processPropertyKeyToken( RecordStore<PropertyKeyTokenRecord> store,
+    public final void processPropertyKeyToken( OldRecordStore<PropertyKeyTokenRecord> store,
                                                PropertyKeyTokenRecord record )
     {
         checkPropertyKeyToken( store, record, propertyKeyTokenChecker );
     }
 
     @Override
-    public void processLabelToken( RecordStore<LabelTokenRecord> store, LabelTokenRecord record )
+    public void processLabelToken( OldRecordStore<LabelTokenRecord> store, LabelTokenRecord record )
     {
         checkLabelToken( store, record, labelTokenChecker );
     }

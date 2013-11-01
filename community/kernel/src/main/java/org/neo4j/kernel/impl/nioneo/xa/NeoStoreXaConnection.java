@@ -48,16 +48,15 @@ public class NeoStoreXaConnection extends XaConnectionHelpImpl
     implements IndexXaConnection // Implements this to enable a temporary workaround, see #createIndex
 {
     private final NeoStoreXaResource xaResource;
-    private final NeoStore neoStore;
+    // private final NeoStore neoStore;
 
-    NeoStoreXaConnection( NeoStore neoStore, XaResourceManager xaRm,
+    NeoStoreXaConnection( String storeFileName, XaResourceManager xaRm,
         byte branchId[] )
     {
         super( xaRm );
-        this.neoStore = neoStore;
+        // this.neoStore = neoStore;
 
-        this.xaResource = new NeoStoreXaResource(
-            neoStore.getStorageFileName(), xaRm, branchId );
+        this.xaResource = new NeoStoreXaResource( storeFileName, xaRm, branchId );
     }
 
     public XAResource getXaResource()
@@ -105,12 +104,14 @@ public class NeoStoreXaConnection extends XaConnectionHelpImpl
     // TEST These methods are only used by tests - refactor away if possible
     public PropertyStore getPropertyStore()
     {
-        return neoStore.getPropertyStore();
+        throw new RuntimeException( "Not implemented yet" );
+        // return neoStore.getPropertyStore();
     }
 
     public RelationshipTypeTokenStore getRelationshipTypeStore()
     {
-        return neoStore.getRelationshipTypeStore();
+        throw new RuntimeException( "Not implemented yet" );
+        // return neoStore.getRelationshipTypeStore();
     }
 
     @Override

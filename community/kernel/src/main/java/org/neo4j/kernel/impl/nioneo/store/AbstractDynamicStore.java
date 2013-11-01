@@ -602,6 +602,7 @@ public abstract class AbstractDynamicStore extends CommonAbstractStore implement
     }
 
     public Pair<byte[]/*header in the first record*/,byte[]/*all other bytes*/> readFullByteArray(
+            public Pair<byte[]/*header in the first record*/,byte[]/*all other bytes*/> readFullByteArray(
             Iterable<DynamicRecord> records, PropertyType propertyType )
     {
         for ( DynamicRecord record : records )

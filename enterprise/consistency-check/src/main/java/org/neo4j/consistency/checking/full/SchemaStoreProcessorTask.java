@@ -22,13 +22,13 @@ package org.neo4j.consistency.checking.full;
 import org.neo4j.consistency.checking.SchemaRecordCheck;
 import org.neo4j.helpers.progress.ProgressMonitorFactory;
 import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
-import org.neo4j.kernel.impl.nioneo.store.RecordStore;
+import org.neo4j.kernel.impl.nioneo.store.OldRecordStore;
 
 public class SchemaStoreProcessorTask<R extends AbstractBaseRecord> extends StoreProcessorTask<R>
 {
     private final SchemaRecordCheck schemaRecordCheck;
 
-    public SchemaStoreProcessorTask( RecordStore<R> store,
+    public SchemaStoreProcessorTask( OldRecordStore<R> store,
                                      String builderPrefix,
                                      SchemaRecordCheck schemaRecordCheck,
                                      ProgressMonitorFactory.MultiPartBuilder builder,

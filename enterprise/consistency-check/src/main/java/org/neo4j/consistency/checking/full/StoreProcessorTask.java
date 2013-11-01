@@ -22,18 +22,18 @@ package org.neo4j.consistency.checking.full;
 import org.neo4j.helpers.progress.ProgressListener;
 import org.neo4j.helpers.progress.ProgressMonitorFactory;
 import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
-import org.neo4j.kernel.impl.nioneo.store.RecordStore;
+import org.neo4j.kernel.impl.nioneo.store.OldRecordStore;
 
 import static java.lang.String.format;
 
 class StoreProcessorTask<R extends AbstractBaseRecord> implements StoppableRunnable
 {
-    private final RecordStore<R> store;
+    private final OldRecordStore<R> store;
     private final StoreProcessor[] processors;
     private final ProgressListener[] progressListeners;
 
 
-    StoreProcessorTask( RecordStore<R> store,
+    StoreProcessorTask( OldRecordStore<R> store,
                         ProgressMonitorFactory.MultiPartBuilder builder,
                         TaskExecutionOrder order, StoreProcessor singlePassProcessor,
                         StoreProcessor... multiPassProcessors )
@@ -41,7 +41,7 @@ class StoreProcessorTask<R extends AbstractBaseRecord> implements StoppableRunna
         this( store, "", builder, order, singlePassProcessor, multiPassProcessors );
     }
 
-    StoreProcessorTask( RecordStore<R> store, String builderPrefix,
+    StoreProcessorTask( OldRecordStore<R> store, String builderPrefix,
                         ProgressMonitorFactory.MultiPartBuilder builder,
                         TaskExecutionOrder order, StoreProcessor singlePassProcessor,
                         StoreProcessor... multiPassProcessors )

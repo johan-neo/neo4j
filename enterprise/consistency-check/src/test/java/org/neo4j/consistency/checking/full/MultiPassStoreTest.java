@@ -32,7 +32,7 @@ import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
-import org.neo4j.kernel.impl.nioneo.store.RecordStore;
+import org.neo4j.kernel.impl.nioneo.store.OldRecordStore;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 import org.neo4j.kernel.impl.nioneo.store.StoreAccess;
 
@@ -127,7 +127,7 @@ public abstract class MultiPassStoreTest
     private StoreAccess storeAccess( long highId, int recordSize )
     {
         StoreAccess storeAccess = mock( StoreAccess.class );
-        RecordStore recordStore = mock( RecordStore.class );
+        OldRecordStore recordStore = mock( OldRecordStore.class );
         when( multiPassStore().getRecordStore( storeAccess ) ).thenReturn( recordStore );
         when( recordStore.getHighId() ).thenReturn( highId );
         when( recordStore.getRecordSize() ).thenReturn( recordSize );

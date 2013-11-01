@@ -53,7 +53,7 @@ public class PropertyKeyTokenStore extends TokenStore<PropertyKeyTokenRecord>
     }
 
     @Override
-    public <FAILURE extends Exception> void accept( RecordStore.Processor<FAILURE> processor, PropertyKeyTokenRecord record ) throws FAILURE
+    public <FAILURE extends Exception> void accept( OldRecordStore.Processor<FAILURE> processor, PropertyKeyTokenRecord record ) throws FAILURE
     {
         processor.processPropertyKeyToken( this, record );
     }

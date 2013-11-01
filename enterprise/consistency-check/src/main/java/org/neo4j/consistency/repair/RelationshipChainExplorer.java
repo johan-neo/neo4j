@@ -23,15 +23,15 @@ import static org.neo4j.consistency.repair.RelationshipChainDirection.NEXT;
 import static org.neo4j.consistency.repair.RelationshipChainDirection.PREV;
 
 import org.neo4j.kernel.impl.nioneo.store.Record;
-import org.neo4j.kernel.impl.nioneo.store.RecordStore;
+import org.neo4j.kernel.impl.nioneo.store.OldRecordStore;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 
 public class RelationshipChainExplorer
 {
     public static final int none = Record.NO_NEXT_RELATIONSHIP.intValue();
-    private final RecordStore<RelationshipRecord> recordStore;
+    private final OldRecordStore<RelationshipRecord> recordStore;
 
-    public RelationshipChainExplorer( RecordStore<RelationshipRecord> recordStore )
+    public RelationshipChainExplorer( OldRecordStore<RelationshipRecord> recordStore )
     {
         this.recordStore = recordStore;
     }

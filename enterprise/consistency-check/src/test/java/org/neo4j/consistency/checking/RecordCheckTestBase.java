@@ -31,7 +31,7 @@ import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
 import org.neo4j.kernel.impl.nioneo.store.PropertyKeyTokenRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyType;
-import org.neo4j.kernel.impl.nioneo.store.RecordStore;
+import org.neo4j.kernel.impl.nioneo.store.OldRecordStore;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeTokenRecord;
 
@@ -134,7 +134,7 @@ public abstract class RecordCheckTestBase<RECORD extends AbstractBaseRecord,
     }
 
     public static RecordCheck<DynamicRecord, ConsistencyReport.DynamicConsistencyReport> dummyDynamicCheck(
-            RecordStore<DynamicRecord> store, DynamicStore dereference )
+            OldRecordStore<DynamicRecord> store, DynamicStore dereference )
     {
         return new DynamicRecordCheck(store, dereference )
         {

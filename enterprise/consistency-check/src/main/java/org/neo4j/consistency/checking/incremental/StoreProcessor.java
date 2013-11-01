@@ -28,7 +28,7 @@ import org.neo4j.kernel.impl.nioneo.store.LabelTokenRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyKeyTokenRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
-import org.neo4j.kernel.impl.nioneo.store.RecordStore;
+import org.neo4j.kernel.impl.nioneo.store.OldRecordStore;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeTokenRecord;
 
@@ -44,28 +44,28 @@ class StoreProcessor extends AbstractStoreProcessor
     }
 
     @Override
-    protected void checkNode( RecordStore<NodeRecord> store, NodeRecord node,
+    protected void checkNode( OldRecordStore<NodeRecord> store, NodeRecord node,
                               RecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> checker )
     {
         report.forNodeChange( store.forceGetRaw( node ), node, checker );
     }
 
     @Override
-    protected void checkRelationship( RecordStore<RelationshipRecord> store, RelationshipRecord rel,
+    protected void checkRelationship( OldRecordStore<RelationshipRecord> store, RelationshipRecord rel,
                                       RecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> checker )
     {
         report.forRelationshipChange( store.forceGetRaw( rel ), rel, checker );
     }
 
     @Override
-    protected void checkProperty( RecordStore<PropertyRecord> store, PropertyRecord property,
+    protected void checkProperty( OldRecordStore<PropertyRecord> store, PropertyRecord property,
                                   RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport> checker )
     {
         report.forPropertyChange( store.forceGetRaw( property ), property, checker );
     }
 
     @Override
-    protected void checkRelationshipTypeToken( RecordStore<RelationshipTypeTokenRecord> store,
+    protected void checkRelationshipTypeToken( OldRecordStore<RelationshipTypeTokenRecord> store,
                                                RelationshipTypeTokenRecord record,
                                                RecordCheck<RelationshipTypeTokenRecord,
                                                        ConsistencyReport.RelationshipTypeConsistencyReport> checker )
@@ -74,7 +74,7 @@ class StoreProcessor extends AbstractStoreProcessor
     }
 
     @Override
-    protected void checkLabelToken( RecordStore<LabelTokenRecord> store, LabelTokenRecord record,
+    protected void checkLabelToken( OldRecordStore<LabelTokenRecord> store, LabelTokenRecord record,
                                     RecordCheck<LabelTokenRecord,
                                             ConsistencyReport.LabelTokenConsistencyReport> checker )
     {
@@ -82,7 +82,7 @@ class StoreProcessor extends AbstractStoreProcessor
     }
 
     @Override
-    protected void checkPropertyKeyToken( RecordStore<PropertyKeyTokenRecord> store, PropertyKeyTokenRecord record,
+    protected void checkPropertyKeyToken( OldRecordStore<PropertyKeyTokenRecord> store, PropertyKeyTokenRecord record,
                                           RecordCheck<PropertyKeyTokenRecord,
                                                   ConsistencyReport.PropertyKeyTokenConsistencyReport> checker )
     {
@@ -90,7 +90,7 @@ class StoreProcessor extends AbstractStoreProcessor
     }
 
     @Override
-    protected void checkDynamic( RecordType type, RecordStore<DynamicRecord> store, DynamicRecord string,
+    protected void checkDynamic( RecordType type, OldRecordStore<DynamicRecord> store, DynamicRecord string,
                                  RecordCheck<DynamicRecord, ConsistencyReport.DynamicConsistencyReport> checker )
     {
         report.forDynamicBlockChange( type, store.forceGetRaw( string ), string, checker );
@@ -98,7 +98,7 @@ class StoreProcessor extends AbstractStoreProcessor
 
 
     @Override
-    protected void checkDynamicLabel( RecordType type, RecordStore<DynamicRecord> store, DynamicRecord string,
+    protected void checkDynamicLabel( RecordType type, OldRecordStore<DynamicRecord> store, DynamicRecord string,
                                       RecordCheck<DynamicRecord, DynamicLabelConsistencyReport> checker )
     {
         report.forDynamicLabelBlockChange( type, store.forceGetRaw( string ), string, checker );

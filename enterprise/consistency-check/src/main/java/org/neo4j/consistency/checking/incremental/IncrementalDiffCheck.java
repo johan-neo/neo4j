@@ -29,7 +29,7 @@ import org.neo4j.consistency.store.DiffStore;
 import org.neo4j.consistency.store.DirectDiffRecordAccess;
 import org.neo4j.kernel.api.exceptions.schema.MalformedSchemaRuleException;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
-import org.neo4j.kernel.impl.nioneo.store.RecordStore;
+import org.neo4j.kernel.impl.nioneo.store.OldRecordStore;
 import org.neo4j.kernel.impl.nioneo.store.SchemaRule;
 import org.neo4j.kernel.impl.nioneo.store.SchemaRuleAccess;
 import org.neo4j.kernel.impl.nioneo.store.SchemaStore;
@@ -80,9 +80,9 @@ public class IncrementalDiffCheck extends DiffCheck
 
     private static class RuleReader implements SchemaRuleAccess
     {
-        private final RecordStore<DynamicRecord> schemaStore;
+        private final OldRecordStore<DynamicRecord> schemaStore;
 
-        private RuleReader( RecordStore<DynamicRecord> schemaStore )
+        private RuleReader( OldRecordStore<DynamicRecord> schemaStore )
         {
             this.schemaStore = schemaStore;
         }

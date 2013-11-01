@@ -39,7 +39,7 @@ import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
 import org.neo4j.kernel.impl.nioneo.store.LabelTokenRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyKeyTokenRecord;
-import org.neo4j.kernel.impl.nioneo.store.RecordStore;
+import org.neo4j.kernel.impl.nioneo.store.OldRecordStore;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeTokenRecord;
 import org.neo4j.kernel.impl.nioneo.store.StoreAccess;
 import org.neo4j.kernel.impl.util.StringLogger;
@@ -122,7 +122,7 @@ public class FullCheck
                 readAllRecords( LabelTokenRecord.class, store.getLabelTokenStore() ) );
     }
 
-    private static <T extends AbstractBaseRecord> T[] readAllRecords( Class<T> type, RecordStore<T> store )
+    private static <T extends AbstractBaseRecord> T[] readAllRecords( Class<T> type, OldRecordStore<T> store )
     {
         @SuppressWarnings("unchecked")
         T[] records = (T[]) Array.newInstance( type, (int) store.getHighId() );

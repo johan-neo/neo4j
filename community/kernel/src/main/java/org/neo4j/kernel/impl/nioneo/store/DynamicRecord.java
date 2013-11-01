@@ -25,7 +25,6 @@ public class DynamicRecord extends Abstract64BitRecord
     private byte[] data = null;
     private int length;
     private long nextBlock = Record.NO_NEXT_BLOCK.intValue();
-    private int type;
     private boolean startRecord = true;
 
     public static DynamicRecord dynamicRecord( long id, boolean inUse )
@@ -42,7 +41,7 @@ public class DynamicRecord extends Abstract64BitRecord
         record.setInUse( inUse );
         record.setStartRecord( isStartRecord );
         record.setNextBlock( nextBlock );
-        record.setType( type );
+        // record.setType( type );
         record.setData( data );
         return record;
     }
@@ -60,16 +59,6 @@ public class DynamicRecord extends Abstract64BitRecord
     public boolean isStartRecord()
     {
         return startRecord;
-    }
-
-    public int getType()
-    {
-        return type;
-    }
-
-    public void setType( int type )
-    {
-        this.type = type;
     }
 
     public boolean isLight()
@@ -90,12 +79,6 @@ public class DynamicRecord extends Abstract64BitRecord
         {
             data = null;
         }
-    }
-
-    public void setInUse( boolean inUse, int type )
-    {
-        this.type = type;
-        this.setInUse( inUse );
     }
 
     public void setData( byte[] data )
@@ -133,19 +116,19 @@ public class DynamicRecord extends Abstract64BitRecord
                 .append( ",used=" ).append(inUse() ).append( "," )
                 .append( "light=" ).append( isLight() )
                 .append("(" ).append( length ).append( "),type=" );
-        PropertyType type = PropertyType.getPropertyType( this.type << 24, true );
-        if ( type == null ) buf.append( this.type ); else buf.append( type.name() );
+        // PropertyType type = PropertyType.getPropertyType( this.type << 24, true );
+        // if ( type == null ) buf.append( this.type ); else buf.append( type.name() );
         buf.append( ",data=" );
         if ( data != null )
         {
-            if ( type == PropertyType.STRING && data.length <= MAX_CHARS_IN_TO_STRING )
+/*            if ( type == PropertyType.STRING && data.length <= MAX_CHARS_IN_TO_STRING )
             {
                 buf.append( '"' );
                 buf.append( PropertyStore.decodeString( data ) );
                 buf.append( "\"," );
-            }
+            } 
             else
-            {
+            {*/
                 buf.append( "byte[" );
                 if ( data.length <= MAX_BYTES_IN_TO_STRING )
                 {
@@ -160,7 +143,7 @@ public class DynamicRecord extends Abstract64BitRecord
                     buf.append( "size=" ).append( data.length );
                 }
                 buf.append( "]," );
-            }
+            // }
         }
         else
         {
@@ -180,7 +163,7 @@ public class DynamicRecord extends Abstract64BitRecord
         result.setInUse( inUse() );
         result.length = length;
         result.nextBlock = nextBlock;
-        result.type = type;
+        // result.type = type;
         result.startRecord = startRecord;
         return result;
     }

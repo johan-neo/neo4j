@@ -253,6 +253,7 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
             return list;
         }
     }, true);
+
     private Map<Integer, RelationshipTypeTokenRecord> relationshipTypeTokenRecords;
     private Map<Integer, LabelTokenRecord> labelTokenRecords;
     private Map<Integer, PropertyKeyTokenRecord> propertyKeyTokenRecords;
@@ -276,7 +277,7 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
     private final TransactionState state;
     private final CacheAccessBackDoor cacheAccess;
     private final IndexingService indexes;
-    private final NeoStore neoStore;
+    private final FlatNeoStores neoStores;
     private final LabelScanStore labelScanStore;
     private final IntegrityValidator integrityValidator;
     private final KernelTransactionImplementation kernelTransaction;
@@ -294,14 +295,14 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
      * @param kernelTransaction is the vanilla sauce to the WriteTransaction apple pie.
      */
     WriteTransaction( int identifier, long lastCommittedTxWhenTransactionStarted, XaLogicalLog log,
-                      TransactionState state, NeoStore neoStore, CacheAccessBackDoor cacheAccess,
+                      TransactionState state, FlatNeoStores neoStores, CacheAccessBackDoor cacheAccess,
                       IndexingService indexingService, LabelScanStore labelScanStore,
                       IntegrityValidator integrityValidator, KernelTransactionImplementation kernelTransaction,
                       LockService locks )
     {
         super( identifier, log, state );
         this.lastCommittedTxWhenTransactionStarted = lastCommittedTxWhenTransactionStarted;
-        this.neoStore = neoStore;
+        this.neoStores = neoStores;
         this.state = state;
         this.cacheAccess = cacheAccess;
         this.indexes = indexingService;
@@ -377,8 +378,7 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
             for ( RelationshipTypeTokenRecord record : relationshipTypeTokenRecords.values() )
             {
                 Command.RelationshipTypeTokenCommand command =
-                        new Command.RelationshipTypeTokenCommand(
-                                neoStore.getRelationshipTypeStore(), record );
+                        new Command.RelationshipTypeTokenCommand( record );
                 relationshipTypeTokenCommands.add( command );
                 commands.add( command );
             }
@@ -389,8 +389,7 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
             for ( LabelTokenRecord record : labelTokenRecords.values() )
             {
                 Command.LabelTokenCommand command =
-                        new Command.LabelTokenCommand(
-                                neoStore.getLabelTokenStore(), record );
+                        new Command.LabelTokenCommand( record );
                 labelTokenCommands.add( command );
                 commands.add( command );
             }
@@ -399,15 +398,13 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
         {
             NodeRecord record = change.forReadingLinkage();
             integrityValidator.validateNodeRecord( record );
-            Command.NodeCommand command = new Command.NodeCommand(
-                    neoStore.getNodeStore(), change.getBefore(), record );
+            Command.NodeCommand command = new Command.NodeCommand( change.getBefore(), record );
             nodeCommands.put( record.getId(), command );
             commands.add( command );
         }
         for ( RecordChange<Long, RelationshipRecord, Void> record : relRecords.changes() )
         {
-            Command.RelationshipCommand command = new Command.RelationshipCommand(
-                    neoStore.getRelationshipStore(), record.forReadingLinkage() );
+            Command.RelationshipCommand command = new Command.RelationshipCommand( record.forReadingLinkage() );
             relCommands.add( command );
             commands.add( command );
         }
@@ -415,7 +412,7 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
         {
             for ( RecordChange<Long, NeoStoreRecord, Void> change : neoStoreRecord.changes() )
             {
-                neoStoreCommand = new Command.NeoStoreCommand( neoStore, change.forReadingData() );
+                neoStoreCommand = new Command.NeoStoreCommand( change.forReadingData() );
                 addCommand( neoStoreCommand );
             }
         }
@@ -425,8 +422,7 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
             for ( PropertyKeyTokenRecord record : propertyKeyTokenRecords.values() )
             {
                 Command.PropertyKeyTokenCommand command =
-                        new Command.PropertyKeyTokenCommand(
-                                neoStore.getPropertyStore().getPropertyKeyTokenStore(), record );
+                        new Command.PropertyKeyTokenCommand( record );
                 propertyKeyTokenCommands.add( command );
                 commands.add( command );
             }
@@ -434,7 +430,7 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
         for ( RecordChange<Long, PropertyRecord, PrimitiveRecord> change : propertyRecords.changes() )
         {
             Command.PropertyCommand command = new Command.PropertyCommand(
-                    neoStore.getPropertyStore(), change.getBefore(), change.forReadingLinkage() );
+                    change.getBefore(), change.forReadingLinkage() );
             propCommands.add( command );
             commands.add( command );
         }
@@ -628,12 +624,12 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
                         {
                             if ( dynamicRecord.isCreated() )
                             {
-                                if ( dynamicRecord.getType() == PropertyType.STRING.intValue() )
+                                if ( block.getType() == PropertyType.STRING )
                                 {
                                     getPropertyStore().freeStringBlockId(
                                             dynamicRecord.getId() );
                                 }
-                                else if ( dynamicRecord.getType() == PropertyType.ARRAY.intValue() )
+                                else if ( block.getType() == PropertyType.ARRAY )
                                 {
                                     getPropertyStore().freeArrayBlockId(
                                             dynamicRecord.getId() );
@@ -699,25 +695,22 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
     private void addRelationshipType( int id )
     {
         setRecovered();
-        Token type = isRecovered() ?
-                     neoStore.getRelationshipTypeStore().getToken( id, true ) :
-                     neoStore.getRelationshipTypeStore().getToken( id );
+        Token type = NeoTokenStore.getToken( neoStores.getRelationshipTypeTokenStore().getRecordStore(), 
+                neoStores.getRelationshipTypeTokenNameStore().getRecordStore(), id, isRecovered() );
         cacheAccess.addRelationshipTypeToken( type );
     }
 
     private void addLabel( int id )
     {
-        Token labelId = isRecovered() ?
-                        neoStore.getLabelTokenStore().getToken( id, true ) :
-                        neoStore.getLabelTokenStore().getToken( id );
+        Token labelId = NeoTokenStore.getToken( neoStores.getLabelTokenStore().getRecordStore(), 
+                neoStores.getLabelTokenNameStore().getRecordStore(), id, isRecovered() );
         cacheAccess.addLabelToken( labelId );
     }
 
     private void addPropertyKey( int id )
     {
-        Token index = isRecovered() ?
-                      neoStore.getPropertyStore().getPropertyKeyTokenStore().getToken( id, true ) :
-                      neoStore.getPropertyStore().getPropertyKeyTokenStore().getToken( id );
+        Token index = NeoTokenStore.getToken( neoStores.getPropertyKeyTokenStore().getRecordStore(), 
+                neoStores.getPropertyKeyTokenNameStore().getRecordStore(), id, isRecovered() );
         cacheAccess.addPropertyKeyToken( index );
     }
 
@@ -763,7 +756,7 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
                 java.util.Collections.sort( relationshipTypeTokenCommands, sorter );
                 for ( Command.RelationshipTypeTokenCommand command : relationshipTypeTokenCommands )
                 {
-                    command.execute();
+                    command.execute( neoStores.getRelationshipTypeTokenStore().getRecordStore(), neoStores.getRelationshipTypeTokenNameStore().getRecordStore() );
                     if ( isRecovered )
                     {
                         addRelationshipType( (int) command.getKey() );
@@ -776,7 +769,7 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
                 java.util.Collections.sort( labelTokenCommands, sorter );
                 for ( Command.LabelTokenCommand command : labelTokenCommands )
                 {
-                    command.execute();
+                    command.execute( neoStores.getLabelTokenStore().getRecordStore(), neoStores.getLabelTokenNameStore().getRecordStore(), NeoTokenStore.LABEL_TOKEN_RECORD_SIZE );
                     if ( isRecovered )
                     {
                         addLabel( (int) command.getKey() );
@@ -789,7 +782,7 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
                 java.util.Collections.sort( propertyKeyTokenCommands, sorter );
                 for ( Command.PropertyKeyTokenCommand command : propertyKeyTokenCommands )
                 {
-                    command.execute();
+                    command.execute( neoStores.getLabelTokenStore().getRecordStore(), neoStores.getLabelTokenNameStore().getRecordStore(), NeoTokenStore.PROPERTY_KEY_TOKEN_RECORD_SIZE );
                     if ( isRecovered )
                     {
                         addPropertyKey( (int) command.getKey() );
@@ -831,7 +824,7 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
             for ( SchemaRuleCommand command : schemaRuleCommands )
             {
                 command.setTxId( getCommitTxId() );
-                command.execute();
+                command.execute( neoStores.getSchemaStore().getRecordStore(), indexes );
                 switch ( command.getMode() )
                 {
                 case DELETE:
@@ -1186,7 +1179,7 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
             PropertyRecord before = propertyChange.getBefore();
             for ( PropertyBlock block : before.getPropertyBlocks() )
             {
-                result.put( block.getKeyIndexId(), block.newPropertyData( getPropertyStore() ) );
+                result.put( block.getKeyIndexId(), block.newPropertyData( neoStores ) );
             }
             for ( PropertyBlock block : propRecord.getPropertyBlocks() )
             {
@@ -1311,8 +1304,7 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
     }
 
     @Override
-    public Pair<Map<DirectionWrapper, Iterable<RelationshipRecord>>, Long> getMoreRelationships( long nodeId,
-                                                                                                 long position )
+    public Pair<Map<DirectionWrapper, Iterable<RelationshipRecord>>, Long> getMoreRelationships( long nodeId, long position, int count )
     {
         return getMoreRelationships( nodeId, position, getRelGrabSize(), getRelationshipStore() );
     }
@@ -1434,7 +1426,7 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
         for ( DynamicRecord valueRecord : block.getValueRecords() )
         {
             assert valueRecord.inUse();
-            valueRecord.setInUse( false, block.getType().intValue() );
+            valueRecord.setInUse( false ); // , block.getType().intValue() );
             propRecord.addDeletedRecord( valueRecord );
         }
         if ( propRecord.size() > 0 )
@@ -1567,7 +1559,7 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
         for ( DynamicRecord record : block.getValueRecords() )
         {
             assert record.inUse();
-            record.setInUse( false, block.getType().intValue() );
+            record.setInUse( false ); // , block.getType().intValue() );
             propertyRecord.addDeletedRecord( record );
         }
         getPropertyStore().encodeValue( block, propertyKey, value );
@@ -2089,7 +2081,6 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
     public void graphLoadProperties( boolean light, PropertyReceiver records )
     {
         loadProperties( getPropertyStore(),
-                getOrLoadNeoStoreRecord().forReadingLinkage().getNextProp(), records );
     }
 
     @Override
@@ -2118,14 +2109,14 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
     public void addLabelToNode( int labelId, long nodeId )
     {
         NodeRecord nodeRecord = nodeRecords.getOrLoad( nodeId, null ).forChangingData();
-        parseLabelsField( nodeRecord ).add( labelId, getNodeStore() );
+        parseLabelsField( nodeRecord ).add( labelId, neoStores.getNodeStore() );
     }
 
     @Override
     public void removeLabelFromNode( int labelId, long nodeId )
     {
         NodeRecord nodeRecord = nodeRecords.getOrLoad( nodeId, null ).forChangingData();
-        parseLabelsField( nodeRecord ).remove( labelId, getNodeStore() );
+        parseLabelsField( nodeRecord ).remove( labelId, neoStores.getNodeStore() );
     }
 
     @Override
@@ -2133,7 +2124,7 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
     {
         // Don't consider changes in this transaction
         NodeRecord node = getNodeStore().getRecord( nodeId );
-        return asPrimitiveIterator( parseLabelsField( node ).get( getNodeStore() ) );
+        return asPrimitiveIterator( parseLabelsField( node ).get( neoStores.getNodeStore() ) );
     }
 
     @Override

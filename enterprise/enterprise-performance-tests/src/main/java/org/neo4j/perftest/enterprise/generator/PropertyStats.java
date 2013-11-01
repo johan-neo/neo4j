@@ -27,15 +27,15 @@ import java.util.TreeMap;
 import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyType;
-import org.neo4j.kernel.impl.nioneo.store.RecordStore;
+import org.neo4j.kernel.impl.nioneo.store.OldRecordStore;
 
-class PropertyStats extends RecordStore.Processor<RuntimeException>
+class PropertyStats extends OldRecordStore.Processor<RuntimeException>
 {
     Map<Integer, Long> sizeHistogram = new TreeMap<Integer, Long>();
     Map<PropertyType, Long> typeHistogram = new EnumMap<PropertyType, Long>( PropertyType.class );
 
     @Override
-    public void processProperty( RecordStore<PropertyRecord> store, PropertyRecord property )
+    public void processProperty( OldRecordStore<PropertyRecord> store, PropertyRecord property )
     {
         List<PropertyBlock> blocks = property.getPropertyBlocks();
         update( sizeHistogram, blocks.size() );

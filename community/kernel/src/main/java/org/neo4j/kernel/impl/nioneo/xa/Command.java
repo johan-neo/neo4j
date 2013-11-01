@@ -19,6 +19,11 @@
  */
 package org.neo4j.kernel.impl.nioneo.xa;
 
+import static java.util.Collections.unmodifiableCollection;
+import static org.neo4j.helpers.Exceptions.launderedException;
+import static org.neo4j.helpers.collection.IteratorUtil.first;
+import static org.neo4j.kernel.impl.util.IoPrimitiveUtils.readAndFlip;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
@@ -33,38 +38,28 @@ import org.neo4j.kernel.api.exceptions.index.IndexPopulationFailedKernelExceptio
 import org.neo4j.kernel.api.exceptions.schema.MalformedSchemaRuleException;
 import org.neo4j.kernel.impl.api.index.IndexingService;
 import org.neo4j.kernel.impl.core.CacheAccessBackDoor;
+import org.neo4j.kernel.impl.nioneo.alt.NeoTokenStore;
+import org.neo4j.kernel.impl.nioneo.alt.RecordStore;
 import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
 import org.neo4j.kernel.impl.nioneo.store.AbstractDynamicStore;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.IndexRule;
 import org.neo4j.kernel.impl.nioneo.store.LabelTokenRecord;
-import org.neo4j.kernel.impl.nioneo.store.LabelTokenStore;
 import org.neo4j.kernel.impl.nioneo.store.NeoStore;
 import org.neo4j.kernel.impl.nioneo.store.NeoStoreRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
-import org.neo4j.kernel.impl.nioneo.store.NodeStore;
 import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
 import org.neo4j.kernel.impl.nioneo.store.PropertyKeyTokenRecord;
-import org.neo4j.kernel.impl.nioneo.store.PropertyKeyTokenStore;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
-import org.neo4j.kernel.impl.nioneo.store.PropertyStore;
 import org.neo4j.kernel.impl.nioneo.store.PropertyType;
 import org.neo4j.kernel.impl.nioneo.store.Record;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
-import org.neo4j.kernel.impl.nioneo.store.RelationshipStore;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeTokenRecord;
-import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeTokenStore;
 import org.neo4j.kernel.impl.nioneo.store.SchemaRule;
 import org.neo4j.kernel.impl.nioneo.store.SchemaStore;
 import org.neo4j.kernel.impl.nioneo.store.UniquenessConstraintRule;
 import org.neo4j.kernel.impl.transaction.xaframework.LogBuffer;
 import org.neo4j.kernel.impl.transaction.xaframework.XaCommand;
-
-import static java.util.Collections.unmodifiableCollection;
-
-import static org.neo4j.helpers.Exceptions.launderedException;
-import static org.neo4j.helpers.collection.IteratorUtil.first;
-import static org.neo4j.kernel.impl.util.IoPrimitiveUtils.readAndFlip;
 
 /**
  * Command implementations for all the commands that can be performed on a Neo
@@ -196,7 +191,7 @@ public abstract class Command extends XaCommand
             {
                 inUse |= Record.FIRST_IN_CHAIN.byteValue();
             }
-            buffer.putLong( record.getId() ).putInt( record.getType() ).put(
+            buffer.putLong( record.getId() ).putInt( -1 /* type now in data array */ ).put(
                     inUse ).putInt( record.getLength() ).putLong(
                     record.getNextBlock() );
             byte[] data = record.getData();
@@ -206,7 +201,7 @@ public abstract class Command extends XaCommand
         else
         {
             byte inUse = Record.NOT_IN_USE.byteValue();
-            buffer.putLong( record.getId() ).putInt( record.getType() ).put(
+            buffer.putLong( record.getId() ).putInt( -1 /* type now in data array */ ).put(
                 inUse );
         }
     }
@@ -302,12 +297,14 @@ public abstract class Command extends XaCommand
         long id = buffer.getLong();
         assert id >= 0 && id <= ( 1l << 36 ) - 1 : id
                                                   + " is not a valid dynamic record id";
-        int type = buffer.getInt();
+         
+        buffer.getInt(); /*type now in data array*/
+        
         byte inUseFlag = buffer.get();
         boolean inUse = ( inUseFlag & Record.IN_USE.byteValue() ) != 0;
 
         DynamicRecord record = new DynamicRecord( id );
-        record.setInUse( inUse, type );
+        record.setInUse( inUse ); // , type );
         if ( inUse )
         {
             record.setStartRecord( ( inUseFlag & Record.FIRST_IN_CHAIN.byteValue() ) != 0 );
@@ -361,14 +358,12 @@ public abstract class Command extends XaCommand
 
     static class NodeCommand extends Command
     {
-        private final NodeStore store;
         private final NodeRecord before;
         private final NodeRecord after;
 
-        NodeCommand( NodeStore store, NodeRecord before, NodeRecord after )
+        NodeCommand( NodeRecord before, NodeRecord after )
         {
             super( after.getId(), Mode.fromRecordState( after ) );
-            this.store = store;
             this.before = before;
             this.after = after;
         }
@@ -391,7 +386,6 @@ public abstract class Command extends XaCommand
             cacheAccess.removeNodeFromCache( getKey() );
         }
 
-        @Override
         public void execute()
         {
             store.updateRecord( after );
@@ -445,7 +439,7 @@ public abstract class Command extends XaCommand
             }
         }
 
-        public static Command readFromFile( NeoStore neoStore, ReadableByteChannel byteChannel, ByteBuffer buffer )
+        public static Command readFromFile( ReadableByteChannel byteChannel, ByteBuffer buffer )
             throws IOException
         {
             if ( !readAndFlip( byteChannel, buffer, 8 ) )
@@ -471,7 +465,7 @@ public abstract class Command extends XaCommand
                 after.setCreated();
             }
             
-            return new NodeCommand( neoStore == null ? null : neoStore.getNodeStore(), before, after );
+            return new NodeCommand( before, after );
         }
 
         private static NodeRecord readNodeRecord( long id, ReadableByteChannel byteChannel, ByteBuffer buffer )
@@ -532,15 +526,13 @@ public abstract class Command extends XaCommand
         private final RelationshipRecord record;
         // before update stores the record as it looked before the command is executed
         private RelationshipRecord beforeUpdate;
-        private final RelationshipStore store;
 
-        RelationshipCommand( RelationshipStore store, RelationshipRecord record )
+        RelationshipCommand( RelationshipRecord record )
         {
             super( record.getId(), Mode.fromRecordState( record ) );
             this.record = record;
             // the default (common) case is that the record to be written is complete and not from recovery or HA
             this.beforeUpdate = record;
-            this.store = store;
         }
         
         @Override
@@ -580,8 +572,7 @@ public abstract class Command extends XaCommand
             }
         }
 
-        @Override
-        public void execute()
+/*        public void execute()
         {
             if ( isRecovered() && !record.inUse() )
             {
@@ -591,10 +582,10 @@ public abstract class Command extends XaCommand
                  * Therefore, we need to read the record from the store. This is not too expensive, since the window
                  * will be either in memory or will soon be anyway and we are just saving the write the trouble.
                  */
-                beforeUpdate = store.forceGetRaw( record.getId() );
+                /*beforeUpdate = store.forceGetRaw( record.getId() );
             }
             store.updateRecord( record );
-        }
+        }*/
 
         @Override
         public void writeToFile( LogBuffer buffer ) throws IOException
@@ -618,8 +609,7 @@ public abstract class Command extends XaCommand
             }
         }
 
-        public static Command readFromFile( NeoStore neoStore,
-            ReadableByteChannel byteChannel, ByteBuffer buffer )
+        public static Command readFromFile( ReadableByteChannel byteChannel, ByteBuffer buffer )
             throws IOException
         {
             if ( !readAndFlip( byteChannel, buffer, 9 ) )
@@ -660,28 +650,24 @@ public abstract class Command extends XaCommand
                 record = new RelationshipRecord( id, -1, -1, -1 );
                 record.setInUse( false );
             }
-            return new RelationshipCommand( neoStore == null ? null : neoStore.getRelationshipStore(),
-                record );
+            return new RelationshipCommand( record );
         }
     }
     
     static class NeoStoreCommand extends Command
     {
         private final NeoStoreRecord record;
-        private final NeoStore neoStore;
 
-        NeoStoreCommand( NeoStore neoStore, NeoStoreRecord record )
+        NeoStoreCommand( NeoStoreRecord record )
         {
             super( record.getId(), Mode.fromRecordState( record ) );
-            this.neoStore = neoStore;
             this.record = record;
         }
 
-        @Override
-        public void execute()
+/*        public void execute()
         {
             neoStore.setGraphNextProp( record.getNextProp() );
-        }
+        }*/
         
         @Override
         public void accept( CommandRecordVisitor visitor )
@@ -707,8 +693,7 @@ public abstract class Command extends XaCommand
             buffer.put( NEOSTORE_COMMAND ).putLong( record.getNextProp() );
         }
 
-        public static Command readFromFile( NeoStore neoStore,
-                ReadableByteChannel byteChannel, ByteBuffer buffer )
+        public static Command readFromFile( ReadableByteChannel byteChannel, ByteBuffer buffer )
                 throws IOException
         {
             if ( !readAndFlip( byteChannel, buffer, 8 ) )
@@ -718,21 +703,18 @@ public abstract class Command extends XaCommand
             long nextProp = buffer.getLong();
             NeoStoreRecord record = new NeoStoreRecord();
             record.setNextProp( nextProp );
-            return new NeoStoreCommand( neoStore, record );
+            return new NeoStoreCommand( record );
         }
     }
 
     static class PropertyKeyTokenCommand extends Command
     {
         private final PropertyKeyTokenRecord record;
-        private final PropertyKeyTokenStore store;
 
-        PropertyKeyTokenCommand( PropertyKeyTokenStore store,
-                                 PropertyKeyTokenRecord record )
+        PropertyKeyTokenCommand( PropertyKeyTokenRecord record )
         {
             super( record.getId(), Mode.fromRecordState( record ) );
             this.record = record;
-            this.store = store;
         }
         
         @Override
@@ -753,10 +735,9 @@ public abstract class Command extends XaCommand
             // no-op
         }
 
-        @Override
-        public void execute()
+        public void execute( RecordStore tokenStore, RecordStore tokenNameStore, int recordSize )
         {
-            store.updateRecord( record );
+            NeoTokenStore.updateToken( tokenStore, tokenNameStore, record, new byte[recordSize] );
         }
 
         @Override
@@ -779,7 +760,7 @@ public abstract class Command extends XaCommand
             }
         }
 
-        public static Command readFromFile( NeoStore neoStore, ReadableByteChannel byteChannel,
+        public static Command readFromFile( ReadableByteChannel byteChannel,
             ByteBuffer buffer ) throws IOException
         {
             // id+in_use(byte)+count(int)+key_blockId(int)
@@ -824,16 +805,14 @@ public abstract class Command extends XaCommand
 
     static class PropertyCommand extends Command
     {
-        private final PropertyStore store;
         private final PropertyRecord before;
         private final PropertyRecord after;
 
         // TODO as optimization the deserialized key/values could be passed in here
         // so that the cost of deserializing them only applies in recovery/HA
-        PropertyCommand( PropertyStore store, PropertyRecord before, PropertyRecord after )
+        PropertyCommand( PropertyRecord before, PropertyRecord after )
         {
             super( after.getId(), Mode.fromRecordState( after ) );
-            this.store = store;
             this.before = before;
             this.after = after;
         }
@@ -875,11 +854,10 @@ public abstract class Command extends XaCommand
             return after;
         }
 
-        @Override
-        public void execute()
+/*        public void execute()
         {
             store.updateRecord( after );
-        }
+        }*/
 
         public long getNodeId()
         {
@@ -943,8 +921,7 @@ public abstract class Command extends XaCommand
             writeDynamicRecords( buffer, record.getDeletedRecords() );
         }
 
-        public static Command readFromFile( NeoStore neoStore,
-            ReadableByteChannel byteChannel, ByteBuffer buffer )
+        public static Command readFromFile( ReadableByteChannel byteChannel, ByteBuffer buffer )
             throws IOException
         {
             // ID
@@ -968,8 +945,7 @@ public abstract class Command extends XaCommand
                 return null;
             }
             
-            return new PropertyCommand( neoStore == null ? null
-                    : neoStore.getPropertyStore(), before, after );
+            return new PropertyCommand( before, after );
         }
 
         private static PropertyRecord readPropertyRecord( long id, ReadableByteChannel byteChannel, ByteBuffer buffer )
@@ -1070,14 +1046,11 @@ public abstract class Command extends XaCommand
     static class RelationshipTypeTokenCommand extends Command
     {
         private final RelationshipTypeTokenRecord record;
-        private final RelationshipTypeTokenStore store;
 
-        RelationshipTypeTokenCommand( RelationshipTypeTokenStore store,
-                                      RelationshipTypeTokenRecord record )
+        RelationshipTypeTokenCommand( RelationshipTypeTokenRecord record )
         {
             super( record.getId(), Mode.fromRecordState( record ) );
             this.record = record;
-            this.store = store;
         }
         
         @Override
@@ -1098,10 +1071,9 @@ public abstract class Command extends XaCommand
             // no-op
         }
 
-        @Override
-        public void execute()
+        public void execute( RecordStore tokenStore, RecordStore tokenNameStore )
         {
-            store.updateRecord( record );
+            NeoTokenStore.updateToken( tokenStore, tokenNameStore, record, new byte[NeoTokenStore.RELATIONSHIP_TYPE_TOKEN_RECORD_SIZE] );
         }
 
         @Override
@@ -1115,8 +1087,7 @@ public abstract class Command extends XaCommand
             writeDynamicRecords( buffer, record.getNameRecords() );
         }
 
-        public static Command readFromFile( NeoStore neoStore,
-            ReadableByteChannel byteChannel, ByteBuffer buffer )
+        public static Command readFromFile( ReadableByteChannel byteChannel, ByteBuffer buffer )
             throws IOException
         {
             // id+in_use(byte)+type_blockId(int)+nr_type_records(int)
@@ -1149,22 +1120,18 @@ public abstract class Command extends XaCommand
                 }
                 record.addNameRecord( dr );
             }
-            return new RelationshipTypeTokenCommand(
-                    neoStore == null ? null : neoStore.getRelationshipTypeStore(), record );
+            return new RelationshipTypeTokenCommand( record );
         }
     }
 
     static class LabelTokenCommand extends Command
     {
         private final LabelTokenRecord record;
-        private final LabelTokenStore store;
 
-        LabelTokenCommand( LabelTokenStore store,
-                           LabelTokenRecord record )
+        LabelTokenCommand( LabelTokenRecord record )
         {
             super( record.getId(), Mode.fromRecordState( record ) );
             this.record = record;
-            this.store = store;
         }
 
         @Override
@@ -1185,10 +1152,9 @@ public abstract class Command extends XaCommand
             // no-op
         }
 
-        @Override
-        public void execute()
+        public void execute( RecordStore tokenStore, RecordStore tokenNameStore, int recordSize )
         {
-            store.updateRecord( record );
+            NeoTokenStore.updateToken( tokenStore, tokenNameStore, record, new byte[recordSize] );
         }
 
         @Override
@@ -1202,8 +1168,7 @@ public abstract class Command extends XaCommand
             writeDynamicRecords( buffer, record.getNameRecords() );
         }
 
-        public static Command readFromFile( NeoStore neoStore,
-            ReadableByteChannel byteChannel, ByteBuffer buffer )
+        public static Command readFromFile( ReadableByteChannel byteChannel, ByteBuffer buffer )
             throws IOException
         {
             // id+in_use(byte)+type_blockId(int)+nr_type_records(int)
@@ -1236,8 +1201,7 @@ public abstract class Command extends XaCommand
                 }
                 record.addNameRecord( dr );
             }
-            return new LabelTokenCommand(
-                    neoStore == null ? null : neoStore.getLabelTokenStore(), record );
+            return new LabelTokenCommand( record );
         }
     }
 
@@ -1293,8 +1257,7 @@ public abstract class Command extends XaCommand
             return unmodifiableCollection( recordsAfter );
         }
 
-        @Override
-        public void execute()
+        public void execute( RecordStore schemaStore, IndexingService indexes )
         {
             for ( DynamicRecord record : recordsAfter )
             {
@@ -1373,7 +1336,7 @@ public abstract class Command extends XaCommand
             this.txId = txId;
         }
 
-        static Command readFromFile( NeoStore neoStore, IndexingService indexes, ReadableByteChannel byteChannel,
+        static Command readFromFile( ReadableByteChannel byteChannel,
                 ByteBuffer buffer ) throws IOException
         {
             Collection<DynamicRecord> recordsBefore = new ArrayList<>();
@@ -1440,7 +1403,7 @@ public abstract class Command extends XaCommand
         }
     };
 
-    public static Command readCommand( NeoStore neoStore, IndexingService indexes, ReadableByteChannel byteChannel,
+    public static Command readCommand( /*NeoStore neoStore, IndexingService indexes, */ ReadableByteChannel byteChannel,
         ByteBuffer buffer ) throws IOException
     {
         if ( !readAndFlip( byteChannel, buffer, 1 ) )
@@ -1451,21 +1414,21 @@ public abstract class Command extends XaCommand
         switch ( commandType )
         {
             case NODE_COMMAND:
-                return NodeCommand.readFromFile( neoStore, byteChannel, buffer );
+                return NodeCommand.readFromFile( byteChannel, buffer );
             case PROP_COMMAND:
-                return PropertyCommand.readFromFile( neoStore, byteChannel, buffer );
+                return PropertyCommand.readFromFile( byteChannel, buffer );
             case PROP_INDEX_COMMAND:
-                return PropertyKeyTokenCommand.readFromFile( neoStore, byteChannel, buffer );
+                return PropertyKeyTokenCommand.readFromFile( byteChannel, buffer );
             case REL_COMMAND:
-                return RelationshipCommand.readFromFile( neoStore, byteChannel, buffer );
+                return RelationshipCommand.readFromFile( byteChannel, buffer );
             case REL_TYPE_COMMAND:
-                return RelationshipTypeTokenCommand.readFromFile( neoStore, byteChannel, buffer );
+                return RelationshipTypeTokenCommand.readFromFile( byteChannel, buffer );
             case LABEL_KEY_COMMAND:
-                return LabelTokenCommand.readFromFile( neoStore, byteChannel, buffer );
+                return LabelTokenCommand.readFromFile( byteChannel, buffer );
             case NEOSTORE_COMMAND:
-                return NeoStoreCommand.readFromFile( neoStore, byteChannel, buffer );
+                return NeoStoreCommand.readFromFile( byteChannel, buffer );
             case SCHEMA_RULE_COMMAND:
-                return SchemaRuleCommand.readFromFile( neoStore, indexes, byteChannel, buffer );
+                return SchemaRuleCommand.readFromFile( byteChannel, buffer );
             case NONE: return null;
             default:
                 throw new IOException( "Unknown command type[" + commandType + "]" );

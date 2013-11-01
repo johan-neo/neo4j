@@ -147,7 +147,7 @@ public class WriteTransactionTest
         Collection<DynamicRecord> records = schemaStore.allocateFrom( rule );
         for ( DynamicRecord record : records )
         {
-            schemaStore.updateRecord( record );
+            schemaStore.writeToByteArray( record );
         }
         long ruleId = first( records ).getId();
         WriteTransaction writeTransaction = newWriteTransaction( mockIndexing );

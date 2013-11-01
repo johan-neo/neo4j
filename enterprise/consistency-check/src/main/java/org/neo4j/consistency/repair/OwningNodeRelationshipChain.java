@@ -20,16 +20,16 @@
 package org.neo4j.consistency.repair;
 
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
-import org.neo4j.kernel.impl.nioneo.store.RecordStore;
+import org.neo4j.kernel.impl.nioneo.store.OldRecordStore;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 
 public class OwningNodeRelationshipChain
 {
     private final RelationshipChainExplorer relationshipChainExplorer;
-    private final RecordStore<NodeRecord> nodeStore;
+    private final OldRecordStore<NodeRecord> nodeStore;
 
     public OwningNodeRelationshipChain( RelationshipChainExplorer relationshipChainExplorer,
-                                        RecordStore<NodeRecord> nodeStore )
+                                        OldRecordStore<NodeRecord> nodeStore )
     {
         this.relationshipChainExplorer = relationshipChainExplorer;
         this.nodeStore = nodeStore;

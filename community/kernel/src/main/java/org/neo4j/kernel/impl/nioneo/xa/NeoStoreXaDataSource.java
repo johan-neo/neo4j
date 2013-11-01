@@ -158,7 +158,7 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
     private IndexingService indexingService;
     private SchemaIndexProvider indexProvider;
     private XaContainer xaContainer;
-    private ArrayMap<Class<?>,Store> idGenerators;
+    private ArrayMap<Class<?>,IdGenerator> idGenerators;
     private IntegrityValidator integrityValidator;
     private NeoStoreFileListing fileListing;
 
@@ -180,7 +180,7 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
             @Override
             void dump( NeoStoreXaDataSource source, StringLogger.LineLogger log )
             {
-                source.neoStore.logVersions( log );
+                log.logLine( NeoNeoStore.buildTypeDescriptorAndVersion( NeoNeoStore.TYPE_DESCRIPTOR ) );
             }
         },
         NEO_STORE_ID_USAGE( "Id usage:" )
@@ -188,9 +188,10 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
             @Override
             void dump( NeoStoreXaDataSource source, StringLogger.LineLogger log )
             {
-                source.neoStore.logIdUsage( log );
+                // source.neoStore.logIdUsage( log );
+                throw new RuntimeException( "Not implemented yet" );
             }
-        },
+        }/*,
         PERSISTENCE_WINDOW_POOL_STATS( "Persistence Window Pool stats:" )
         {
             @Override
@@ -204,7 +205,7 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
             {
                 return phase.isExplicitlyRequested();
             }
-        };
+        }*/;
 
         private final String message;
 
@@ -320,8 +321,8 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
         {
             tf = new TransactionFactory();
         }
-        neoStore = storeFactory.newNeoStore( store );
-
+        // neoStore = storeFactory.newNeoStore( store );
+        neoStores = storeFactory.newFlatNeoStore( storeDir.getCanonicalPath(), store );
         schemaCache = new SchemaCache( Collections.<SchemaRule>emptyList() );
 
         final NodeManager nodeManager = dependencyResolver.resolveDependency( NodeManager.class );
@@ -350,14 +351,14 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
                     new IndexingService(
                             scheduler,
                             providerMap,
-                            new NeoStoreIndexStoreView( locks, neoStore ),
+                            new NeoStoreIndexStoreView( locks, neoStores ),
                             tokenNameLookup, updateableSchemaState,
                             logging ) );
 
-            integrityValidator = new IntegrityValidator( neoStore, indexingService );
+            integrityValidator = new IntegrityValidator( neoStores, indexingService );
 
             xaContainer = xaFactory.newXaContainer(this, config.get( Configuration.logical_log ),
-                    new CommandFactory( neoStore, indexingService ),
+                    new CommandFactory(),
                     new NeoStoreInjectedTransactionValidator(integrityValidator), tf,
                     stateFactory, providers, readOnly  );
 
@@ -376,7 +377,7 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
             // TODO: Why isn't this done in the init() method of the indexing service?
             if ( !readOnly )
             {
-                neoStore.setRecoveredStatus( true );
+                // neoStore.setRecoveredStatus( true );
                 try
                 {
                     indexingService.initIndexes( loadIndexRules() );
@@ -384,26 +385,26 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
                 }
                 finally
                 {
-                    neoStore.setRecoveredStatus( false );
+                    // neoStore.setRecoveredStatus( false );
                 }
             }
-            if ( !xaContainer.getResourceManager().hasRecoveredTransactions() )
-            {
-                neoStore.makeStoreOk();
-            }
-            else
-            {
-                msgLog.debug( "Waiting for TM to take care of recovered " +
-                        "transactions." );
-            }
+//            if ( !xaContainer.getResourceManager().hasRecoveredTransactions() )
+//            {
+//                neoStore.makeStoreOk();
+//            }
+//            else
+//            {
+//                msgLog.debug( "Waiting for TM to take care of recovered " +
+//                        "transactions." );
+//            }
             idGenerators = new ArrayMap<>( (byte)5, false, false );
-            this.idGenerators.put( Node.class, neoStore.getNodeStore() );
-            this.idGenerators.put( Relationship.class, neoStore.getRelationshipStore() );
-            this.idGenerators.put( RelationshipType.class, neoStore.getRelationshipTypeStore() );
-            this.idGenerators.put( Label.class, neoStore.getLabelTokenStore() );
-            this.idGenerators.put( PropertyStore.class, neoStore.getPropertyStore() );
+            this.idGenerators.put( Node.class, neoStores.getNodeStore().getIdGenerator() );
+            this.idGenerators.put( Relationship.class, neoStores.getRelationshipStore().getIdGenerator() );
+            this.idGenerators.put( RelationshipType.class, neoStores.getRelationshipTypeTokenStore().getIdGenerator() );
+            this.idGenerators.put( Label.class, neoStores.getLabelTokenStore().getIdGenerator() );
+            this.idGenerators.put( PropertyStore.class, neoStores.getPropertyStore().getIdGenerator() );
             this.idGenerators.put( PropertyKeyTokenRecord.class,
-                    neoStore.getPropertyStore().getPropertyKeyTokenStore() );
+                    neoStores.getPropertyKeyTokenStore().getIdGenerator() );
             setLogicalLogAtCreationTime( xaContainer.getLogicalLog() );
 
             life.start();
@@ -412,7 +413,7 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
         {   // Something unexpected happened during startup
             try
             {   // Close the neostore, so that locks are released properly
-                neoStore.close();
+                neoStores.close();
             }
             catch ( Exception closeException )
             {
@@ -422,9 +423,11 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
         }
     }
 
-    public NeoStore getNeoStore()
+    
+    
+    public FlatNeoStores getNeoStores()
     {
-        return neoStore;
+        return neoStores;
     }
 
     public IndexingService getIndexService()
@@ -454,16 +457,17 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
         xaContainer.close();
         if ( logApplied )
         {
-            neoStore.rebuildIdGenerators();
-            logApplied = false;
+            throw new RuntimeException( "Not implemented yet" );
+            // neoStore.rebuildIdGenerators();
+            // logApplied = false;
         }
-        neoStore.close();
+        neoStores.close();
         msgLog.info( "NeoStore closed" );
     }
 
     private void forceEverything()
     {
-        neoStore.flushAll();
+        neoStores.flushAll();
         indexingService.flushAll();
         labelScanStore.force();
     }
@@ -477,32 +481,24 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
 
     public StoreId getStoreId()
     {
-        return neoStore.getStoreId();
+        throw new RuntimeException( "Not implemented yet" );
+        // return neoStore.getStoreId();
     }
 
     @Override
     public NeoStoreXaConnection getXaConnection()
     {
-        return new NeoStoreXaConnection( neoStore,
+        return new NeoStoreXaConnection( neoStores.getBaseFileName(),
             xaContainer.getResourceManager(), getBranchId() );
     }
 
     private static class CommandFactory extends XaCommandFactory
     {
-        private final NeoStore neoStore;
-        private final IndexingService indexingService;
-
-        CommandFactory( NeoStore neoStore, IndexingService indexingService )
-        {
-            this.neoStore = neoStore;
-            this.indexingService = indexingService;
-        }
-
         @Override
         public XaCommand readCommand( ReadableByteChannel byteChannel,
             ByteBuffer buffer ) throws IOException
         {
-            return Command.readCommand( neoStore, indexingService, byteChannel, buffer );
+            return Command.readCommand( byteChannel, buffer );
         }
     }
 
@@ -536,27 +532,31 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
             msgLog.debug( "Rebuilding id generators as needed. "
                     + "This can take a while for large stores..." );
             forceEverything();
-            neoStore.makeStoreOk();
-            neoStore.setVersion( xaContainer.getLogicalLog().getHighestLogVersion() );
-            msgLog.debug( "Rebuild of id generators complete." );
+            throw new RuntimeException( "Not implemented yet" );
+            // neoStore.makeStoreOk();
+            // neoStore.setVersion( xaContainer.getLogicalLog().getHighestLogVersion() );
+            // msgLog.debug( "Rebuild of id generators complete." );
         }
 
         @Override
         public long getCurrentVersion()
         {
-            return neoStore.getVersion();
+            throw new RuntimeException( "Not implemented yet" );
+            // return neoStore.getVersion();
         }
 
         @Override
         public long getAndSetNewVersion()
         {
-            return neoStore.incrementVersion();
+            throw new RuntimeException( "Not implemented yet" );
+            // return neoStore.incrementVersion();
         }
 
         @Override
         public void setVersion( long version )
         {
-            neoStore.setVersion( version );
+            throw new RuntimeException( "Not implemented yet" );
+            // neoStore.setVersion( version );
         }
 
         @Override
@@ -568,42 +568,43 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
         @Override
         public long getLastCommittedTx()
         {
-            return neoStore.getLastCommittedTx();
+            throw new RuntimeException( "Not implemented yet" );
+            // return neoStore.getLastCommittedTx();
         }
     }
 
     public long nextId( Class<?> clazz )
     {
-        Store store = idGenerators.get( clazz );
+        IdGenerator idGenerator = idGenerators.get( clazz );
 
-        if ( store == null )
+        if ( idGenerator == null )
         {
             throw new IdGenerationFailedException( "No IdGenerator for: "
                 + clazz );
         }
-        return store.nextId();
+        return idGenerator.nextId();
     }
 
     public long getHighestPossibleIdInUse( Class<?> clazz )
     {
-        Store store = idGenerators.get( clazz );
-        if ( store == null )
+        IdGenerator idGenerator = idGenerators.get( clazz );
+        if ( idGenerator == null )
         {
             throw new IdGenerationFailedException( "No IdGenerator for: "
                 + clazz );
         }
-        return store.getHighestPossibleIdInUse();
+        return idGenerator.getHighId();
     }
 
     public long getNumberOfIdsInUse( Class<?> clazz )
     {
-        Store store = idGenerators.get( clazz );
-        if ( store == null )
+        IdGenerator idGenerator = idGenerators.get( clazz );
+        if ( idGenerator == null )
         {
             throw new IdGenerationFailedException( "No IdGenerator for: "
                 + clazz );
         }
-        return store.getNumberOfIdsInUse();
+        return idGenerator.getNumberOfIdsInUse();
     }
 
     public String getStoreDir()
@@ -614,30 +615,36 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
     @Override
     public long getCreationTime()
     {
-        return neoStore.getCreationTime();
+        throw new RuntimeException( "Not implemented yet" );
+        // return neoStore.getCreationTime();
     }
 
     @Override
     public long getRandomIdentifier()
     {
-        return neoStore.getRandomNumber();
+        throw new RuntimeException( "Not implemented yet" );
+        // return neoStore.getRandomNumber();
     }
 
     @Override
     public long getCurrentLogVersion()
     {
-        return neoStore.getVersion();
+        throw new RuntimeException( "Not implemented yet" );
+        // return neoStore.getVersion();
     }
 
     public long incrementAndGetLogVersion()
     {
-        return neoStore.incrementVersion();
+        throw new RuntimeException( "Not implemented yet" );
+        // return neoStore.incrementVersion();
     }
 
     // used for testing, do not use.
     @Override
     public void setLastCommittedTxId( long txId )
     {
+        throw new RuntimeException( "Not implemented yet" );
+        /*
         neoStore.setRecoveredStatus( true );
         try
         {
@@ -646,7 +653,7 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
         finally
         {
             neoStore.setRecoveredStatus( false );
-        }
+        }*/
     }
 
     public boolean isReadOnly()
@@ -654,15 +661,16 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
         return readOnly;
     }
 
-    public List<WindowPoolStats> getWindowPoolStats()
-    {
-        return neoStore.getAllWindowPoolStats();
-    }
+//    public List<WindowPoolStats> getWindowPoolStats()
+//    {
+//        return neoStore.getAllWindowPoolStats();
+//    }
 
     @Override
     public long getLastCommittedTxId()
     {
-        return neoStore.getLastCommittedTx();
+        throw new RuntimeException( "Not implemented yet" );
+        // return neoStore.getLastCommittedTx();
     }
 
     @Override
@@ -674,9 +682,10 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
     @Override
     public boolean setRecovered( boolean recovered )
     {
-        boolean currentValue = neoStore.isInRecoveryMode();
-        neoStore.setRecoveredStatus( true );
-        return currentValue;
+        throw new RuntimeException( "Not implemented yet" );
+//        boolean currentValue = neoStore.isInRecoveryMode();
+//        neoStore.setRecoveredStatus( true );
+//        return currentValue;
     }
 
     @Override
@@ -698,6 +707,7 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
     @Override
     public NeoStore evaluate()
     {
-        return neoStore;
+        throw new RuntimeException( "Not implemented yet" );
+        // return neoStore;
     }
 }

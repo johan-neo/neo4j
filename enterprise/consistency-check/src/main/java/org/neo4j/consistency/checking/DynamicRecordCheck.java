@@ -24,7 +24,7 @@ import org.neo4j.consistency.store.DiffRecordAccess;
 import org.neo4j.consistency.store.RecordAccess;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.Record;
-import org.neo4j.kernel.impl.nioneo.store.RecordStore;
+import org.neo4j.kernel.impl.nioneo.store.OldRecordStore;
 
 class DynamicRecordCheck
         implements RecordCheck<DynamicRecord, ConsistencyReport.DynamicConsistencyReport>,
@@ -32,9 +32,9 @@ class DynamicRecordCheck
 {
     private final int blockSize;
     private final DynamicStore dereference;
-    private final RecordStore<DynamicRecord> store;
+    private final OldRecordStore<DynamicRecord> store;
 
-    DynamicRecordCheck( RecordStore<DynamicRecord> store, DynamicStore dereference )
+    DynamicRecordCheck( OldRecordStore<DynamicRecord> store, DynamicStore dereference )
     {
         this.blockSize = store.getRecordSize() - store.getRecordHeaderSize();
         this.dereference = dereference;

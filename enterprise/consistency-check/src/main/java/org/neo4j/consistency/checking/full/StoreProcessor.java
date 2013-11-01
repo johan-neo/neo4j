@@ -30,7 +30,7 @@ import org.neo4j.kernel.impl.nioneo.store.LabelTokenRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyKeyTokenRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
-import org.neo4j.kernel.impl.nioneo.store.RecordStore;
+import org.neo4j.kernel.impl.nioneo.store.OldRecordStore;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeTokenRecord;
 
@@ -53,35 +53,35 @@ class StoreProcessor extends AbstractStoreProcessor
     }
 
     @SuppressWarnings("UnusedParameters")
-    protected void checkSchema( RecordType type, RecordStore<DynamicRecord> store, DynamicRecord schema, RecordCheck
+    protected void checkSchema( RecordType type, OldRecordStore<DynamicRecord> store, DynamicRecord schema, RecordCheck
             <DynamicRecord, ConsistencyReport.SchemaConsistencyReport> checker )
     {
         report.forSchema( schema, checker );
     }
 
     @Override
-    protected void checkNode( RecordStore<NodeRecord> store, NodeRecord node,
+    protected void checkNode( OldRecordStore<NodeRecord> store, NodeRecord node,
                               RecordCheck<NodeRecord, ConsistencyReport.NodeConsistencyReport> checker )
     {
         report.forNode( node, checker );
     }
 
     @Override
-    protected void checkRelationship( RecordStore<RelationshipRecord> store, RelationshipRecord rel,
+    protected void checkRelationship( OldRecordStore<RelationshipRecord> store, RelationshipRecord rel,
                                       RecordCheck<RelationshipRecord, ConsistencyReport.RelationshipConsistencyReport> checker )
     {
         report.forRelationship( rel, checker );
     }
 
     @Override
-    protected void checkProperty( RecordStore<PropertyRecord> store, PropertyRecord property,
+    protected void checkProperty( OldRecordStore<PropertyRecord> store, PropertyRecord property,
                                   RecordCheck<PropertyRecord, ConsistencyReport.PropertyConsistencyReport> checker )
     {
         report.forProperty( property, checker );
     }
 
     @Override
-    protected void checkRelationshipTypeToken( RecordStore<RelationshipTypeTokenRecord> store,
+    protected void checkRelationshipTypeToken( OldRecordStore<RelationshipTypeTokenRecord> store,
                                                RelationshipTypeTokenRecord relationshipType,
                                                RecordCheck<RelationshipTypeTokenRecord,
                                                        ConsistencyReport.RelationshipTypeConsistencyReport> checker )
@@ -90,7 +90,7 @@ class StoreProcessor extends AbstractStoreProcessor
     }
 
     @Override
-    protected void checkLabelToken( RecordStore<LabelTokenRecord> store, LabelTokenRecord label,
+    protected void checkLabelToken( OldRecordStore<LabelTokenRecord> store, LabelTokenRecord label,
                                     RecordCheck<LabelTokenRecord, ConsistencyReport.LabelTokenConsistencyReport>
                                             checker )
     {
@@ -98,7 +98,7 @@ class StoreProcessor extends AbstractStoreProcessor
     }
 
     @Override
-    protected void checkPropertyKeyToken( RecordStore<PropertyKeyTokenRecord> store, PropertyKeyTokenRecord key,
+    protected void checkPropertyKeyToken( OldRecordStore<PropertyKeyTokenRecord> store, PropertyKeyTokenRecord key,
                                           RecordCheck<PropertyKeyTokenRecord,
                                           ConsistencyReport.PropertyKeyTokenConsistencyReport> checker )
     {
@@ -106,14 +106,14 @@ class StoreProcessor extends AbstractStoreProcessor
     }
 
     @Override
-    protected void checkDynamic( RecordType type, RecordStore<DynamicRecord> store, DynamicRecord string,
+    protected void checkDynamic( RecordType type, OldRecordStore<DynamicRecord> store, DynamicRecord string,
                                  RecordCheck<DynamicRecord, ConsistencyReport.DynamicConsistencyReport> checker )
     {
         report.forDynamicBlock( type, string, checker );
     }
 
     @Override
-    protected void checkDynamicLabel( RecordType type, RecordStore<DynamicRecord> store, DynamicRecord string,
+    protected void checkDynamicLabel( RecordType type, OldRecordStore<DynamicRecord> store, DynamicRecord string,
                                       RecordCheck<DynamicRecord, DynamicLabelConsistencyReport> checker )
     {
         report.forDynamicLabelBlock( type, string, checker );
@@ -125,7 +125,7 @@ class StoreProcessor extends AbstractStoreProcessor
     }
 
     @Override
-    public void processSchema( RecordStore<DynamicRecord> store, DynamicRecord schema )
+    public void processSchema( OldRecordStore<DynamicRecord> store, DynamicRecord schema )
     {
         if ( null == schemaRecordCheck )
         {

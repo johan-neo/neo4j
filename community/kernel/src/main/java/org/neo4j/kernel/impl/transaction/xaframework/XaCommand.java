@@ -83,7 +83,7 @@ public abstract class XaCommand
      * any protests about this command not being able to execute should be done
      * before execution of any command within the transaction.
      */
-    public abstract void execute();
+    // public abstract void execute();
 
     /**
      * When a command is added to a transaction (usually when it is created) it

@@ -131,7 +131,7 @@ public class SchemaStoreTest
         Collection<DynamicRecord> records = store.allocateFrom( rule );
         for ( DynamicRecord record : records )
         {
-            store.updateRecord( record );
+            store.writeToByteArray( record );
         }
         return first( records ).getId();
     }

@@ -144,7 +144,7 @@ public class TestArrayStore
     {
         Collection<DynamicRecord> records = arrayStore.allocateRecords( array );
         for ( DynamicRecord record : records )
-            arrayStore.updateRecord( record );
+            arrayStore.writeToByteArray( record );
         return records;
     }
     

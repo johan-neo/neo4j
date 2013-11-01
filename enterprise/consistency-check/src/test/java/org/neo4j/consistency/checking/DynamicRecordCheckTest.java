@@ -27,7 +27,7 @@ import org.junit.runners.Suite;
 import org.neo4j.consistency.report.ConsistencyReport;
 import org.neo4j.kernel.impl.nioneo.store.AbstractDynamicStore;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
-import org.neo4j.kernel.impl.nioneo.store.RecordStore;
+import org.neo4j.kernel.impl.nioneo.store.OldRecordStore;
 import org.neo4j.kernel.impl.nioneo.store.SchemaStore;
 
 import static org.mockito.Mockito.mock;
@@ -326,10 +326,10 @@ public abstract class DynamicRecordCheckTest
         }
     }
 
-    public static RecordStore<DynamicRecord> configureDynamicStore( int blockSize )
+    public static OldRecordStore<DynamicRecord> configureDynamicStore( int blockSize )
     {
         @SuppressWarnings( "unchecked" )
-        RecordStore<DynamicRecord> mock = mock( RecordStore.class );
+        OldRecordStore<DynamicRecord> mock = mock( OldRecordStore.class );
         when( mock.getRecordSize() ).thenReturn( blockSize + AbstractDynamicStore.BLOCK_HEADER_SIZE );
         when( mock.getRecordHeaderSize() ).thenReturn( AbstractDynamicStore.BLOCK_HEADER_SIZE );
         return mock;

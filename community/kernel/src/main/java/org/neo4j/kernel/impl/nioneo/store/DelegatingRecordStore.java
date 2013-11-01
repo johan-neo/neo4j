@@ -22,11 +22,11 @@ package org.neo4j.kernel.impl.nioneo.store;
 import java.io.File;
 import java.util.Collection;
 
-public class DelegatingRecordStore<R extends AbstractBaseRecord> implements RecordStore<R>
+public class DelegatingRecordStore<R extends AbstractBaseRecord> implements OldRecordStore<R>
 {
-    private final RecordStore<R> delegate;
+    private final OldRecordStore<R> delegate;
 
-    public DelegatingRecordStore( RecordStore<R> delegate )
+    public DelegatingRecordStore( OldRecordStore<R> delegate )
     {
         this.delegate = delegate;
     }

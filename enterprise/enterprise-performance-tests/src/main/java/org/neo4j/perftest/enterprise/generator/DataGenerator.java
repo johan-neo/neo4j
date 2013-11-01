@@ -30,7 +30,7 @@ import java.util.Random;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.helpers.progress.ProgressListener;
 import org.neo4j.helpers.progress.ProgressMonitorFactory;
-import org.neo4j.kernel.impl.nioneo.store.RecordStore;
+import org.neo4j.kernel.impl.nioneo.store.OldRecordStore;
 import org.neo4j.kernel.impl.nioneo.store.StoreAccess;
 import org.neo4j.kernel.impl.util.FileUtils;
 import org.neo4j.perftest.enterprise.util.Configuration;
@@ -126,7 +126,7 @@ public class DataGenerator
             if ( configuration.get( report_stats ) )
             {
                 PropertyStats stats = new PropertyStats();
-                stats.applyFiltered( stores.getPropertyStore(), RecordStore.IN_USE );
+                stats.applyFiltered( stores.getPropertyStore(), OldRecordStore.IN_USE );
                 System.out.println( stats );
             }
         }
@@ -202,7 +202,7 @@ public class DataGenerator
         return result;
     }
 
-    private static void printCount( RecordStore<?> store )
+    private static void printCount( OldRecordStore<?> store )
     {
         File name = store.getStorageFileName();
         System.out.format( "Number of records in %s: %d%n", name.getName(), store.getHighId() );

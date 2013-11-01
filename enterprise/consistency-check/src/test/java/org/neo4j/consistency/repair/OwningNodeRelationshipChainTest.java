@@ -25,7 +25,7 @@ import org.hamcrest.TypeSafeMatcher;
 import org.junit.Test;
 
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
-import org.neo4j.kernel.impl.nioneo.store.RecordStore;
+import org.neo4j.kernel.impl.nioneo.store.OldRecordStore;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 
 import static org.junit.Assert.assertThat;
@@ -54,7 +54,7 @@ public class OwningNodeRelationshipChainTest
                 new RelationshipRecord( node2Rel + 1, node2, node2 + 1, relType ) );
 
         @SuppressWarnings("unchecked")
-        RecordStore<NodeRecord> recordStore = mock( RecordStore.class );
+        OldRecordStore<NodeRecord> recordStore = mock( OldRecordStore.class );
         when( recordStore.forceGetRecord( node1 ) ).thenReturn(
                 new NodeRecord( node1, node1Rel, NO_NEXT_PROPERTY.intValue() ) );
         when( recordStore.forceGetRecord( node2 ) ).thenReturn(

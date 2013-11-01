@@ -100,7 +100,7 @@ public class PersistenceManager
     }
 
     public Pair<Map<DirectionWrapper, Iterable<RelationshipRecord>>, Long> getMoreRelationships(
-            long nodeId, long position )
+            long nodeId, long position, int count )
     {
         return getResource().getMoreRelationships( nodeId, position );
     }

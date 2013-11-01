@@ -27,7 +27,7 @@ import org.neo4j.consistency.report.ConsistencyReporter;
 import org.neo4j.consistency.report.InconsistencyReport;
 import org.neo4j.consistency.store.DiffRecordAccess;
 import org.neo4j.consistency.store.FilteringRecordAccess;
-import org.neo4j.kernel.impl.nioneo.store.RecordStore;
+import org.neo4j.kernel.impl.nioneo.store.OldRecordStore;
 import org.neo4j.kernel.impl.nioneo.store.StoreAccess;
 
 public enum MultiPassStore
@@ -35,7 +35,7 @@ public enum MultiPassStore
     NODES
             {
                 @Override
-                RecordStore getRecordStore( StoreAccess storeAccess )
+                OldRecordStore getRecordStore( StoreAccess storeAccess )
                 {
                     return storeAccess.getNodeStore();
                 }
@@ -44,7 +44,7 @@ public enum MultiPassStore
     RELATIONSHIPS
             {
                 @Override
-                RecordStore getRecordStore( StoreAccess storeAccess )
+                OldRecordStore getRecordStore( StoreAccess storeAccess )
                 {
                     return storeAccess.getRelationshipStore();
                 }
@@ -53,7 +53,7 @@ public enum MultiPassStore
     PROPERTIES
             {
                 @Override
-                RecordStore getRecordStore( StoreAccess storeAccess )
+                OldRecordStore getRecordStore( StoreAccess storeAccess )
                 {
                     return storeAccess.getPropertyStore();
                 }
@@ -62,7 +62,7 @@ public enum MultiPassStore
     STRINGS
             {
                 @Override
-                RecordStore getRecordStore( StoreAccess storeAccess )
+                OldRecordStore getRecordStore( StoreAccess storeAccess )
                 {
                     return storeAccess.getNodeStore();
                 }
@@ -71,7 +71,7 @@ public enum MultiPassStore
     ARRAYS
             {
                 @Override
-                RecordStore getRecordStore( StoreAccess storeAccess )
+                OldRecordStore getRecordStore( StoreAccess storeAccess )
                 {
                     return storeAccess.getNodeStore();
                 }
@@ -87,7 +87,7 @@ public enum MultiPassStore
                                                     DiffRecordAccess recordAccess, MultiPassStore[] stores )
     {
         ArrayList<DiffRecordAccess> filteringStores = new ArrayList<DiffRecordAccess>();
-        RecordStore recordStore = getRecordStore( storeAccess );
+        OldRecordStore recordStore = getRecordStore( storeAccess );
         long recordsPerPass = memoryPerPass / recordStore.getRecordSize();
         long highId = recordStore.getHighId();
         for ( int iPass = 0; iPass * recordsPerPass <= highId; iPass++ )
@@ -98,7 +98,7 @@ public enum MultiPassStore
     }
 
 
-    abstract RecordStore getRecordStore( StoreAccess storeAccess );
+    abstract OldRecordStore getRecordStore( StoreAccess storeAccess );
 
     static class Factory
     {

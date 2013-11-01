@@ -106,23 +106,22 @@ public class TransactionWriter
 
     public void propertyKey( int id, String key, int... dynamicIds ) throws IOException
     {
-        write( new Command.PropertyKeyTokenCommand( null, withName( new PropertyKeyTokenRecord( id ), dynamicIds, key ) ) );
+        write( new Command.PropertyKeyTokenCommand( withName( new PropertyKeyTokenRecord( id ), dynamicIds, key ) ) );
     }
 
     public void label( int id, String name, int... dynamicIds ) throws IOException
     {
-        write( new Command.LabelTokenCommand( null, withName( new LabelTokenRecord( id ), dynamicIds, name ) ) );
+        write( new Command.LabelTokenCommand( withName( new LabelTokenRecord( id ), dynamicIds, name ) ) );
     }
 
     public void relationshipType( int id, String label, int... dynamicIds ) throws IOException
     {
-        write( new Command.RelationshipTypeTokenCommand( null,
-                withName( new RelationshipTypeTokenRecord( id ), dynamicIds, label ) ) );
+        write( new Command.RelationshipTypeTokenCommand( withName( new RelationshipTypeTokenRecord( id ), dynamicIds, label ) ) );
     }
 
     public void update( NeoStoreRecord record ) throws IOException
     {
-        write( new Command.NeoStoreCommand( null, record ) );
+        write( new Command.NeoStoreCommand( record ) );
     }
 
     public void create( NodeRecord node ) throws IOException
@@ -211,32 +210,32 @@ public class TransactionWriter
 
     public void add( NodeRecord before, NodeRecord after ) throws IOException
     {
-        write( new Command.NodeCommand( null, before, after ) );
+        write( new Command.NodeCommand( before, after ) );
     }
 
     public void add( RelationshipRecord relationship ) throws IOException
     {
-        write( new Command.RelationshipCommand( null, relationship ) );
+        write( new Command.RelationshipCommand( relationship ) );
     }
 
     public void add( PropertyRecord before, PropertyRecord property ) throws IOException
     {
-        write( new Command.PropertyCommand( null, before, property ) );
+        write( new Command.PropertyCommand( before, property ) );
     }
 
     public void add( RelationshipTypeTokenRecord record ) throws IOException
     {
-        write( new Command.RelationshipTypeTokenCommand( null, record ) );
+        write( new Command.RelationshipTypeTokenCommand( record ) );
     }
 
     public void add( PropertyKeyTokenRecord record ) throws IOException
     {
-        write( new Command.PropertyKeyTokenCommand( null, record ) );
+        write( new Command.PropertyKeyTokenCommand( record ) );
     }
 
     public void add( NeoStoreRecord record ) throws IOException
     {
-        write( new Command.NeoStoreCommand( null, record ) );
+        write( new Command.NeoStoreCommand( record ) );
     }
 
     private void write( Command command ) throws IOException
