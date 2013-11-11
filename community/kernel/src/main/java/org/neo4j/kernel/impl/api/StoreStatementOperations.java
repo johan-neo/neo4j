@@ -60,10 +60,15 @@ import org.neo4j.kernel.impl.core.Token;
 import org.neo4j.kernel.impl.core.TokenHolder;
 import org.neo4j.kernel.impl.core.TokenNotFoundException;
 import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
 import org.neo4j.kernel.impl.nioneo.alt.NeoNodeStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoSchemaStore;
 import org.neo4j.kernel.impl.nioneo.store.IndexRule;
 import org.neo4j.kernel.impl.nioneo.store.InvalidRecordException;
 import org.neo4j.kernel.impl.nioneo.store.NeoStore;
+import org.neo4j.kernel.impl.nioneo.store.NeoStoreRecord;
+import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeStore;
 import org.neo4j.kernel.impl.nioneo.store.PrimitiveRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
@@ -227,7 +232,7 @@ public class StoreStatementOperations implements
         {
             byte[] nodeData = neoStores.getNodeStore().getRecordStore().getRecord( nodeId );
             NodeRecord nodeRecord = NeoNodeStore.getRecord( nodeId, nodeData );
-            final long[] labels = parseLabelsField( nodeStore.getRecord( nodeId ) ).get( neoStore );
+            final long[] labels = parseLabelsField( nodeRecord ).get( neoStores.getNodeStore() );
             return new PrimitiveIntIterator()
             {
                 private int cursor;
@@ -386,7 +391,7 @@ public class StoreStatementOperations implements
 
     private Iterator<IndexDescriptor> getIndexDescriptorsFor( Predicate<SchemaRule> filter )
     {
-        Iterator<SchemaRule> filtered = filter( filter, neoStore.getSchemaStore().loadAllSchemaRules() );
+        Iterator<SchemaRule> filtered = filter( filter, NeoSchemaStore.loadAllSchemaRules( neoStores.getSchemaStore().getRecordStore() ) );
 
         return map( new Function<SchemaRule, IndexDescriptor>()
         {
@@ -520,7 +525,9 @@ public class StoreStatementOperations implements
     {
         try
         {
-            return loadAllPropertiesOf( nodeStore.getRecord( nodeId ) );
+            byte[] nodeData = neoStores.getNodeStore().getRecordStore().getRecord( nodeId );
+            NodeRecord nodeRecord = NeoNodeStore.getRecord( nodeId, nodeData );
+            return loadAllPropertiesOf( nodeRecord );
         }
         catch ( InvalidRecordException e )
         {
@@ -534,7 +541,9 @@ public class StoreStatementOperations implements
     {
         try
         {
-            return loadAllPropertiesOf( relationshipStore.getRecord( relationshipId ) );
+            byte[] nodeData = neoStores.getRelationshipStore().getRecordStore().getRecord( relationshipId );
+            NodeRecord relRecord = NeoNodeStore.getRecord( relationshipId, nodeData );
+            return loadAllPropertiesOf( relRecord );
         }
         catch ( InvalidRecordException e )
         {
@@ -545,7 +554,10 @@ public class StoreStatementOperations implements
     @Override
     public Iterator<DefinedProperty> graphGetAllProperties( KernelStatement state )
     {
-        return loadAllPropertiesOf( neoStore.asRecord() );
+        long nextProp = NeoNeoStore.getLong( neoStores.getNeoStore().getRecordStore(), NeoNeoStore.NEXT_GRAPH_PROP_POSITION );
+        NeoStoreRecord record = new NeoStoreRecord();
+        record.setNextProp( nextProp );
+        return loadAllPropertiesOf( record );
     }
 
     @Override
@@ -558,7 +570,9 @@ public class StoreStatementOperations implements
 
     private Iterator<DefinedProperty> loadAllPropertiesOf( PrimitiveRecord primitiveRecord )
     {
-        Collection<PropertyRecord> records = propertyStore.getPropertyRecordChain( primitiveRecord.getNextProp() );
+        
+        Collection<PropertyRecord> records = NeoPropertyStore.getPropertyRecordChain( 
+                neoStores.getPropertyStore().getRecordStore(), primitiveRecord.getNextProp() );
         if ( null == records )
         {
             return IteratorUtil.emptyIterator();
@@ -568,7 +582,7 @@ public class StoreStatementOperations implements
         {
             for ( PropertyBlock block : record.getPropertyBlocks() )
             {
-                properties.add( block.getType().readProperty( block.getKeyIndexId(), block, propertyStore ) );
+                properties.add( block.getType().readProperty( block.getKeyIndexId(), block, neoStores ) );
             }
         }
         return properties.iterator();

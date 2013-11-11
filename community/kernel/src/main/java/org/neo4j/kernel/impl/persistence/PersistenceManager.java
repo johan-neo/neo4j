@@ -102,7 +102,7 @@ public class PersistenceManager
     public Pair<Map<DirectionWrapper, Iterable<RelationshipRecord>>, Long> getMoreRelationships(
             long nodeId, long position, int count )
     {
-        return getResource().getMoreRelationships( nodeId, position );
+        return getResource().getMoreRelationships( nodeId, position, count );
     }
 
     public void loadNodeProperties( long nodeId, boolean light, PropertyReceiver receiver )

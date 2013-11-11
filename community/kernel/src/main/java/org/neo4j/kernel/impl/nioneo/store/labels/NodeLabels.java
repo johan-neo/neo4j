@@ -27,17 +27,17 @@ import org.neo4j.kernel.impl.nioneo.store.NodeStore;
 
 public interface NodeLabels
 {
-    long[] get( Store nodeStore );
+    long[] get( Store labelStore );
 
     long[] getIfLoaded();
 
-    Collection<DynamicRecord> put( long[] labelIds, NodeStore nodeStore );
+    Collection<DynamicRecord> put( long[] labelIds, Store labelStore );
 
-    Collection<DynamicRecord> add( long labelId, Store nodeStore );
+    Collection<DynamicRecord> add( long labelId, Store labelStore );
 
-    Collection<DynamicRecord> remove( long labelId, Store nodeStore );
-
-    void ensureHeavy( NodeStore nodeStore );
+    Collection<DynamicRecord> remove( long labelId, Store labelStore );
 
     boolean isInlined();
+
+    void ensureHeavy( Store labelStore );
 }

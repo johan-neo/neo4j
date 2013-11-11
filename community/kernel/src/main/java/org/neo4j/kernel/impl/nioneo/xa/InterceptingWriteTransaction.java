@@ -41,7 +41,7 @@ public class InterceptingWriteTransaction extends WriteTransaction
                                   TransactionInterceptor interceptor, IntegrityValidator validator,
                                   KernelTransactionImplementation kernelTransaction, LockService locks )
     {
-        super( identifier, lastCommittedTxWhenTransactionStarted, log, state, neoStore, cacheAccess, indexingService,
+        super( identifier, lastCommittedTxWhenTransactionStarted, log, state, neoStores, cacheAccess, indexingService,
                 labelScanStore, validator, kernelTransaction, locks );
         this.interceptor = interceptor;
     }

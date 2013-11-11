@@ -27,17 +27,21 @@ import java.util.Map;
 import java.util.Set;
 
 import org.neo4j.kernel.api.index.NodePropertyUpdate;
+import org.neo4j.kernel.impl.nioneo.alt.RecordStore;
 import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyStore;
+import org.neo4j.kernel.impl.nioneo.store.PropertyType;
 
 public class PropertyPhysicalToLogicalConverter
 {
-    private final PropertyStore propertyStore;
+    private final RecordStore stringStore;
+    private final RecordStore arrayStore;
 
-    public PropertyPhysicalToLogicalConverter( PropertyStore propertyStore )
+    public PropertyPhysicalToLogicalConverter( RecordStore stringStore, RecordStore arrayStore )
     {
-        this.propertyStore = propertyStore;
+        this.stringStore = stringStore;
+        this.arrayStore = arrayStore;
     }
 
     public Iterable<NodePropertyUpdate> apply(
@@ -121,7 +125,17 @@ public class PropertyPhysicalToLogicalConverter
         {
             return null;
         }
-
-        return block.getType().getValue( block, propertyStore );
+        if ( block.getType() == PropertyType.STRING )
+        {
+            return block.getType().getValue( block, stringStore );
+        }
+        else if ( block.getType() == PropertyType.ARRAY )
+        {
+            return block.getType().getValue( block, arrayStore );
+        }
+        else
+        {
+            return block.getType().getValue( block, null );           
+        }
     }
 }

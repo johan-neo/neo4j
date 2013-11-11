@@ -43,12 +43,12 @@ public class RelationshipLoader
         this.relationshipCache = relationshipCache;
     }
 
-    public Triplet<ArrayMap<Integer, RelIdArray>, List<RelationshipImpl>, Long> getMoreRelationships( NodeImpl node )
+    public Triplet<ArrayMap<Integer, RelIdArray>, List<RelationshipImpl>, Long> getMoreRelationships( NodeImpl node, int count )
     {
         long nodeId = node.getId();
         long position = node.getRelChainPosition();
         Pair<Map<RelIdArray.DirectionWrapper, Iterable<RelationshipRecord>>, Long> rels =
-                persistenceManager.getMoreRelationships( nodeId, position );
+                persistenceManager.getMoreRelationships( nodeId, position, count );
         ArrayMap<Integer, RelIdArray> newRelationshipMap =
                 new ArrayMap<>();
 

@@ -19,20 +19,20 @@
  */
 package org.neo4j.kernel.impl.nioneo.xa;
 
-import org.neo4j.kernel.impl.nioneo.store.NeoStore;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
 
 public final class SimpleNeoStoreProvider implements NeoStoreProvider
 {
-    private NeoStore neoStore;
+    private FlatNeoStores neoStores;
 
-    public SimpleNeoStoreProvider( NeoStore neoStore )
+    public SimpleNeoStoreProvider( FlatNeoStores neoStores )
     {
-        this.neoStore = neoStore;
+        this.neoStores = neoStores;
     }
 
     @Override
-    public NeoStore evaluate()
+    public FlatNeoStores evaluate()
     {
-        return neoStore;
+        return neoStores;
     }
 }

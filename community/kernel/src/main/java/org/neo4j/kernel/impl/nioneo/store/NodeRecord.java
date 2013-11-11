@@ -65,15 +65,20 @@ public class NodeRecord extends PrimitiveRecord
      * @param labels this will be either in-lined labels, or an id where to get the labels
      * @param dynamicRecords all changed dynamic records by doing this.
      */
-    public void setLabelField( long labels, Collection<DynamicRecord> dynamicRecords )
+    public void setLabelField( long labels )
     {
         this.labels = labels;
+    }
+    
+    public void addLabelDynamicRecords( Collection<DynamicRecord> dynamicRecords )
+    {
         this.dynamicLabelRecords = dynamicRecords;
 
         // Only mark it as heavy if there are dynamic records, since there's a possibility that we just
         // loaded a light version of the node record where this method was called for setting the label field.
         // Keeping it as light in this case would make it possible to load it fully later on.
         this.isLight = dynamicRecords.isEmpty();
+        
     }
 
     public long getLabelField()

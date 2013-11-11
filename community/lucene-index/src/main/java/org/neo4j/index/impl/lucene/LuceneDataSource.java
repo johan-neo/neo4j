@@ -433,19 +433,19 @@ public class LuceneDataSource extends LogBackedXaDataSource
         }
 
         @Override
-        public long getCurrentVersion()
+        public long getCurrentLogVersion()
         {
             return providerStore.getVersion();
         }
 
         @Override
-        public long getAndSetNewVersion()
+        public long incrementAndGetPreviousLogVersion()
         {
             return providerStore.incrementVersion();
         }
 
         @Override
-        public void setVersion( long version )
+        public void setLogVersion( long version )
         {
             providerStore.setVersion( version );
         }

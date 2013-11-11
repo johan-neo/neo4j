@@ -163,11 +163,6 @@ public class IndexDefineCommand extends XaCommand
     }
 
     @Override
-    public void execute()
-    {
-    }
-
-    @Override
     public void writeToFile( LogBuffer buffer ) throws IOException
     {
         buffer.put( (byte)(IndexCommand.DEFINE_COMMAND << 5) );

@@ -237,7 +237,7 @@ public class PropertyStore extends AbstractRecordStore<PropertyRecord> implement
                 if ( !block.isLight()
                      && block.getValueRecords().get( 0 ).isCreated() )
                 {
-                    updateDynamicRecords( block.getValueRecords() );
+                    updateDynamicRecords( block.getType(), block.getValueRecords() );
                 }
             }
             if ( longsAppended < PropertyType.getPayloadSizeLongs() )
@@ -258,17 +258,17 @@ public class PropertyStore extends AbstractRecordStore<PropertyRecord> implement
         updateDynamicRecords( record.getDeletedRecords() );
     }
 
-    private void updateDynamicRecords( List<DynamicRecord> records )
+    private void updateDynamicRecords( PropertyType type, List<DynamicRecord> records )
     {
         for ( DynamicRecord valueRecord : records )
         {
-            if ( valueRecord.getType() == PropertyType.STRING.intValue() )
+            if ( type == PropertyType.STRING )
             {
-                stringPropertyStore.writeToByteArray( valueRecord );
+                stringPropertyStore.updateRecord( valueRecord );
             }
-            else if ( valueRecord.getType() == PropertyType.ARRAY.intValue() )
+            else if ( type == PropertyType.ARRAY )
             {
-                arrayPropertyStore.writeToByteArray( valueRecord );
+                arrayPropertyStore.updateRecord( valueRecord );
             }
             else
             {

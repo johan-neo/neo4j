@@ -38,6 +38,12 @@ import org.neo4j.kernel.api.exceptions.index.IndexPopulationFailedKernelExceptio
 import org.neo4j.kernel.api.exceptions.schema.MalformedSchemaRuleException;
 import org.neo4j.kernel.impl.api.index.IndexingService;
 import org.neo4j.kernel.impl.core.CacheAccessBackDoor;
+import org.neo4j.kernel.impl.nioneo.alt.NeoDynamicStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoLabelStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNodeStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoRelationshipStore;
 import org.neo4j.kernel.impl.nioneo.alt.NeoTokenStore;
 import org.neo4j.kernel.impl.nioneo.alt.RecordStore;
 import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
@@ -386,16 +392,6 @@ public abstract class Command extends XaCommand
             cacheAccess.removeNodeFromCache( getKey() );
         }
 
-        public void execute()
-        {
-            store.updateRecord( after );
-
-            // Dynamic Label Records
-            Collection<DynamicRecord> toUpdate = new ArrayList<>( after.getDynamicLabelRecords() );
-            addRemoved( toUpdate );
-            store.updateDynamicLabelRecords( toUpdate );
-        }
-
         private void addRemoved( Collection<DynamicRecord> toUpdate )
         {
             // the dynamic label records that exist in before, but not in after should be deleted.
@@ -414,6 +410,22 @@ public abstract class Command extends XaCommand
             }
         }
 
+        public void execute( RecordStore nodeStore, RecordStore labelStore )
+        {
+            byte[] data = new byte[nodeStore.getRecordSize()];
+            NeoNodeStore.updateRecord( after, data, isRecovered() );
+            nodeStore.writeRecord( after.getId(), data );
+            
+            Collection<DynamicRecord> toUpdate = new ArrayList<>( after.getDynamicLabelRecords() );
+            addRemoved( toUpdate );
+            for ( DynamicRecord dynamicRecord : toUpdate )
+            {
+                byte[] dynamicData = new byte[ labelStore.getRecordSize() ];
+                NeoLabelStore.updateRecord( dynamicRecord, dynamicData );
+                labelStore.writeRecord( dynamicRecord.getId(), dynamicData );
+            }
+        }
+        
         @Override
         public void writeToFile( LogBuffer buffer ) throws IOException
         {
@@ -498,7 +510,8 @@ public abstract class Command extends XaCommand
                 long labelField = buffer.getLong();
                 Collection<DynamicRecord> dynamicLabelRecords = new ArrayList<>();
                 readDynamicRecords( byteChannel, buffer, dynamicLabelRecords, COLLECTION_DYNAMIC_RECORD_ADDER );
-                record.setLabelField( labelField, dynamicLabelRecords );
+                record.setLabelField( labelField );
+                record.addLabelDynamicRecords( dynamicLabelRecords );
             }
             else
             {
@@ -572,7 +585,14 @@ public abstract class Command extends XaCommand
             }
         }
 
-/*        public void execute()
+        public void execute( RecordStore recordStore )
+        {
+            byte[] data = new byte[recordStore.getRecordSize()];
+            NeoRelationshipStore.updateRecord( record, data, isRecovered() );
+            recordStore.writeRecord( record.getId(), data );
+        }
+
+        /*        public void execute()
         {
             if ( isRecovered() && !record.inUse() )
             {
@@ -664,10 +684,12 @@ public abstract class Command extends XaCommand
             this.record = record;
         }
 
-/*        public void execute()
+        public void execute( RecordStore neoStore )
         {
-            neoStore.setGraphNextProp( record.getNextProp() );
-        }*/
+            byte data[] = new byte[NeoNeoStore.RECORD_SIZE];
+            NeoNeoStore.updateLong( data, record.getNextProp() );
+            neoStore.writeRecord( NeoNeoStore.NEXT_GRAPH_PROP_POSITION, data );
+        }
         
         @Override
         public void accept( CommandRecordVisitor visitor )
@@ -853,6 +875,36 @@ public abstract class Command extends XaCommand
         {
             return after;
         }
+        
+        public void execute( RecordStore propertyStore, RecordStore stringStore, RecordStore arrayStore )
+        {
+            byte[] data = new byte[NeoPropertyStore.RECORD_SIZE];
+            NeoPropertyStore.updateRecord( after, data );
+            propertyStore.writeRecord( after.getId(), data );
+            
+            for ( PropertyBlock block : after.getPropertyBlocks() )
+            {
+                for ( DynamicRecord dynamicRecord : block.getValueRecords() )
+                {
+                    if ( block.getType() == PropertyType.STRING )
+                    {
+                        byte[] dynamicData = new byte[ stringStore.getRecordSize() ];
+                        NeoDynamicStore.updateRecord( dynamicRecord, dynamicData );
+                        stringStore.writeRecord( dynamicRecord.getId(), dynamicData );
+                    }
+                    else if ( block.getType() == PropertyType.ARRAY )
+                    {
+                        byte[] dynamicData = new byte[ arrayStore.getRecordSize() ];
+                        NeoDynamicStore.updateRecord( dynamicRecord, dynamicData );
+                        arrayStore.writeRecord( dynamicRecord.getId(), dynamicData );
+                    }
+                    else
+                    {
+                        throw new IllegalStateException( "Unkown type " + block.getType() );
+                    }
+                }
+            }
+        }
 
 /*        public void execute()
         {
@@ -918,7 +970,7 @@ public abstract class Command extends XaCommand
                 assert block.getSize() > 0 : record + " seems kinda broken";
                 writePropertyBlock( buffer, block );
             }
-            writeDynamicRecords( buffer, record.getDeletedRecords() );
+            // writeDynamicRecords( buffer, record.getDeletedRecords() );
         }
 
         public static Command readFromFile( ReadableByteChannel byteChannel, ByteBuffer buffer )
@@ -1003,8 +1055,7 @@ public abstract class Command extends XaCommand
                 record.addPropertyBlock( block );
             }
             
-            if ( !readDynamicRecords( byteChannel, buffer, record, PROPERTY_DELETED_DYNAMIC_RECORD_ADDER ) )
-            {
+ /*           if ( !readDynamicRecords( byteChannel, buffer, record, PROPERTY_DELETED_DYNAMIC_RECORD_ADDER ) )
                 return null;
             }
 
@@ -1019,7 +1070,7 @@ public abstract class Command extends XaCommand
                     return null;
                 }
                 record.addDeletedRecord( read );
-            }
+            }*/
 
             if ( ( inUse && !record.inUse() ) || ( !inUse && record.inUse() ) )
             {
@@ -1039,7 +1090,7 @@ public abstract class Command extends XaCommand
         public void add( PropertyRecord target, DynamicRecord record )
         {
             assert !record.inUse() : record + " is kinda weird";
-            target.addDeletedRecord( record );
+            // target.addDeletedRecord(  record );
         }
     };
 
@@ -1207,23 +1258,16 @@ public abstract class Command extends XaCommand
 
     static class SchemaRuleCommand extends Command
     {
-        private final NeoStore neoStore;
-        private final IndexingService indexes;
-        private final SchemaStore store;
         private final Collection<DynamicRecord> recordsBefore;
         private final Collection<DynamicRecord> recordsAfter;
         private final SchemaRule schemaRule;
 
         private long txId;
 
-        SchemaRuleCommand( NeoStore neoStore, SchemaStore store, IndexingService indexes,
-                           Collection<DynamicRecord> recordsBefore, Collection<DynamicRecord> recordsAfter,
+        SchemaRuleCommand( Collection<DynamicRecord> recordsBefore, Collection<DynamicRecord> recordsAfter,
                            SchemaRule schemaRule, long txId )
         {
             super( first( recordsAfter ).getId(), Mode.fromRecordState( first( recordsAfter ) ) );
-            this.neoStore = neoStore;
-            this.indexes = indexes;
-            this.store = store;
             this.recordsBefore = recordsBefore;
             this.recordsAfter = recordsAfter;
             this.schemaRule = schemaRule;
@@ -1257,13 +1301,14 @@ public abstract class Command extends XaCommand
             return unmodifiableCollection( recordsAfter );
         }
 
-        public void execute( RecordStore schemaStore, IndexingService indexes )
+        public void execute( RecordStore neoStore, RecordStore schemaStore, IndexingService indexes )
         {
             for ( DynamicRecord record : recordsAfter )
             {
-                store.updateRecord( record );
+                byte[] data = NeoDynamicStore.writeToByteArray( record );
+                schemaStore.writeRecord( record.getId(), data );
             }
-
+            
             if ( schemaRule instanceof IndexRule )
             {
                 switch ( getMode() )
@@ -1301,7 +1346,9 @@ public abstract class Command extends XaCommand
                 {
                     case UPDATE:
                     case CREATE:
-                        neoStore.setLatestConstraintIntroducingTx( txId );
+                        byte[] data = new byte[NeoNeoStore.RECORD_SIZE];
+                        NeoNeoStore.updateLong( data, txId );
+                        neoStore.writeRecord( NeoNeoStore.LATEST_CONSTRAINT_TX_POSITION, data );
                         break;
                     case DELETE:
                         break;
@@ -1370,8 +1417,7 @@ public abstract class Command extends XaCommand
                     readSchemaRule( recordsAfter ) :
                     readSchemaRule( recordsBefore );
 
-            return new SchemaRuleCommand( neoStore, neoStore != null ? neoStore.getSchemaStore() : null,
-                    indexes, recordsBefore, recordsAfter, rule, txId );
+            return new SchemaRuleCommand( recordsBefore, recordsAfter, rule, txId );
         }
 
         private static SchemaRule readSchemaRule( Collection<DynamicRecord> recordsBefore )
@@ -1403,8 +1449,7 @@ public abstract class Command extends XaCommand
         }
     };
 
-    public static Command readCommand( /*NeoStore neoStore, IndexingService indexes, */ ReadableByteChannel byteChannel,
-        ByteBuffer buffer ) throws IOException
+    public static Command readCommand( ReadableByteChannel byteChannel, ByteBuffer buffer ) throws IOException
     {
         if ( !readAndFlip( byteChannel, buffer, 1 ) )
         {

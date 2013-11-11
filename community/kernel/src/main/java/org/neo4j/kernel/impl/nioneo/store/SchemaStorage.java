@@ -150,6 +150,8 @@ public class SchemaStorage implements SchemaRuleAccess
             }
         }, loadAllSchemaRules() ) );
     }
+    
+    
 
     public <R extends SchemaRule, T> Iterator<T> schemaRules(
             Function<? super R, T> conversion, final SchemaRule.Kind kind,
@@ -243,7 +245,7 @@ public class SchemaStorage implements SchemaRuleAccess
 
     public long newRuleId()
     {
-        return schemaStore.nextId();
+        return schemaStore.getIdGenerator().nextId();
     }
 
     public UniquenessConstraintRule uniquenessConstraint( int labelId, final int propertyKeyId )

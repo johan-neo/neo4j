@@ -123,8 +123,8 @@ public class InlineNodeLabels implements NodeLabels
                 return false;
             }
         }
-        node.setLabelField( combineLabelCountAndLabelStorage( (byte) ids.length, bits.getLongs()[0] ),
-                            changedDynamicRecords );
+        node.setLabelField( combineLabelCountAndLabelStorage( (byte) ids.length, bits.getLongs()[0] ) );
+        node.addLabelDynamicRecords( changedDynamicRecords );
         return true;
     }
 

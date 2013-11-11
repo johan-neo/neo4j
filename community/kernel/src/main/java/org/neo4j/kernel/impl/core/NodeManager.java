@@ -19,6 +19,10 @@
  */
 package org.neo4j.kernel.impl.core;
 
+import static java.lang.String.format;
+import static java.util.Arrays.asList;
+import static org.neo4j.helpers.collection.Iterables.cast;
+
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -45,10 +49,10 @@ import org.neo4j.kernel.api.properties.DefinedProperty;
 import org.neo4j.kernel.impl.cache.AutoLoadingCache;
 import org.neo4j.kernel.impl.cache.Cache;
 import org.neo4j.kernel.impl.cache.CacheProvider;
-import org.neo4j.kernel.impl.nioneo.store.NeoStore;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
+import org.neo4j.kernel.impl.nioneo.alt.NeoTokenStore;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
-import org.neo4j.kernel.impl.nioneo.store.TokenStore;
 import org.neo4j.kernel.impl.nioneo.xa.NeoStoreXaDataSource;
 import org.neo4j.kernel.impl.persistence.EntityIdGenerator;
 import org.neo4j.kernel.impl.persistence.PersistenceManager;
@@ -61,10 +65,6 @@ import org.neo4j.kernel.impl.util.RelIdArray;
 import org.neo4j.kernel.impl.util.RelIdArray.DirectionWrapper;
 import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.kernel.lifecycle.Lifecycle;
-
-import static java.lang.String.format;
-import static java.util.Arrays.asList;
-import static org.neo4j.helpers.collection.Iterables.cast;
 
 public class NodeManager implements Lifecycle, EntityFactory
 {
@@ -176,15 +176,18 @@ public class NodeManager implements Lifecycle, EntityFactory
         {
             if ( ds.getName().equals( NeoStoreXaDataSource.DEFAULT_DATA_SOURCE_NAME ) )
             {
-                NeoStore neoStore = ((NeoStoreXaDataSource) ds).getNeoStore();
+                FlatNeoStores neoStores = ((NeoStoreXaDataSource) ds).getNeoStores();
 
-                TokenStore<?> propTokens = neoStore.getPropertyStore().getPropertyKeyTokenStore();
-                TokenStore<?> labelTokens = neoStore.getLabelTokenStore();
-                TokenStore<?> relTokens = neoStore.getRelationshipTypeStore();
+                addRawRelationshipTypes( 
+                        NeoTokenStore.getTokens( neoStores.getRelationshipTypeTokenStore().getRecordStore(), 
+                                neoStores.getRelationshipTypeTokenNameStore().getRecordStore(), Integer.MAX_VALUE ) );
 
-                addRawRelationshipTypes( relTokens.getTokens( Integer.MAX_VALUE ) );
-                addPropertyKeyTokens( propTokens.getTokens( Integer.MAX_VALUE ) );
-                addLabelTokens( labelTokens.getTokens( Integer.MAX_VALUE ) );
+                addPropertyKeyTokens( NeoTokenStore.getTokens( neoStores.getPropertyKeyTokenStore().getRecordStore(), 
+                        neoStores.getPropertyKeyTokenNameStore().getRecordStore(), Integer.MAX_VALUE ) );
+
+                addLabelTokens(  NeoTokenStore.getTokens( neoStores.getLabelTokenStore().getRecordStore(), 
+                        neoStores.getLabelTokenNameStore().getRecordStore(), Integer.MAX_VALUE ) );
+
             }
         }
     }
@@ -776,7 +779,8 @@ public class NodeManager implements Lifecycle, EntityFactory
 
     public Triplet<ArrayMap<Integer, RelIdArray>, List<RelationshipImpl>, Long> getMoreRelationships( NodeImpl node )
     {
-        return relationshipLoader.getMoreRelationships( node );
+        // TODO: fix this
+        return relationshipLoader.getMoreRelationships( node, 100 );
     }
 
     public NodeImpl getNodeIfCached( long nodeId )

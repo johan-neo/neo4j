@@ -46,7 +46,7 @@ public class NeoArrayStore extends NeoDynamicStore
     public static final String TYPE_DESCRIPTOR = "ArrayPropertyStore";
     public static final String VERSION = NeoNeoStore.buildTypeDescriptorAndVersion( TYPE_DESCRIPTOR );
 
-    public static Collection<DynamicRecord> allocateFromNumbers( Object array, Iterator<DynamicRecord> recordsToUseFirst,
+    public static Collection<DynamicRecord> allocateFromNumbers( Object array, Collection<DynamicRecord> recordsToUseFirst,
                                                                  DynamicRecordAllocator recordAllocator )
     {
         Class<?> componentType = array.getClass().getComponentType();
@@ -88,7 +88,7 @@ public class NeoArrayStore extends NeoDynamicStore
         return allocateRecordsFromBytes( bytes, recordsToUseFirst, recordAllocator );
     }
 
-    static Collection<DynamicRecord> allocateFromString( String[] array, Iterator<DynamicRecord> recordsToUseFirst,
+    static Collection<DynamicRecord> allocateFromString( String[] array, Collection<DynamicRecord> recordsToUseFirst,
                                                                  DynamicRecordAllocator recordAllocator )
     {
         List<byte[]> stringsAsBytes = new ArrayList<>();

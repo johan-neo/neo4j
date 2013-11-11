@@ -81,7 +81,6 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.junit.Assert.*;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.*;
-
 import static org.neo4j.helpers.collection.Iterables.count;
 import static org.neo4j.helpers.collection.IteratorUtil.asCollection;
 import static org.neo4j.helpers.collection.IteratorUtil.asSet;

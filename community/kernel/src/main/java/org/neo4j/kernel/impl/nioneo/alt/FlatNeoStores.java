@@ -23,6 +23,7 @@ public class FlatNeoStores
     private final Store propertyStore;
     private final Store stringStore;
     private final Store arrayStore;
+    private final Store labelStore;
     private final Store schemaStore;
     
     private final Store propertyToken;
@@ -49,6 +50,7 @@ public class FlatNeoStores
         this.propertyStore = createRecordStore( StoreFactory.PROPERTY_STORE_NAME, IdType.PROPERTY, false, NeoPropertyStore.RECORD_SIZE, NeoPropertyStore.TYPE_DESCRIPTOR );
         this.stringStore = createRecordStore( StoreFactory.PROPERTY_STRINGS_STORE_NAME, IdType.STRING_BLOCK, true, NeoPropertyStore.DEFAULT_DATA_BLOCK_SIZE, NeoStringStore.TYPE_DESCRIPTOR );
         this.arrayStore = createRecordStore( StoreFactory.PROPERTY_ARRAYS_STORE_NAME, IdType.ARRAY_BLOCK, true, NeoPropertyStore.DEFAULT_DATA_BLOCK_SIZE, NeoArrayStore.TYPE_DESCRIPTOR );
+        this.labelStore = createRecordStore( StoreFactory.NODE_LABELS_STORE_NAME, IdType.NODE_LABELS, true, NeoLabelStore.DEFAULT_DATA_BLOCK_SIZE, NeoLabelStore.TYPE_DESCRIPTOR );
         this.schemaStore = createRecordStore( StoreFactory.SCHEMA_STORE_NAME, IdType.SCHEMA, true, NeoSchemaStore.BLOCK_SIZE, NeoSchemaStore.TYPE_DESCRIPTOR );
         
         this.propertyToken = createRecordStore( StoreFactory.PROPERTY_KEY_TOKEN_STORE_NAME, IdType.PROPERTY_KEY_TOKEN, false, NeoTokenStore.PROPERTY_KEY_TOKEN_RECORD_SIZE, NeoTokenStore.PROPERTY_KEY_TOKEN_TYPE_DESCRIPTOR );
@@ -73,6 +75,7 @@ public class FlatNeoStores
         propertyStore.close();
         stringStore.close();
         arrayStore.close();
+        labelStore.close();
         schemaStore.close();
         
         propertyToken.close();
@@ -91,6 +94,7 @@ public class FlatNeoStores
         propertyStore.getRecordStore().force();
         stringStore.getRecordStore().force();
         arrayStore.getRecordStore().force();
+        labelStore.getRecordStore().force();
         schemaStore.getRecordStore().force();
         
         propertyToken.getRecordStore().force();
@@ -101,7 +105,7 @@ public class FlatNeoStores
         labelTokenName.getRecordStore().force();
     }
     
-    public Store getNeotore()
+    public Store getNeoStore()
     {
         return neoStore;
     }
@@ -109,6 +113,11 @@ public class FlatNeoStores
     public Store getNodeStore()
     {
         return nodeStore;
+    }
+    
+    public Store getLabelStore()
+    {
+        return labelStore;
     }
     
     public Store getRelationshipStore()

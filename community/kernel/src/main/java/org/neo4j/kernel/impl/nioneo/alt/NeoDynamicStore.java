@@ -26,10 +26,13 @@ import java.util.LinkedList;
 import java.util.List;
 
 import org.neo4j.kernel.impl.nioneo.store.AbstractStore;
+import org.neo4j.kernel.impl.nioneo.store.Buffer;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecordAllocator;
 import org.neo4j.kernel.impl.nioneo.store.IdGenerator;
 import org.neo4j.kernel.impl.nioneo.store.InvalidRecordException;
+import org.neo4j.kernel.impl.nioneo.store.OperationType;
+import org.neo4j.kernel.impl.nioneo.store.PersistenceWindow;
 import org.neo4j.kernel.impl.nioneo.store.Record;
 import org.neo4j.kernel.impl.nioneo.store.RecordLoad;
 
@@ -118,12 +121,12 @@ public abstract class NeoDynamicStore
 //    }
 
     public static Collection<DynamicRecord> allocateRecordsFromBytes(
-            byte src[], Iterator<DynamicRecord> recordsToUseFirst,
+            byte src[], Collection<DynamicRecord> recordsToUseFirst,
             DynamicRecordAllocator dynamicRecordAllocator )
     {
         assert src != null : "Null src argument";
         List<DynamicRecord> recordList = new LinkedList<>();
-        DynamicRecord nextRecord = dynamicRecordAllocator.nextUsedRecordOrNew( recordsToUseFirst );
+        DynamicRecord nextRecord = dynamicRecordAllocator.nextUsedRecordOrNew( recordsToUseFirst.iterator() );
         int srcOffset = 0;
         int dataSize = dynamicRecordAllocator.dataSize();
         do
@@ -135,7 +138,7 @@ public abstract class NeoDynamicStore
                 byte data[] = new byte[dataSize];
                 System.arraycopy( src, srcOffset, data, 0, dataSize );
                 record.setData( data );
-                nextRecord = dynamicRecordAllocator.nextUsedRecordOrNew( recordsToUseFirst );
+                nextRecord = dynamicRecordAllocator.nextUsedRecordOrNew( recordsToUseFirst.iterator() );
                 record.setNextBlock( nextRecord.getId() );
                 srcOffset += dataSize;
             }
@@ -160,7 +163,41 @@ public abstract class NeoDynamicStore
         return ( ( buffer.get() & (byte) 0xF0 ) >> 4 ) == Record.IN_USE.byteValue();
     }
 
-    static DynamicRecord getRecord( long blockId, byte[] data, RecordLoad load )
+    public static void updateRecord( DynamicRecord record, byte[] data )
+    {
+        ByteBuffer buffer = ByteBuffer.wrap( data );
+        if ( record.inUse() )
+        {
+            long nextBlock = record.getNextBlock();
+            int highByteInFirstInteger = nextBlock == Record.NO_NEXT_BLOCK.intValue() ? 0
+                    : (int) ( ( nextBlock & 0xF00000000L ) >> 8 );
+            highByteInFirstInteger |= ( Record.IN_USE.byteValue() << 28 );
+            highByteInFirstInteger |= (record.isStartRecord() ? 0 : 1) << 31;
+
+            /*
+             * First 4b
+             * [x   ,    ][    ,    ][    ,    ][    ,    ] 0: start record, 1: linked record
+             * [   x,    ][    ,    ][    ,    ][    ,    ] inUse
+             * [    ,xxxx][    ,    ][    ,    ][    ,    ] high next block bits
+             * [    ,    ][xxxx,xxxx][xxxx,xxxx][xxxx,xxxx] nr of bytes in the data field in this record
+             *
+             */
+            int firstInteger = record.getLength();
+            assert firstInteger < ( 1 << 24 ) - 1;
+
+            firstInteger |= highByteInFirstInteger;
+
+            buffer.putInt( firstInteger ).putInt( (int) nextBlock );
+            buffer.put( record.getData() );
+        }
+        else
+        {
+            buffer.put( Record.NOT_IN_USE.byteValue() );
+        }
+    }
+
+    
+    public static DynamicRecord getRecord( long blockId, byte[] data, RecordLoad load )
     {
         DynamicRecord record = new DynamicRecord( blockId );
         ByteBuffer buffer = ByteBuffer.wrap( data );
@@ -284,5 +321,25 @@ public abstract class NeoDynamicStore
     public static byte[] readByteArray( RecordStore store, long blockId )
     {
         return readFullByteArray( getRecords( store, blockId, RecordLoad.NORMAL ) );
+    }
+
+    @Deprecated
+    public static void ensureHeavy( DynamicRecord record, RecordStore store )
+    {
+        if ( !record.isLight() )
+            return;
+        if ( record.getLength() == 0 ) // don't go though the trouble of acquiring the window if we would read nothing
+        {
+            record.setData( NO_DATA );
+        }
+
+        long blockId = record.getId();
+        byte[] recordData = store.getRecord( blockId );
+        ByteBuffer buf = ByteBuffer.wrap( recordData );
+        // NOTE: skip of header in offset
+        buf.position( BLOCK_HEADER_SIZE );
+        byte bytes[] = new byte[record.getLength()];
+        buf.get( bytes );
+        record.setData( bytes );
     }
 }

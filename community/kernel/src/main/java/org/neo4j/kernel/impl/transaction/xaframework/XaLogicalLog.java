@@ -184,7 +184,7 @@ public class XaLogicalLog implements LogLoader
         if ( fileSystem.fileExists( fileName ) )
         {
             renameLogFileToRightVersion( fileName, fileSystem.getFileSize( fileName ) );
-            xaTf.getAndSetNewVersion();
+            xaTf.incrementAndGetPreviousLogVersion();
         }
     }
 
@@ -216,7 +216,7 @@ public class XaLogicalLog implements LogLoader
         }
         else
         {
-            logVersion = xaTf.getCurrentVersion();
+            logVersion = xaTf.getCurrentLogVersion();
             
             /* This is for compensating for that, during rotation, renaming the active log
              * file and updating the log version via xaTf isn't atomic. First the file gets
@@ -230,7 +230,7 @@ public class XaLogicalLog implements LogLoader
                 logVersionChanged = true;
             }
             if ( logVersionChanged )
-                xaTf.setVersion( logVersion );
+                xaTf.setLogVersion( logVersion );
 
             long lastTxId = xaTf.getLastCommittedTx();
             LogIoUtils.writeLogHeader( sharedBuffer, logVersion, lastTxId );
@@ -720,7 +720,7 @@ public class XaLogicalLog implements LogLoader
         xaTf.flushAll();
         File activeLogFileName = new File( fileName.getPath() + "." + logWas);
         renameLogFileToRightVersion( activeLogFileName, endPosition );
-        xaTf.getAndSetNewVersion();
+        xaTf.incrementAndGetPreviousLogVersion();
         pruneStrategy.prune( this );
 
         msgLog.info( "Closed log " + fileName );
@@ -768,7 +768,7 @@ public class XaLogicalLog implements LogLoader
          * file and updating the log version via xaTf isn't atomic. First the file gets
          * renamed and then the version is updated. If a crash occurs in between those
          * two we need to detect and repair it the next startup */
-        xaTf.setVersion( logVersion );
+        xaTf.setLogVersion( logVersion );
 
         long lastCommittedTx = header[1];
         previousLogLastCommittedTx = lastCommittedTx;
@@ -1231,7 +1231,7 @@ public class XaLogicalLog implements LogLoader
         {
             throw new IllegalStateException( "Tried to apply tx " +
                     nextTxId + " but expected transaction " +
-                    (xaTf.getCurrentVersion() + 1) );
+                    (xaTf.getCurrentLogVersion() + 1) );
         }
 
         logRecoveryMessage( "applyTxWithoutTxId log version: " + logVersion +
@@ -1376,7 +1376,7 @@ public class XaLogicalLog implements LogLoader
         File newLogFile = logFiles.getLog2FileName();
         File currentLogFile = logFiles.getLog1FileName();
         char newActiveLog = LOG2;
-        long currentVersion = xaTf.getCurrentVersion();
+        long currentVersion = xaTf.getCurrentLogVersion();
 
         File oldCopy = getFileName( currentVersion );
         if ( currentLog == CLEAN || currentLog == LOG2 )
@@ -1430,13 +1430,13 @@ public class XaLogicalLog implements LogLoader
         setActiveLog( newActiveLog );
 
         renameLogFileToRightVersion( currentLogFile, endPosition );
-        xaTf.getAndSetNewVersion();
+        xaTf.incrementAndGetPreviousLogVersion();
 
-        this.logVersion = xaTf.getCurrentVersion();
-        if ( xaTf.getCurrentVersion() != (currentVersion + 1) )
+        this.logVersion = xaTf.getCurrentLogVersion();
+        if ( xaTf.getCurrentLogVersion() != (currentVersion + 1) )
         {
             throw new IOException( "Version change failed, expected " + (currentVersion + 1) + ", but was " +
-                    xaTf.getCurrentVersion() );
+                    xaTf.getCurrentLogVersion() );
         }
         pruneStrategy.prune( this );
         fileChannel = newLog;

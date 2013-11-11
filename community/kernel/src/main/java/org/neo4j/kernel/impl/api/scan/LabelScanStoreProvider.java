@@ -33,6 +33,10 @@ import org.neo4j.kernel.extension.KernelExtensions;
 import org.neo4j.kernel.impl.util.AbstractPrimitiveLongIterator;
 import org.neo4j.kernel.impl.util.PrimitiveLongIterator;
 import org.neo4j.kernel.impl.core.Token;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNodeStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoTokenStore;
+import org.neo4j.kernel.impl.nioneo.alt.RecordStore;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeStore;
 import org.neo4j.kernel.impl.nioneo.store.labels.NodeLabelsField;
@@ -42,7 +46,6 @@ import org.neo4j.kernel.lifecycle.Lifecycle;
 import org.neo4j.kernel.lifecycle.LifecycleAdapter;
 
 import static java.lang.Integer.MAX_VALUE;
-
 import static org.neo4j.helpers.collection.IteratorUtil.addToCollection;
 import static org.neo4j.kernel.extension.KernelExtensionUtil.servicesClassPathEntryInformation;
 
@@ -117,7 +120,7 @@ public class LabelScanStoreProvider extends LifecycleAdapter implements Comparab
         long highestNodeId();
     }
 
-    public static FullStoreChangeStream fullStoreLabelUpdateStream( final NeoStoreProvider neoStoreProvider )
+    public static FullStoreChangeStream fullStoreLabelUpdateStream( final FlatNeoStores flatNeoStores )
     {
         return new FullStoreChangeStream()
         {
@@ -127,19 +130,20 @@ public class LabelScanStoreProvider extends LifecycleAdapter implements Comparab
                 return new PrefetchingIterator<NodeLabelUpdate>()
                 {
                     private final long[] NO_LABELS = new long[0];
-                    private final NodeStore nodeStore = neoStoreProvider.evaluate().getNodeStore();
-                    private final long highId = nodeStore.getHighestPossibleIdInUse();
+                    private final FlatNeoStores neoStores = flatNeoStores;
+                    private final long highNodeId = neoStores.getNodeStore().getIdGenerator().getHighId();
                     private long current;
 
                     @Override
                     protected NodeLabelUpdate fetchNextOrNull()
                     {
-                        while ( current <= highId )
+                        while ( current <= highNodeId )
                         {
-                            NodeRecord node = nodeStore.forceGetRecord( current++ );
+                            NodeRecord node = NeoNodeStore.getRecord( current, neoStores.getNodeStore().getRecordStore().getRecord( current ) );
+                            current++;
                             if ( node.inUse() )
                             {
-                                long[] labels = NodeLabelsField.parseLabelsField( node ).get( nodeStore );
+                                long[] labels = NodeLabelsField.parseLabelsField( node ).get( neoStores.getNodeStore() );
                                 if ( labels.length > 0 )
                                 {
                                     return NodeLabelUpdate.labelChanges( node.getId(), NO_LABELS, labels );
@@ -154,7 +158,8 @@ public class LabelScanStoreProvider extends LifecycleAdapter implements Comparab
             @Override
             public PrimitiveLongIterator labelIds()
             {
-                final Token[] labels = neoStoreProvider.evaluate().getLabelTokenStore().getTokens( MAX_VALUE );
+                final Token[] labels = NeoTokenStore.getTokens( flatNeoStores.getLabelTokenStore().getRecordStore(), 
+                        flatNeoStores.getLabelTokenNameStore().getRecordStore(), MAX_VALUE ); 
                 return new AbstractPrimitiveLongIterator()
                 {
                     int index;
@@ -180,7 +185,7 @@ public class LabelScanStoreProvider extends LifecycleAdapter implements Comparab
             @Override
             public long highestNodeId()
             {
-                return neoStoreProvider.evaluate().getNodeStore().getHighestPossibleIdInUse();
+                return flatNeoStores.getNodeStore().getIdGenerator().getHighId();
             }
         };
     }

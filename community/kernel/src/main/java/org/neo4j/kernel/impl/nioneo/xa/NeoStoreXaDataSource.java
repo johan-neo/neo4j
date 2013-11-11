@@ -19,13 +19,15 @@
  */
 package org.neo4j.kernel.impl.nioneo.xa;
 
+import static org.neo4j.helpers.collection.Iterables.filter;
+import static org.neo4j.helpers.collection.Iterables.map;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.util.Collections;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Properties;
 
 import org.neo4j.graphdb.DependencyResolver;
@@ -69,16 +71,16 @@ import org.neo4j.kernel.impl.core.RelationshipTypeTokenHolder;
 import org.neo4j.kernel.impl.core.TransactionState;
 import org.neo4j.kernel.impl.locking.LockService;
 import org.neo4j.kernel.impl.locking.ReentrantLockService;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoSchemaStore;
+import org.neo4j.kernel.impl.nioneo.store.IdGenerator;
 import org.neo4j.kernel.impl.nioneo.store.IndexRule;
-import org.neo4j.kernel.impl.nioneo.store.NeoStore;
 import org.neo4j.kernel.impl.nioneo.store.PropertyKeyTokenRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyStore;
 import org.neo4j.kernel.impl.nioneo.store.SchemaRule;
-import org.neo4j.kernel.impl.nioneo.store.SchemaStorage;
-import org.neo4j.kernel.impl.nioneo.store.Store;
 import org.neo4j.kernel.impl.nioneo.store.StoreFactory;
 import org.neo4j.kernel.impl.nioneo.store.StoreId;
-import org.neo4j.kernel.impl.nioneo.store.WindowPoolStats;
 import org.neo4j.kernel.impl.persistence.IdGenerationFailedException;
 import org.neo4j.kernel.impl.persistence.PersistenceManager;
 import org.neo4j.kernel.impl.transaction.AbstractTransactionManager;
@@ -154,7 +156,7 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
 
     private KernelAPI kernel;
 
-    private NeoStore neoStore;
+    private FlatNeoStores neoStores;
     private IndexingService indexingService;
     private SchemaIndexProvider indexProvider;
     private XaContainer xaContainer;
@@ -321,7 +323,6 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
         {
             tf = new TransactionFactory();
         }
-        // neoStore = storeFactory.newNeoStore( store );
         neoStores = storeFactory.newFlatNeoStore( storeDir.getCanonicalPath(), store );
         schemaCache = new SchemaCache( Collections.<SchemaRule>emptyList() );
 
@@ -369,7 +370,7 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
 
             kernel = life.add( new Kernel( txManager, propertyKeyTokens, labelTokens, relationshipTypeTokens,
                     persistenceManager, lockManager, updateableSchemaState, schemaWriteGuard,
-                    indexingService, nodeManager, neoStore, persistenceCache, schemaCache, providerMap, labelScanStore,
+                    indexingService, nodeManager, neoStores, persistenceCache, schemaCache, providerMap, labelScanStore,
                     readOnly ));
 
             life.init();
@@ -481,8 +482,10 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
 
     public StoreId getStoreId()
     {
-        throw new RuntimeException( "Not implemented yet" );
-        // return neoStore.getStoreId();
+        long creationTime = NeoNeoStore.getLong( neoStores.getNeoStore().getRecordStore(), NeoNeoStore.TIME_POSITION );
+        long randomNumber = NeoNeoStore.getLong( neoStores.getNeoStore().getRecordStore(), NeoNeoStore.RANDOM_POSITION );
+        long storeVersion = NeoNeoStore.getLong( neoStores.getNeoStore().getRecordStore(), NeoNeoStore.STORE_VERSION_POSITION );
+        return new StoreId( creationTime, randomNumber, storeVersion );
     }
 
     @Override
@@ -509,7 +512,7 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
         {
             TransactionInterceptor first = providers.resolveChain( NeoStoreXaDataSource.this );
             return new InterceptingWriteTransaction( identifier, lastCommittedTxWhenTransactionStarted, getLogicalLog(),
-                    neoStore, state, cacheAccess, indexingService, labelScanStore, first, integrityValidator,
+                    neoStores, state, cacheAccess, indexingService, labelScanStore, first, integrityValidator,
                     (KernelTransactionImplementation)kernel.newTransaction(), locks );
         }
     }
@@ -520,7 +523,7 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
         public XaTransaction create( int identifier, long lastCommittedTxWhenTransactionStarted, TransactionState state)
         {
             return new WriteTransaction( identifier, lastCommittedTxWhenTransactionStarted, getLogicalLog(), state,
-                neoStore, cacheAccess, indexingService, labelScanStore, integrityValidator,
+                neoStores, cacheAccess, indexingService, labelScanStore, integrityValidator,
                 (KernelTransactionImplementation)kernel.newTransaction(), locks );
         }
 
@@ -539,24 +542,27 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
         }
 
         @Override
-        public long getCurrentVersion()
+        public long getCurrentLogVersion()
         {
-            throw new RuntimeException( "Not implemented yet" );
-            // return neoStore.getVersion();
+            return NeoNeoStore.getLong( neoStores.getNeoStore().getRecordStore(), NeoNeoStore.LOG_VERSION_POSITION );
         }
 
         @Override
-        public long getAndSetNewVersion()
+        public long incrementAndGetPreviousLogVersion()
         {
-            throw new RuntimeException( "Not implemented yet" );
-            // return neoStore.incrementVersion();
+            byte[] data = neoStores.getNeoStore().getRecordStore().getRecord( NeoNeoStore.LOG_VERSION_POSITION );
+            long currentVersion = NeoNeoStore.getLong( data );
+            NeoNeoStore.updateLong( data, currentVersion + 1 );
+            neoStores.getNeoStore().getRecordStore().writeRecord( NeoNeoStore.LOG_VERSION_POSITION, data );
+            return currentVersion;
         }
 
         @Override
-        public void setVersion( long version )
+        public void setLogVersion( long version )
         {
-            throw new RuntimeException( "Not implemented yet" );
-            // neoStore.setVersion( version );
+            byte[] data = new byte[NeoNeoStore.RECORD_SIZE]; 
+            NeoNeoStore.updateLong( data, version );
+            neoStores.getNeoStore().getRecordStore().writeRecord( NeoNeoStore.LOG_VERSION_POSITION, data );
         }
 
         @Override
@@ -568,8 +574,7 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
         @Override
         public long getLastCommittedTx()
         {
-            throw new RuntimeException( "Not implemented yet" );
-            // return neoStore.getLastCommittedTx();
+            return NeoNeoStore.getLong( neoStores.getNeoStore().getRecordStore(), NeoNeoStore.LATEST_COMMITTED_TX_POSITION );
         }
     }
 
@@ -615,45 +620,37 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
     @Override
     public long getCreationTime()
     {
-        throw new RuntimeException( "Not implemented yet" );
-        // return neoStore.getCreationTime();
+        return NeoNeoStore.getLong( neoStores.getNeoStore().getRecordStore(), NeoNeoStore.TIME_POSITION );
     }
 
     @Override
     public long getRandomIdentifier()
     {
-        throw new RuntimeException( "Not implemented yet" );
-        // return neoStore.getRandomNumber();
+        return NeoNeoStore.getLong( neoStores.getNeoStore().getRecordStore(), NeoNeoStore.RANDOM_POSITION );
     }
 
     @Override
     public long getCurrentLogVersion()
     {
-        throw new RuntimeException( "Not implemented yet" );
-        // return neoStore.getVersion();
+        return NeoNeoStore.getLong( neoStores.getNeoStore().getRecordStore(), NeoNeoStore.LOG_VERSION_POSITION );
     }
 
     public long incrementAndGetLogVersion()
     {
-        throw new RuntimeException( "Not implemented yet" );
-        // return neoStore.incrementVersion();
+        byte[] data = neoStores.getNeoStore().getRecordStore().getRecord( NeoNeoStore.LOG_VERSION_POSITION );
+        long currentVersion = NeoNeoStore.getLong( data );
+        NeoNeoStore.updateLong( data, currentVersion + 1 );
+        neoStores.getNeoStore().getRecordStore().writeRecord( NeoNeoStore.LOG_VERSION_POSITION, data );
+        return currentVersion;
     }
 
     // used for testing, do not use.
     @Override
     public void setLastCommittedTxId( long txId )
     {
-        throw new RuntimeException( "Not implemented yet" );
-        /*
-        neoStore.setRecoveredStatus( true );
-        try
-        {
-            neoStore.setLastCommittedTx( txId );
-        }
-        finally
-        {
-            neoStore.setRecoveredStatus( false );
-        }*/
+        byte[] data = new byte[NeoNeoStore.RECORD_SIZE]; 
+        NeoNeoStore.updateLong( data, txId );
+        neoStores.getNeoStore().getRecordStore().writeRecord( NeoNeoStore.LATEST_COMMITTED_TX_POSITION, data );
     }
 
     public boolean isReadOnly()
@@ -661,16 +658,10 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
         return readOnly;
     }
 
-//    public List<WindowPoolStats> getWindowPoolStats()
-//    {
-//        return neoStore.getAllWindowPoolStats();
-//    }
-
     @Override
     public long getLastCommittedTxId()
     {
-        throw new RuntimeException( "Not implemented yet" );
-        // return neoStore.getLastCommittedTx();
+        return NeoNeoStore.getLong( neoStores.getNeoStore().getRecordStore(), NeoNeoStore.LATEST_COMMITTED_TX_POSITION );
     }
 
     @Override
@@ -705,9 +696,8 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
     }
 
     @Override
-    public NeoStore evaluate()
+    public FlatNeoStores evaluate()
     {
-        throw new RuntimeException( "Not implemented yet" );
-        // return neoStore;
+        return neoStores;
     }
 }

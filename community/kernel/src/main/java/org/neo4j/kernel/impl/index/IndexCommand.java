@@ -109,11 +109,6 @@ public abstract class IndexCommand extends XaCommand
     }
     
     @Override
-    public void execute()
-    {
-    }
-    
-    @Override
     public void writeToFile( LogBuffer buffer ) throws IOException
     {
         /* c: commandType

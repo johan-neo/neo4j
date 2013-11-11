@@ -207,4 +207,10 @@ public class PagedFileWithRecords implements RecordStore
         long pageCount = pages.length * pageSizeRecords;
         return Math.max( fwrCount, pageCount );
     }
+
+    @Override
+    public int getRecordSize()
+    {
+        return fwr.getRecordSize();
+    }
 }

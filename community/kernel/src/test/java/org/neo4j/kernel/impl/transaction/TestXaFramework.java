@@ -217,19 +217,19 @@ public class TestXaFramework extends AbstractNeo4jTestCase
         }
 
         @Override
-        public long getAndSetNewVersion()
+        public long incrementAndGetPreviousLogVersion()
         {
             return 0;
         }
 
         @Override
-        public long getCurrentVersion()
+        public long getCurrentLogVersion()
         {
             return 0;
         }
 
         @Override
-        public void setVersion( long version )
+        public void setLogVersion( long version )
         {
         }
 

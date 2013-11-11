@@ -42,6 +42,8 @@ import org.neo4j.kernel.impl.core.NodeManager;
 import org.neo4j.kernel.impl.core.PropertyKeyTokenHolder;
 import org.neo4j.kernel.impl.core.RelationshipTypeTokenHolder;
 import org.neo4j.kernel.impl.core.TransactionState;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
+import org.neo4j.kernel.impl.nioneo.alt.NeoSchemaStore;
 import org.neo4j.kernel.impl.nioneo.store.NeoStore;
 import org.neo4j.kernel.impl.nioneo.store.SchemaRule;
 import org.neo4j.kernel.impl.nioneo.store.SchemaStorage;
@@ -85,7 +87,7 @@ import static org.neo4j.helpers.collection.IteratorUtil.loop;
  * at the same time it should remain independent and runnable without a transaction manager.
  *
  * The heart of this work is in the relationship between {@link KernelTransaction},
- * {@link org.neo4j.kernel.impl.nioneo.xa.WriteTransaction} and
+ * {@link org.neo4j.kernel.impl.nioneo.alt.WriteTransaction} and
  * {@link org.neo4j.kernel.impl.transaction.xaframework.XaResourceManager}. The latter should become a wrapper around
  * KernelTransactions, exposing them as JTA-capable transactions. The Write transaction should be hidden from the outside,
  * an implementation detail living inside the kernel.
@@ -117,7 +119,8 @@ public class Kernel extends LifecycleAdapter implements KernelAPI
     private final UpdateableSchemaState schemaState;
     private final SchemaWriteGuard schemaWriteGuard;
     private final IndexingService indexService;
-    private final NeoStore neoStore;
+    // private final NeoStore neoStore;
+    private final FlatNeoStores neoStores;
     private final PersistenceCache persistenceCache;
     private final SchemaCache schemaCache;
     private final SchemaIndexProviderMap providerMap;
@@ -135,7 +138,7 @@ public class Kernel extends LifecycleAdapter implements KernelAPI
                    LabelTokenHolder labelTokenHolder, RelationshipTypeTokenHolder relationshipTypeTokenHolder,
                    PersistenceManager persistenceManager, LockManager lockManager, UpdateableSchemaState schemaState,
                    SchemaWriteGuard schemaWriteGuard,
-                   IndexingService indexService, NodeManager nodeManager, NeoStore neoStore, PersistenceCache persistenceCache,
+                   IndexingService indexService, NodeManager nodeManager, FlatNeoStores neoStores, PersistenceCache persistenceCache,
                    SchemaCache schemaCache, SchemaIndexProviderMap providerMap, LabelScanStore labelScanStore, boolean readOnly )
     {
         this.transactionManager = transactionManager;
@@ -149,7 +152,7 @@ public class Kernel extends LifecycleAdapter implements KernelAPI
         this.readOnly = readOnly;
         this.schemaWriteGuard = schemaWriteGuard;
         this.indexService = indexService;
-        this.neoStore = neoStore;
+        this.neoStores = neoStores;
         this.persistenceCache = persistenceCache;
         this.schemaCache = schemaCache;
         this.labelScanStore = labelScanStore;
@@ -166,7 +169,8 @@ public class Kernel extends LifecycleAdapter implements KernelAPI
     @Override
     public void start()
     {
-        for ( SchemaRule schemaRule : loop( neoStore.getSchemaStore().loadAllSchemaRules() ) )
+        
+        for ( SchemaRule schemaRule : loop( NeoSchemaStore.loadAllSchemaRules( neoStores.getSchemaStore().getRecordStore() ) ) )
         {
             schemaCache.addSchemaRule( schemaRule );
         }
@@ -185,7 +189,7 @@ public class Kernel extends LifecycleAdapter implements KernelAPI
         return new KernelTransactionImplementation( statementOperations, legacyKernelOperations, readOnly,
                 schemaWriteGuard, labelScanStore, indexService, transactionManager, nodeManager,
                 schemaState, new LockHolderImpl( lockManager, getJTATransaction(), nodeManager ),
-                persistenceManager, providerMap, neoStore, getLegacyTxState() );
+                persistenceManager, providerMap, neoStores, getLegacyTxState() );
     }
 
     // We temporarily need this until all transaction state has moved into the kernel

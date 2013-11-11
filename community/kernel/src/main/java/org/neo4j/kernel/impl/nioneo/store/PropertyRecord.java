@@ -23,6 +23,8 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.neo4j.helpers.Pair;
+
 /**
  * PropertyRecord is a container for PropertyBlocks. PropertyRecords form
  * a double linked list and each one holds one or more PropertyBlocks that
@@ -38,7 +40,7 @@ public class PropertyRecord extends Abstract64BitRecord
     private long entityId = -1;
     private Boolean nodeIdSet;
     private boolean isChanged;
-    private final List<DynamicRecord> deletedRecords = new LinkedList<>();
+    // private final List<Pair<PropertyType,DynamicRecord>> deletedRecords = new LinkedList<>();
 
     public PropertyRecord( long id )
     {
@@ -110,16 +112,16 @@ public class PropertyRecord extends Abstract64BitRecord
         return blockRecords;
     }
 
-    public List<DynamicRecord> getDeletedRecords()
-    {
-        return deletedRecords;
-    }
-
-    public void addDeletedRecord( DynamicRecord record )
-    {
-        assert !record.inUse();
-        deletedRecords.add( record );
-    }
+//    public List<Pair<PropertyType,DynamicRecord>> getDeletedRecords()
+//    {
+//        return deletedRecords;
+//    }
+//
+//    public void addDeletedRecord( PropertyType type, DynamicRecord record )
+//    {
+//        assert !record.inUse();
+//        deletedRecords.add( Pair.of( type, record ) );
+//    }
 
     public void addPropertyBlock(PropertyBlock block)
     {
@@ -182,10 +184,10 @@ public class PropertyRecord extends Abstract64BitRecord
         {
             buf.append( ',' ).append( block );
         }
-        for ( DynamicRecord dyn : deletedRecords )
-        {
-            buf.append( ",del:" ).append( dyn );
-        }
+//        for ( Pair<PropertyType,DynamicRecord> pair : deletedRecords )
+//        {
+//            buf.append( ",del:" ).append( pair.other() );
+//        }
         buf.append( "]" );
         return buf.toString();
     }
@@ -223,8 +225,8 @@ public class PropertyRecord extends Abstract64BitRecord
         result.isChanged = isChanged;
         for ( PropertyBlock block : blockRecords )
             result.blockRecords.add( block.clone() );
-        for ( DynamicRecord deletedRecord : deletedRecords )
-            result.deletedRecords.add( deletedRecord.clone() );
+//        for ( Pair<PropertyType,DynamicRecord> pair : deletedRecords )
+//            result.deletedRecords.add( Pair.of( pair.first(), pair.other().clone() ) );
         return result;
     }
 }

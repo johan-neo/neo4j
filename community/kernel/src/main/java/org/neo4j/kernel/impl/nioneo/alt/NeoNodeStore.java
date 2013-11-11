@@ -20,7 +20,10 @@
 package org.neo4j.kernel.impl.nioneo.alt;
 
 import java.nio.ByteBuffer;
+import java.util.Collection;
+import java.util.Collections;
 
+import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.InvalidRecordException;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.Record;

@@ -47,8 +47,8 @@ public class NeoNeoStore
 
     public static final int TIME_POSITION = 0;
     public static final int RANDOM_POSITION = 1;
-    public static final int VERSION_POSITION = 2;
-    public static final int LATEST_TX_POSITION = 3;
+    public static final int LOG_VERSION_POSITION = 2;
+    public static final int LATEST_COMMITTED_TX_POSITION = 3;
     public static final int STORE_VERSION_POSITION = 4;
     public static final int NEXT_GRAPH_PROP_POSITION = 5;
     public static final int LATEST_CONSTRAINT_TX_POSITION = 6;
@@ -74,5 +74,18 @@ public class NeoNeoStore
         ByteBuffer buffer = ByteBuffer.wrap( data );
         buffer.get(); // skip the in-use byte
         return buffer.getLong();
+    }
+    
+    public static void updateLong( byte[] data, long newLong )
+    {
+        ByteBuffer buffer = ByteBuffer.wrap( data );
+        buffer.get(); // skip the in use
+        buffer.putLong( newLong );
+    }
+
+    public static long getLong( RecordStore recordStore, long record )
+    {
+        byte[] data = recordStore.getRecord( record );
+        return getLong( data );
     }
 }

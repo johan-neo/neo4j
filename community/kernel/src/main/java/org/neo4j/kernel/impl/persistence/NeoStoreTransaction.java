@@ -187,7 +187,7 @@ public interface NeoStoreTransaction
      * @param propertyKey The index key of the property.
      */
     void graphRemoveProperty( int propertyKey );
-
+    
     /**
      * Loads the complete property chain for the graph and returns it as a
      * map from property index id to property data.

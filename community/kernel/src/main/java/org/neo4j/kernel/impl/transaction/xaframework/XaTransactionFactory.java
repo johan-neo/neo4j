@@ -62,11 +62,11 @@ public abstract class XaTransactionFactory
     {
     }
 
-    public abstract long getCurrentVersion();
+    public abstract long getCurrentLogVersion();
     
-    public abstract long getAndSetNewVersion();
+    public abstract long incrementAndGetPreviousLogVersion();
     
-    public abstract void setVersion( long version );
+    public abstract void setLogVersion( long version );
 
     public abstract long getLastCommittedTx();
 } 

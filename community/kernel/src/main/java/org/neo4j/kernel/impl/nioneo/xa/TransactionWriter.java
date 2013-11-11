@@ -205,7 +205,7 @@ public class TransactionWriter
 
     private void addSchema( Collection<DynamicRecord> beforeRecords, Collection<DynamicRecord> afterRecords ) throws IOException
     {
-        write( new Command.SchemaRuleCommand( null, null, null, beforeRecords, afterRecords, null, Long.MAX_VALUE ) );
+        write( new Command.SchemaRuleCommand( beforeRecords, afterRecords, null, Long.MAX_VALUE ) );
     }
 
     public void add( NodeRecord before, NodeRecord after ) throws IOException

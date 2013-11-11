@@ -90,7 +90,7 @@ public class TransactionReader
         @Override
         public XaCommand readCommand( ReadableByteChannel byteChannel, ByteBuffer buffer ) throws IOException
         {
-            return Command.readCommand( null, null, byteChannel, buffer );
+            return Command.readCommand( byteChannel, buffer );
         }
     };
     private final ByteBuffer buffer = ByteBuffer.wrap( new byte[256] );

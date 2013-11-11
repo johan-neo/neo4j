@@ -49,6 +49,7 @@ import org.neo4j.kernel.impl.api.state.TxState;
 import org.neo4j.kernel.impl.api.state.TxStateImpl;
 import org.neo4j.kernel.impl.core.NodeManager;
 import org.neo4j.kernel.impl.core.TransactionState;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
 import org.neo4j.kernel.impl.nioneo.store.IndexRule;
 import org.neo4j.kernel.impl.nioneo.store.NeoStore;
 import org.neo4j.kernel.impl.nioneo.store.SchemaStorage;
@@ -87,7 +88,7 @@ public class KernelTransactionImplementation implements KernelTransaction, TxSta
                                             AbstractTransactionManager transactionManager, NodeManager nodeManager,
                                             UpdateableSchemaState schemaState,
                                             LockHolder lockHolder, PersistenceManager persistenceManager,
-                                            SchemaIndexProviderMap providerMap, NeoStore neoStore,
+                                            SchemaIndexProviderMap providerMap, FlatNeoStores neoStores,
                                             TransactionState legacyTxState )
     {
         this.operations = operations;
@@ -103,7 +104,7 @@ public class KernelTransactionImplementation implements KernelTransaction, TxSta
 
         constraintIndexCreator = new ConstraintIndexCreator( new Transactor( transactionManager, persistenceManager ),
                 this.indexService );
-        schemaStorage = new SchemaStorage( neoStore.getSchemaStore() );
+        schemaStorage = new SchemaStorage( neoStores.getSchemaStore() );
         legacyStateBridge = new OldTxStateBridgeImpl( nodeManager, legacyTxState );
     }
 

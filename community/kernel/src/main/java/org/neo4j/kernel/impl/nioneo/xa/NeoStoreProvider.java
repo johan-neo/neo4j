@@ -21,6 +21,7 @@ package org.neo4j.kernel.impl.nioneo.xa;
 
 import org.neo4j.helpers.Thunk;
 import org.neo4j.kernel.InternalAbstractGraphDatabase;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
 import org.neo4j.kernel.impl.nioneo.store.NeoStore;
 import org.neo4j.kernel.impl.transaction.XaDataSourceManager;
 import org.neo4j.unsafe.batchinsert.BatchInserter;
@@ -30,6 +31,6 @@ import org.neo4j.unsafe.batchinsert.BatchInserter;
  * both an {@link InternalAbstractGraphDatabase} and {@link BatchInserter}, since batch inserter doesn't
  * have an {@link XaDataSourceManager} which would normally serve as a provider if a {@link NeoStore}.
  */
-public interface NeoStoreProvider extends Thunk<NeoStore>
+public interface NeoStoreProvider extends Thunk<FlatNeoStores>
 {
 }

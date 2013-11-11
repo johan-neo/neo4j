@@ -74,8 +74,8 @@ public class XaLogicalLogTest
     {
         // given
         XaTransactionFactory xaTf = mock( XaTransactionFactory.class );
-        when( xaTf.getAndSetNewVersion() ).thenAnswer( new TxVersion( TxVersion.UPDATE_AND_GET ) );
-        when( xaTf.getCurrentVersion() ).thenAnswer( new TxVersion( TxVersion.GET ) );
+        when( xaTf.incrementAndGetPreviousLogVersion() ).thenAnswer( new TxVersion( TxVersion.UPDATE_AND_GET ) );
+        when( xaTf.getCurrentLogVersion() ).thenAnswer( new TxVersion( TxVersion.GET ) );
         // spy on the file system abstraction so that we can spy on the file channel for the logical log
         FileSystemAbstraction fs = spy( ephemeralFs.get() );
         File dir = TargetDirectory.forTest( fs, XaLogicalLogTest.class ).directory( "log", true );
@@ -173,11 +173,6 @@ public class XaLogicalLogTest
         }
         
         @Override
-        public void execute()
-        {   // There's nothing to execute
-        }
-
-        @Override
         public void writeToFile( LogBuffer buffer ) throws IOException
         {
             buffer.putShort( (short) (data.length+2) );
@@ -236,19 +231,19 @@ public class XaLogicalLogTest
         }
 
         @Override
-        public long getCurrentVersion()
+        public long getCurrentLogVersion()
         {
             return currentVersion;
         }
 
         @Override
-        public long getAndSetNewVersion()
+        public long incrementAndGetPreviousLogVersion()
         {
             return ++currentVersion;
         }
 
         @Override
-        public void setVersion( long version )
+        public void setLogVersion( long version )
         {
             this.currentVersion = version;
         }

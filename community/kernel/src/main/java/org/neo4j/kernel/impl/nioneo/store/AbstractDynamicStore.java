@@ -57,7 +57,7 @@ import org.neo4j.kernel.impl.util.StringLogger;
  * Note, the first block of a dynamic store is reserved and contains information
  * about the store.
  */
-public abstract class AbstractDynamicStore extends CommonAbstractStore implements Store, RecordStore<DynamicRecord>,
+public abstract class AbstractDynamicStore extends CommonAbstractStore implements Store, OldRecordStore<DynamicRecord>,
         DynamicBlockSize
 {
     public static abstract class Configuration

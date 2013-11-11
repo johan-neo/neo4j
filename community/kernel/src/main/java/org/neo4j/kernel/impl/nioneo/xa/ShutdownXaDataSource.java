@@ -41,7 +41,7 @@ public class ShutdownXaDataSource extends NeoStoreXaDataSource
 {
     public ShutdownXaDataSource()
     {
-        super( new Config(), null, null, null, null, null, null, null, null, null, null );
+        super( new Config(), null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null );
     }
 
     @Override
@@ -87,19 +87,7 @@ public class ShutdownXaDataSource extends NeoStoreXaDataSource
     }
 
     @Override
-    public DefaultSchemaIndexProviderMap getProviderMap()
-    {
-        throw databaseIsShutdownError();
-    }
-
-    @Override
     public long getRandomIdentifier()
-    {
-        throw databaseIsShutdownError();
-    }
-
-    @Override
-    public SchemaCache getSchemaCache()
     {
         throw databaseIsShutdownError();
     }

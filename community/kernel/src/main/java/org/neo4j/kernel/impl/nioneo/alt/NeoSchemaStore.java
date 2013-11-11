@@ -19,6 +19,21 @@
  */
 package org.neo4j.kernel.impl.nioneo.alt;
 
+import static org.neo4j.helpers.Exceptions.launderedException;
+import static org.neo4j.kernel.impl.nioneo.store.SchemaRule.Kind.deserialize;
+
+import java.nio.ByteBuffer;
+import java.util.Collection;
+import java.util.Iterator;
+
+import org.neo4j.helpers.collection.PrefetchingIterator;
+import org.neo4j.kernel.api.exceptions.schema.MalformedSchemaRuleException;
+import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
+import org.neo4j.kernel.impl.nioneo.store.DynamicRecordAllocator;
+import org.neo4j.kernel.impl.nioneo.store.RecordLoad;
+import org.neo4j.kernel.impl.nioneo.store.RecordSerializer;
+import org.neo4j.kernel.impl.nioneo.store.SchemaRule;
+
 
 public class NeoSchemaStore 
 {
@@ -26,4 +41,76 @@ public class NeoSchemaStore
     public static final String TYPE_DESCRIPTOR = "SchemaStore";
     public static final String VERSION = NeoNeoStore.buildTypeDescriptorAndVersion( TYPE_DESCRIPTOR );
     public static final int BLOCK_SIZE = 56; // + BLOCK_HEADER_SIZE == 64
+
+
+    public static Collection<DynamicRecord> allocateFrom( SchemaRule rule, RecordStore schemaStore, DynamicRecordAllocator recordAllocator )
+    {
+        RecordSerializer serializer = new RecordSerializer();
+        serializer = serializer.append( rule );
+        return NeoDynamicStore.allocateRecordsFromBytes( serializer.serialize(), 
+                NeoDynamicStore.getRecords( schemaStore, rule.getId(), RecordLoad.NORMAL ), recordAllocator );
+    }
+
+
+    public static Iterator<SchemaRule> loadAllSchemaRules( final RecordStore schemaStore )
+    {
+        return new PrefetchingIterator<SchemaRule>()
+        {
+            private final long highestId = schemaStore.getHighestPossibleIdInUse();
+            private long currentId = 1; /*record 0 contains the block size*/
+            private final byte[] scratchData = new byte[schemaStore.getRecordSize()*4];
+
+            @Override
+            protected SchemaRule fetchNextOrNull()
+            {
+                while ( currentId <= highestId )
+                {
+                    long id = currentId++;
+                    DynamicRecord record = NeoDynamicStore.getRecord( id, scratchData, RecordLoad.FORCE );
+                    if ( record.inUse() && record.isStartRecord() )
+                    {
+                        try
+                        {
+                            return getSchemaRule( id, scratchData, schemaStore );
+                        }
+                        catch ( MalformedSchemaRuleException e )
+                        {
+                            // TODO remove this and throw this further up
+                            throw launderedException( e );
+                        }
+                    }
+                }
+                return null;
+            }
+        };
+    }
+    
+    private static SchemaRule getSchemaRule( long id, byte[] buffer, RecordStore schemaStore ) throws MalformedSchemaRuleException
+    {
+        return readSchemaRule( id, NeoDynamicStore.getRecords( schemaStore, id, RecordLoad.NORMAL ), buffer );
+    }
+
+//    private SchemaRule forceGetSchemaRule( long id, byte[] buffer ) throws MalformedSchemaRuleException
+//    {
+//        Collection<DynamicRecord> records = getRecords( id, RecordLoad.FORCE );
+//        for ( DynamicRecord record : records )
+//        {
+//            ensureHeavy( record );
+//        }
+//        return readSchemaRule( id, records, buffer );
+//    }
+
+    public static SchemaRule readSchemaRule( long id, Collection<DynamicRecord> records )
+            throws MalformedSchemaRuleException
+    {
+        return readSchemaRule( id, records, new byte[ BLOCK_SIZE * 4 ] );
+    }
+
+    private static SchemaRule readSchemaRule( long id, Collection<DynamicRecord> records, byte[] buffer )
+            throws MalformedSchemaRuleException
+    {
+        ByteBuffer scratchBuffer = NeoDynamicStore.concatData( records, buffer );
+        return deserialize( id, scratchBuffer );
+    }
+   
 }

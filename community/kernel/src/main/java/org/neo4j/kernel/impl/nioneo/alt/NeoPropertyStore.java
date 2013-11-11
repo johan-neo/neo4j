@@ -22,10 +22,17 @@ package org.neo4j.kernel.impl.nioneo.alt;
 import static org.neo4j.helpers.collection.IteratorUtil.first;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
+import org.neo4j.helpers.Pair;
+import org.neo4j.kernel.api.index.NodePropertyUpdate;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.InvalidRecordException;
 import org.neo4j.kernel.impl.nioneo.store.LongerShortString;
@@ -97,7 +104,7 @@ public class NeoPropertyStore
                 if ( !block.isLight()
                      && block.getValueRecords().get( 0 ).isCreated() )
                 {
-                    updateDynamicRecords( block.getValueRecords() );
+                    updateDynamicRecords2( block.getValueRecords() );
                 }
                 
             }
@@ -113,10 +120,15 @@ public class NeoPropertyStore
             buffer.putLong( 0 );
         }
         // move this elsewhere
-        updateDynamicRecords( record.getDeletedRecords() );
+        // updateDynamicRecords( record.getDeletedRecords() );
     }
 
-    static private void updateDynamicRecords( List<DynamicRecord> records )
+    private static void updateDynamicRecords2( List<DynamicRecord> valueRecords )
+    {
+        throw new RuntimeException( "Implement this elsewhere" );
+    }
+
+    static private void updateDynamicRecords( List<Pair<PropertyType, DynamicRecord>> list )
     {
         throw new RuntimeException( "Implement this elsewhere" );
     }
@@ -312,7 +324,121 @@ public class NeoPropertyStore
         block.setSingleBlock( keyId | (((long) type.intValue()) << 24)
                 | (longValue << 28) );
     }
+    
+    @Deprecated
+    public static void ensureHeavy( PropertyBlock block, RecordStore dynamicStore, long blockId )
+    {
+        if ( block.isLight() )
+        {
+            Collection<DynamicRecord> dynamicRecords = NeoDynamicStore.getRecords( dynamicStore, blockId, RecordLoad.NORMAL );
+            for ( DynamicRecord stringRecord : dynamicRecords )
+            {
+                block.addValueRecord( stringRecord );
+            }
+        }
+        else
+        {
+            for ( DynamicRecord dynamicRecord : block.getValueRecords() )
+                NeoDynamicStore.ensureHeavy( dynamicRecord, dynamicStore );
+        }
+    }
+    
+    public static Iterable<NodePropertyUpdate> convertPhysicalToLogical(
+            PropertyRecord before, long[] labelsBefore,
+            PropertyRecord after, long[] labelsAfter, RecordStore stringStore, RecordStore arrayStore )
+    {
+        assert before.getNodeId() == after.getNodeId() :
+            "Node ids differ between before(" + before.getNodeId() + ") and after(" + after.getNodeId() + ")";
+        long nodeId = before.getNodeId();
+        Map<Integer, PropertyBlock> beforeMap = mapBlocks( before );
+        Map<Integer, PropertyBlock> afterMap = mapBlocks( after );
 
+        @SuppressWarnings( "unchecked" )
+        Set<Integer> allKeys = union( beforeMap.keySet(), afterMap.keySet() );
+
+        Collection<NodePropertyUpdate> result = new ArrayList<>();
+        for ( int key : allKeys )
+        {
+            PropertyBlock beforeBlock = beforeMap.get( key );
+            PropertyBlock afterBlock = afterMap.get( key );
+            NodePropertyUpdate update = null;
+
+            if ( beforeBlock != null && afterBlock != null )
+            {
+                // CHANGE
+                if ( !beforeBlock.hasSameContentsAs( afterBlock ) )
+                {
+                    Object beforeVal = valueOf( beforeBlock, arrayStore, arrayStore );
+                    Object afterVal = valueOf( afterBlock, arrayStore, arrayStore );
+                    update = NodePropertyUpdate.change( nodeId, key, beforeVal, labelsBefore, afterVal, labelsAfter );
+                }
+            }
+            else
+            {
+                // ADD/REMOVE
+                if ( afterBlock != null )
+                {
+                    update = NodePropertyUpdate.add( nodeId, key, valueOf( afterBlock, arrayStore, arrayStore ), labelsAfter );
+                }
+                else if ( beforeBlock != null )
+                {
+                    update = NodePropertyUpdate.remove( nodeId, key, valueOf( beforeBlock, arrayStore, arrayStore ), labelsBefore );
+                }
+                else
+                {
+                    throw new IllegalStateException( "Weird, an update with no property value for before or after" );
+                }
+            }
+
+            if ( update != null)
+            {
+                result.add( update );
+            }
+        }
+        return result;
+    }
+    
+    private static <T> Set<T> union( Set<T>... sets )
+    {
+        Set<T> union = new HashSet<>();
+        for ( Set<T> set : sets )
+        {
+            union.addAll( set );
+        }
+        return union;
+    }
+
+    private static Map<Integer, PropertyBlock> mapBlocks( PropertyRecord before )
+    {
+        HashMap<Integer, PropertyBlock> map = new HashMap<>();
+        for ( PropertyBlock block : before.getPropertyBlocks() )
+        {
+            map.put( block.getKeyIndexId(), block );
+        }
+        return map;
+    }
+
+    private static Object valueOf( PropertyBlock block, RecordStore stringStore, RecordStore arrayStore )
+    {
+        if ( block == null )
+        {
+            return null;
+        }
+        if ( block.getType() == PropertyType.STRING )
+        {
+            return block.getType().getValue( block, stringStore );
+        }
+        else if ( block.getType() == PropertyType.ARRAY )
+        {
+            return block.getType().getValue( block, arrayStore );
+        }
+        else
+        {
+            return block.getType().getValue( block, null );           
+        }
+    }
+    
+    
 //    public String getStringFor( PropertyBlock propertyBlock )
 //    {
 //        ensureHeavy( propertyBlock );
