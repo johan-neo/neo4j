@@ -23,6 +23,8 @@ import java.nio.ByteBuffer;
 import java.security.SecureRandom;
 import java.util.Random;
 
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
+
 public final class StoreId
 {
     private static final Random r = new SecureRandom();
@@ -35,7 +37,7 @@ public final class StoreId
         this(
                 System.currentTimeMillis(),
                 r.nextLong(),
-                NeoStore.versionStringToLong( CommonAbstractStore.ALL_STORES_VERSION ) );
+                NeoNeoStore.versionStringToLong( NeoNeoStore.ALL_STORES_VERSION ) );
     }
 
     public StoreId( long creationTime, long randomId, long storeVersion )

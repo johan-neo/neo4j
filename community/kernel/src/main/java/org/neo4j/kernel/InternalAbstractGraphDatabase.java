@@ -118,7 +118,6 @@ import org.neo4j.kernel.impl.coreapi.NodeAutoIndexerImpl;
 import org.neo4j.kernel.impl.coreapi.RelationshipAutoIndexerImpl;
 import org.neo4j.kernel.impl.coreapi.schema.SchemaImpl;
 import org.neo4j.kernel.impl.index.IndexStore;
-import org.neo4j.kernel.impl.nioneo.store.DefaultWindowPoolFactory;
 import org.neo4j.kernel.impl.nioneo.store.FileSystemAbstraction;
 import org.neo4j.kernel.impl.nioneo.store.StoreFactory;
 import org.neo4j.kernel.impl.nioneo.store.StoreId;
@@ -196,8 +195,8 @@ public abstract class InternalAbstractGraphDatabase
         public static final Setting<String> cache_type = GraphDatabaseSettings.cache_type;
         public static final Setting<Boolean> ephemeral = setting( "ephemeral", Settings.BOOLEAN, Settings.FALSE );
         public static final Setting<File> store_dir = GraphDatabaseSettings.store_dir;
-        public static final Setting<File> neo_store = GraphDatabaseSettings.neo_store;
-        public static final Setting<File> logical_log = GraphDatabaseSettings.logical_log;
+        // public static final Setting<File> neo_store = GraphDatabaseSettings.neo_store;
+        // public static final Setting<File> logical_log = GraphDatabaseSettings.logical_log;
     }
 
     private static final long MAX_NODE_ID = IdType.NODE.getMaxValue();
@@ -796,7 +795,7 @@ public abstract class InternalAbstractGraphDatabase
 
     protected StoreFactory createStoreFactory()
     {
-        return new StoreFactory( config, idGeneratorFactory, new DefaultWindowPoolFactory(), fileSystem,
+        return new StoreFactory( config, idGeneratorFactory, fileSystem,
                 logging.getMessagesLog( StoreFactory.class ), txHook );
     }
 

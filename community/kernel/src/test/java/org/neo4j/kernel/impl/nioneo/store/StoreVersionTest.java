@@ -19,11 +19,8 @@
  */
 package org.neo4j.kernel.impl.nioneo.store;
 
-import static org.hamcrest.CoreMatchers.containsString;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 import java.io.File;
 import java.io.IOException;
@@ -37,6 +34,8 @@ import org.junit.Test;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.kernel.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.configuration.Config;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
 import org.neo4j.kernel.impl.storemigration.StoreMigrator;
 import org.neo4j.kernel.impl.util.FileUtils;
 import org.neo4j.kernel.impl.util.StringLogger;
@@ -50,29 +49,30 @@ public class StoreVersionTest
         File outputDir = new File( "target/var/" + StoreVersionTest.class.getSimpleName() );
         fs.get().mkdirs( outputDir );
 
-        File storeFileName = new File( outputDir, NeoStore.DEFAULT_NAME );
+        File storeFileName = new File( outputDir, StoreFactory.NEO_STORE_NAME );
 
         Map<String, String> config = new HashMap<String, String>();
         config.put( GraphDatabaseSettings.store_dir.name(), outputDir.getPath());
         config.put( "neo_store", storeFileName.getPath() );
         StoreFactory sf = new StoreFactory( new Config( config, GraphDatabaseSettings.class ),
-                new DefaultIdGeneratorFactory(), new DefaultWindowPoolFactory(), fs.get(), StringLogger.DEV_NULL,
+                new DefaultIdGeneratorFactory(), fs.get(), StringLogger.DEV_NULL,
                 null );
-        NeoStore neoStore = sf.createNeoStore( storeFileName );
+        FlatNeoStores neoStores = sf.createNeoStore( outputDir.getPath() );
 
-        CommonAbstractStore[] stores = {
-                neoStore.getNodeStore(),
-                neoStore.getRelationshipStore(),
-                neoStore.getRelationshipTypeStore(),
-                neoStore.getPropertyStore(),
-                neoStore.getPropertyStore().getPropertyKeyTokenStore()
+        throw new RuntimeException( "Implement this using store loader " );
+        /*(Store[] stores = {
+                neoStores.getNodeStore(),
+                neoStores.getRelationshipStore(),
+                neoStores.getRelationshipTypeTokenStore(),
+                neoStores.getPropertyStore(),
+                neoStores.getPropertyKeyTokenStore()
         };
 
-        for ( CommonAbstractStore store : stores )
+        for ( Store store : stores )
         {
             assertThat( store.getTypeAndVersionDescriptor(), containsString( CommonAbstractStore.ALL_STORES_VERSION ) );
         }
-        neoStore.close();
+        neoStores.close();*/
     }
 
     @Test
@@ -90,9 +90,10 @@ public class StoreVersionTest
 
         try
         {
-            new NodeStore( workingFile, config, new DefaultIdGeneratorFactory(),
-                    new DefaultWindowPoolFactory(), fs.get(), StringLogger.DEV_NULL, null );
-            fail( "Should have thrown exception" );
+            throw new RuntimeException( "implement this using store loader" );
+//            new NodeStore( workingFile, config, new DefaultIdGeneratorFactory(),
+//                    new DefaultWindowPoolFactory(), fs.get(), StringLogger.DEV_NULL, null );
+//            fail( "Should have thrown exception" );
         }
         catch ( NotCurrentStoreVersionException e )
         {
@@ -108,20 +109,21 @@ public class StoreVersionTest
                 + "test2" );
         fs.get().mkdirs( outputDir );
 
-        File storeFileName = new File( outputDir, NeoStore.DEFAULT_NAME );
+        File storeFileName = new File( outputDir, StoreFactory.NEO_STORE_NAME );
 
         Map<String, String> config = new HashMap<String, String>();
         config.put( GraphDatabaseSettings.store_dir.name(), outputDir.getPath() );
         config.put( "neo_store", storeFileName.getPath() );
         StoreFactory sf = new StoreFactory( new Config( config, GraphDatabaseSettings.class ),
-                new DefaultIdGeneratorFactory(), new DefaultWindowPoolFactory(), fs.get(), StringLogger.DEV_NULL,
+                new DefaultIdGeneratorFactory(), fs.get(), StringLogger.DEV_NULL,
                 null );
-        NeoStore neoStore = sf.createNeoStore( storeFileName );
-        // The first checks the instance method, the other the public one
-        assertEquals( CommonAbstractStore.ALL_STORES_VERSION,
-                NeoStore.versionLongToString( neoStore.getStoreVersion() ) );
-        assertEquals( CommonAbstractStore.ALL_STORES_VERSION,
-                NeoStore.versionLongToString( NeoStore.getStoreVersion( fs.get(), storeFileName ) ) );
+        throw new RuntimeException( "implement this using store loader" );
+//       NeoStore neoStore = sf.createNeoStore( storeFileName );
+//        // The first checks the instance method, the other the public one
+//        assertEquals( CommonAbstractStore.ALL_STORES_VERSION,
+//                NeoStore.versionLongToString( neoStore.getStoreVersion() ) );
+//        assertEquals( CommonAbstractStore.ALL_STORES_VERSION,
+//                NeoStore.versionLongToString( NeoStore.getStoreVersion( fs.get(), storeFileName ) ) );
     }
 
     @Test
@@ -133,7 +135,7 @@ public class StoreVersionTest
         {
             assertEquals(
                     string,
-                    NeoStore.versionLongToString( NeoStore.versionStringToLong( string ) ) );
+                    NeoNeoStore.versionLongToString( NeoNeoStore.versionStringToLong( string ) ) );
         }
     }
     

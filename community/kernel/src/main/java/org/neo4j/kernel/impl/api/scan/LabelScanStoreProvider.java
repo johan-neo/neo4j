@@ -19,6 +19,10 @@
  */
 package org.neo4j.kernel.impl.api.scan;
 
+import static java.lang.Integer.MAX_VALUE;
+import static org.neo4j.helpers.collection.IteratorUtil.addToCollection;
+import static org.neo4j.kernel.extension.KernelExtensionUtil.servicesClassPathEntryInformation;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -36,18 +40,11 @@ import org.neo4j.kernel.impl.core.Token;
 import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
 import org.neo4j.kernel.impl.nioneo.alt.NeoNodeStore;
 import org.neo4j.kernel.impl.nioneo.alt.NeoTokenStore;
-import org.neo4j.kernel.impl.nioneo.alt.RecordStore;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
-import org.neo4j.kernel.impl.nioneo.store.NodeStore;
 import org.neo4j.kernel.impl.nioneo.store.labels.NodeLabelsField;
-import org.neo4j.kernel.impl.nioneo.xa.NeoStoreProvider;
 import org.neo4j.kernel.lifecycle.LifeSupport;
 import org.neo4j.kernel.lifecycle.Lifecycle;
 import org.neo4j.kernel.lifecycle.LifecycleAdapter;
-
-import static java.lang.Integer.MAX_VALUE;
-import static org.neo4j.helpers.collection.IteratorUtil.addToCollection;
-import static org.neo4j.kernel.extension.KernelExtensionUtil.servicesClassPathEntryInformation;
 
 /**
  * Used by a {@link KernelExtensions} to provide access a {@link LabelScanStore} and prioritize against other.
@@ -143,7 +140,7 @@ public class LabelScanStoreProvider extends LifecycleAdapter implements Comparab
                             current++;
                             if ( node.inUse() )
                             {
-                                long[] labels = NodeLabelsField.parseLabelsField( node ).get( neoStores.getNodeStore() );
+                                long[] labels = NodeLabelsField.parseLabelsField( node ).get( neoStores.getLabelStore() );
                                 if ( labels.length > 0 )
                                 {
                                     return NodeLabelUpdate.labelChanges( node.getId(), NO_LABELS, labels );

@@ -30,6 +30,7 @@ import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.kernel.DefaultFileSystemAbstraction;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.nioneo.store.FileSystemAbstraction;
+import org.neo4j.kernel.impl.transaction.xaframework.XaLogicalLog;
 import org.neo4j.kernel.impl.transaction.xaframework.XaLogicalLogFiles;
 import org.neo4j.kernel.impl.transaction.xaframework.XaLogicalLogRecoveryCheck;
 
@@ -58,7 +59,7 @@ public class StoreRecoverer
         params.put( GraphDatabaseSettings.store_dir.name(), dataDir.getPath() );
         Config config = new Config( params, GraphDatabaseSettings.class );
 
-        File baseLogPath = config.get( GraphDatabaseSettings.logical_log );
+        File baseLogPath = new File( config.get( GraphDatabaseSettings.store_dir ), XaLogicalLog.DEFAULT_FILE_PREFIX );
         XaLogicalLogFiles logFiles = new XaLogicalLogFiles( baseLogPath, fs );
 
         File log;

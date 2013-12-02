@@ -21,23 +21,22 @@ package org.neo4j.kernel.impl.nioneo.store.labels;
 
 import java.util.Collection;
 
-import org.neo4j.kernel.impl.nioneo.alt.Store;
+import org.neo4j.kernel.impl.nioneo.alt.NeoLabelStore;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
-import org.neo4j.kernel.impl.nioneo.store.NodeStore;
 
 public interface NodeLabels
 {
-    long[] get( Store labelStore );
+    long[] get( NeoLabelStore labelStore );
 
     long[] getIfLoaded();
 
-    Collection<DynamicRecord> put( long[] labelIds, Store labelStore );
+    Collection<DynamicRecord> put( long[] labelIds, NeoLabelStore labelStore );
 
-    Collection<DynamicRecord> add( long labelId, Store labelStore );
+    Collection<DynamicRecord> add( long labelId, NeoLabelStore labelStore );
 
-    Collection<DynamicRecord> remove( long labelId, Store labelStore );
+    Collection<DynamicRecord> remove( long labelId, NeoLabelStore labelStore );
 
     boolean isInlined();
 
-    void ensureHeavy( Store labelStore );
+    void ensureHeavy( NeoLabelStore labelStore );
 }

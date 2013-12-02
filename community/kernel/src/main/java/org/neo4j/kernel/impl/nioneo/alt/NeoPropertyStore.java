@@ -21,9 +21,11 @@ package org.neo4j.kernel.impl.nioneo.alt;
 
 import static org.neo4j.helpers.collection.IteratorUtil.first;
 
+import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -32,6 +34,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.neo4j.helpers.Pair;
+import org.neo4j.kernel.IdType;
 import org.neo4j.kernel.api.index.NodePropertyUpdate;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.InvalidRecordException;
@@ -42,12 +45,13 @@ import org.neo4j.kernel.impl.nioneo.store.PropertyType;
 import org.neo4j.kernel.impl.nioneo.store.Record;
 import org.neo4j.kernel.impl.nioneo.store.RecordLoad;
 import org.neo4j.kernel.impl.nioneo.store.ShortArray;
+import org.neo4j.kernel.impl.nioneo.store.StoreFactory;
 
 /**
  * Implementation of the property store. This implementation has two dynamic
  * stores. One used to store keys and another for string property values.
  */
-public class NeoPropertyStore
+public class NeoPropertyStore extends Store
 {
     
     public static final int DEFAULT_DATA_BLOCK_SIZE = 120;
@@ -61,8 +65,15 @@ public class NeoPropertyStore
     + DEFAULT_PAYLOAD_SIZE /*property blocks*/;
     // = 41
 
+    public static final IdType ID_TYPE = IdType.PROPERTY;
+    
+    public NeoPropertyStore( StoreParameter po )
+    {
+        super( new File( po.path, StoreFactory.PROPERTY_STORE_NAME ), po.config, ID_TYPE, po.idGeneratorFactory, 
+                po.fileSystemAbstraction, po.stringLogger, TYPE_DESCRIPTOR, false, RECORD_SIZE );
+    }
 
-    public static void updateRecord( PropertyRecord record, byte[] data )
+    public static byte[] updateRecord( PropertyRecord record, byte[] data )
     {
         // registerIdFromUpdateRecord( id );
         ByteBuffer buffer = ByteBuffer.wrap( data ); 
@@ -101,11 +112,11 @@ public class NeoPropertyStore
                  * assigned as a whole, so just checking the first should be enough.
                  */
                 // move this elsewhere
-                if ( !block.isLight()
-                     && block.getValueRecords().get( 0 ).isCreated() )
-                {
-                    updateDynamicRecords2( block.getValueRecords() );
-                }
+//                if ( !block.isLight()
+//                     && block.getValueRecords().get( 0 ).isCreated() )
+//                {
+//                    updateDynamicRecords2( block.getValueRecords() );
+//                }
                 
             }
             if ( longsAppended < PropertyType.getPayloadSizeLongs() )
@@ -119,6 +130,7 @@ public class NeoPropertyStore
             buffer.position( 9 ); 
             buffer.putLong( 0 );
         }
+        return data;
         // move this elsewhere
         // updateDynamicRecords( record.getDeletedRecords() );
     }
@@ -168,6 +180,11 @@ public class NeoPropertyStore
         return record;
     }
 
+    public static PropertyRecord getRecord( long id, byte[] data )
+    {
+        return getRecord( id, data, RecordLoad.NORMAL );
+    }
+    
     public static PropertyRecord getRecord( long id, byte[] data, RecordLoad load )
     {
         PropertyRecord toReturn = getRecordFromBuffer( id, data );
@@ -206,7 +223,7 @@ public class NeoPropertyStore
     }
 
 
-    static public void encodeValue( PropertyBlock block, int keyId, Object value )
+    static public void encodeValue( PropertyBlock block, int keyId, Object value, FlatNeoStores neoStores )
     {
         if ( value instanceof String )
         {   // Try short string first, i.e. inlined in the property block
@@ -217,8 +234,8 @@ public class NeoPropertyStore
             }
 
             // Fall back to dynamic string store
-            byte[] encodedString = NeoStringStore.encodeString( string );
-            Collection<DynamicRecord> valueRecords = allocateStringRecords( encodedString );
+            byte[] encodedString = NeoPropertyStringStore.encodeString( string );
+            Collection<DynamicRecord> valueRecords = NeoDynamicStore.allocateRecordsFromBytes( encodedString, neoStores.getStringStore(), DynamicRecord.Type.STRING ); 
             setSingleBlockValue( block, keyId, PropertyType.STRING, first( valueRecords ).getId() );
             for ( DynamicRecord valueRecord : valueRecords )
             {
@@ -276,7 +293,8 @@ public class NeoPropertyStore
             }
 
             // Fall back to dynamic array store
-            Collection<DynamicRecord> arrayRecords = allocateArrayRecords( value );
+            Collection<DynamicRecord> arrayRecords = NeoPropertyArrayStore.allocateFromNumbers( value, Collections.<DynamicRecord>emptyList(), 
+                    new NewDynamicRecordAllocator( neoStores.getArrayStore(), DynamicRecord.Type.ARRAY ) );
             setSingleBlockValue( block, keyId, PropertyType.ARRAY, first( arrayRecords ).getId() );
             for ( DynamicRecord valueRecord : arrayRecords )
             {
@@ -309,28 +327,18 @@ public class NeoPropertyStore
     }
 
 
-    private static Collection<DynamicRecord> allocateArrayRecords( Object value )
-    {
-        throw new RuntimeException( "Implemented somehow" );
-    }
-
-    private static Collection<DynamicRecord> allocateStringRecords( byte[] encodedString )
-    {
-        throw new RuntimeException( "Implemented somehow" );
-    }
-
-    static private void setSingleBlockValue( PropertyBlock block, int keyId, PropertyType type, long longValue )
+     static private void setSingleBlockValue( PropertyBlock block, int keyId, PropertyType type, long longValue )
     {
         block.setSingleBlock( keyId | (((long) type.intValue()) << 24)
                 | (longValue << 28) );
     }
     
     @Deprecated
-    public static void ensureHeavy( PropertyBlock block, RecordStore dynamicStore, long blockId )
+    public static void ensureHeavy( PropertyBlock block, RecordStore dynamicStore, long blockId, DynamicRecord.Type type )
     {
         if ( block.isLight() )
         {
-            Collection<DynamicRecord> dynamicRecords = NeoDynamicStore.getRecords( dynamicStore, blockId, RecordLoad.NORMAL );
+            Collection<DynamicRecord> dynamicRecords = NeoDynamicStore.getRecords( dynamicStore, blockId, RecordLoad.NORMAL, type );
             for ( DynamicRecord stringRecord : dynamicRecords )
             {
                 block.addValueRecord( stringRecord );

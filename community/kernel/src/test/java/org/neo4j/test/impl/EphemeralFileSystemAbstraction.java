@@ -437,9 +437,18 @@ public class EphemeralFileSystemAbstraction extends LifecycleAdapter implements 
         }
 
         @Override
-        public int read( ByteBuffer dst )
+        public int read( ByteBuffer dst ) throws IOException
         {
+            checkOpen();
             return data.read( this, dst );
+        }
+
+        private void checkOpen() throws IOException
+        {
+            if ( !isOpen() )
+            {
+                throw new IOException( "Closed channel" );
+            }
         }
 
         @Override
@@ -451,6 +460,7 @@ public class EphemeralFileSystemAbstraction extends LifecycleAdapter implements 
         @Override
         public int write( ByteBuffer src ) throws IOException
         {
+            checkOpen();
             return data.write( this, src );
         }
 
@@ -469,6 +479,7 @@ public class EphemeralFileSystemAbstraction extends LifecycleAdapter implements 
         @Override
         public FileChannel position( long newPosition ) throws IOException
         {
+            checkOpen();
             this.position = newPosition;
             return this;
         }
@@ -476,12 +487,14 @@ public class EphemeralFileSystemAbstraction extends LifecycleAdapter implements 
         @Override
         public long size() throws IOException
         {
+            checkOpen();
             return data.size();
         }
 
         @Override
         public FileChannel truncate( long size ) throws IOException
         {
+            checkOpen();
             data.truncate( size );
             return this;
         }
@@ -501,6 +514,7 @@ public class EphemeralFileSystemAbstraction extends LifecycleAdapter implements 
         @Override
         public long transferFrom( ReadableByteChannel src, long position, long count ) throws IOException
         {
+            checkOpen();
             long previousPos = position();
             position( position );
             try
@@ -528,12 +542,14 @@ public class EphemeralFileSystemAbstraction extends LifecycleAdapter implements 
         @Override
         public int read( ByteBuffer dst, long position ) throws IOException
         {
+            checkOpen();
             return data.read( new LocalPosition( position ), dst );
         }
 
         @Override
         public int write( ByteBuffer src, long position ) throws IOException
         {
+            checkOpen();
             return data.write( new LocalPosition( position ), src );
         }
 
@@ -617,7 +633,7 @@ public class EphemeralFileSystemAbstraction extends LifecycleAdapter implements 
         {
             int wanted = dst.limit();
             int available = min(wanted, (int) (size() - fc.pos()));
-            if ( available == 0 ) return -1; // EOF
+            if ( available <= 0 ) return -1; // EOF
             int pending = available;
             // Read up until our internal size
             byte[] scratchPad = SCRATCH_PAD.get();

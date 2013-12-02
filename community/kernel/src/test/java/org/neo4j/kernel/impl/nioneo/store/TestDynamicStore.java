@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -43,7 +44,13 @@ import org.neo4j.kernel.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.IdGeneratorFactory;
 import org.neo4j.kernel.IdType;
 import org.neo4j.kernel.configuration.Config;
-import org.neo4j.kernel.impl.nioneo.store.windowpool.WindowPoolFactory;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyArrayStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoDynamicStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStringStore;
+import org.neo4j.kernel.impl.nioneo.alt.NewDynamicRecordAllocator;
+import org.neo4j.kernel.impl.nioneo.alt.Store;
 import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.test.EphemeralFileSystemRule;
 
@@ -51,8 +58,6 @@ public class TestDynamicStore
 {
     public static IdGeneratorFactory ID_GENERATOR_FACTORY =
             new DefaultIdGeneratorFactory();
-    public static WindowPoolFactory WINDOW_POOL_FACTORY =
-            new DefaultWindowPoolFactory();
     @Rule public EphemeralFileSystemRule fs = new EphemeralFileSystemRule();
 
     private File path()
@@ -117,14 +122,15 @@ public class TestDynamicStore
 
     private void createEmptyStore( File fileName, int blockSize )
     {
-        new StoreFactory( config(), ID_GENERATOR_FACTORY, new DefaultWindowPoolFactory(), fs.get(),
+        new StoreFactory( config(), ID_GENERATOR_FACTORY, fs.get(),
                 StringLogger.DEV_NULL, null ).createDynamicArrayStore( fileName, blockSize );
     }
 
-    private DynamicArrayStore newStore()
+    private Store newStore()
     {
-        return new DynamicArrayStore( dynamicStoreFile(), config(), IdType.ARRAY_BLOCK, ID_GENERATOR_FACTORY,
-                WINDOW_POOL_FACTORY, fs.get(), StringLogger.DEV_NULL );
+        return new Store( dynamicStoreFile(), config(), IdType.ARRAY_BLOCK, ID_GENERATOR_FACTORY,
+                fs.get(), StringLogger.DEV_NULL, NeoPropertyArrayStore.TYPE_DESCRIPTOR, true, 
+                NeoPropertyStore.DEFAULT_DATA_BLOCK_SIZE );
     }
 
     private void deleteBothFiles()
@@ -150,8 +156,8 @@ public class TestDynamicStore
             FileChannel fileChannel = fs.get().open( dynamicStoreFile(), "rw" );
             fileChannel.truncate( fileChannel.size() - 2 );
             fileChannel.close();
-            DynamicArrayStore store = newStore();
-            store.makeStoreOk();
+            Store store = newStore(  );
+            // store.makeStoreOk();
             store.close();
         }
         finally
@@ -173,12 +179,12 @@ public class TestDynamicStore
         try
         {
             createEmptyStore( dynamicStoreFile(), 30 );
-            DynamicArrayStore store = newStore();
-            Collection<DynamicRecord> records = store.allocateRecordsFromBytes( new byte[10] );
+            Store store = newStore();
+            Collection<DynamicRecord> records = NeoDynamicStore.allocateRecordsFromBytes( new byte[10], store, DynamicRecord.Type.UNKNOWN );
             long blockId = first( records ).getId();
             for ( DynamicRecord record : records )
             {
-                store.writeToByteArray( record );
+                store.getRecordStore().writeRecord( record.getId(), NeoDynamicStore.writeToByteArray( record ) );
             }
             store.close();
             /*
@@ -188,15 +194,7 @@ public class TestDynamicStore
              */
             try
             {
-                store.getArrayFor( store.getRecords( blockId ) );
-                fail( "Closed store should throw exception" );
-            }
-            catch ( RuntimeException e )
-            { // good
-            }
-            try
-            {
-                store.getLightRecords( 0 );
+                NeoDynamicStore.readFullByteArray( NeoDynamicStore.getRecords( store.getRecordStore(), blockId, RecordLoad.NORMAL, DynamicRecord.Type.UNKNOWN ) );
                 fail( "Closed store should throw exception" );
             }
             catch ( RuntimeException e )
@@ -216,15 +214,18 @@ public class TestDynamicStore
         {
             final String STR = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
             createEmptyStore( dynamicStoreFile(), 30 );
-            DynamicArrayStore store = newStore();
+            Store store = newStore();
             char[] chars = new char[STR.length()];
             STR.getChars( 0, STR.length(), chars, 0 );
-            Collection<DynamicRecord> records = store.allocateRecords( chars );
+            Collection<DynamicRecord> records = NeoPropertyArrayStore.allocateFromNumbers( chars, Collections.<DynamicRecord>emptyList(), 
+                    new NewDynamicRecordAllocator( store, DynamicRecord.Type.UNKNOWN ) );
             for ( DynamicRecord record : records )
             {
-                store.writeToByteArray( record );
+                store.getRecordStore().writeRecord( record.getId(), NeoDynamicStore.writeToByteArray( record ) );
             }
-            // assertEquals( STR, new String( store.getChars( blockId ) ) );
+            Collection<DynamicRecord> loadedRecords = NeoDynamicStore.getRecords( store.getRecordStore(), 
+                    first( records ).getId(), RecordLoad.NORMAL, DynamicRecord.Type.UNKNOWN );
+            assertEquals( STR, new String( (char[]) NeoPropertyArrayStore.getRightArray( NeoDynamicStore.readFullByteArray( loadedRecords ) ) ) );
             store.close();
         }
         finally
@@ -238,7 +239,7 @@ public class TestDynamicStore
     {
         Random random = new Random( System.currentTimeMillis() );
         createEmptyStore( dynamicStoreFile(), 30 );
-        DynamicArrayStore store = newStore();
+        Store store = newStore();
         ArrayList<Long> idsTaken = new ArrayList<Long>();
         Map<Long, byte[]> byteData = new HashMap<Long, byte[]>();
         float deleteIndex = 0.2f;
@@ -255,15 +256,15 @@ public class TestDynamicStore
                 {
                     long blockId = idsTaken.remove(
                             random.nextInt( currentCount ) );
-                    store.getLightRecords( blockId );
-                    byte[] bytes = (byte[]) store.getArrayFor( store.getRecords( blockId ) );
+                    Collection<DynamicRecord> records = 
+                            NeoDynamicStore.getRecords( store.getRecordStore(), 
+                                    blockId, RecordLoad.NORMAL, DynamicRecord.Type.UNKNOWN );
+                    byte[] bytes = NeoDynamicStore.readFullByteArray( records );
                     validateData( bytes, byteData.remove( blockId ) );
-                    Collection<DynamicRecord> records = store
-                            .getLightRecords( blockId );
                     for ( DynamicRecord record : records )
                     {
                         record.setInUse( false );
-                        store.writeToByteArray( record );
+                        store.getRecordStore().writeRecord( record.getId(), NeoDynamicStore.writeToByteArray( record ) );
                         set.remove( record.getId() );
                     }
                     currentCount--;
@@ -271,11 +272,11 @@ public class TestDynamicStore
                 else
                 {
                     byte bytes[] = createRandomBytes( random );
-                    Collection<DynamicRecord> records = store.allocateRecords( bytes );
+                    Collection<DynamicRecord> records = NeoDynamicStore.allocateRecordsFromBytes( bytes, store, DynamicRecord.Type.UNKNOWN );
                     for ( DynamicRecord record : records )
                     {
                         assert !set.contains( record.getId() );
-                        store.writeToByteArray( record );
+                        store.getRecordStore().writeRecord( record.getId(), NeoDynamicStore.writeToByteArray( record ) );
                         set.add( record.getId() );
                     }
                     long blockId = first( records ).getId();
@@ -355,12 +356,22 @@ public class TestDynamicStore
         }
     }
 
-    private long create( DynamicArrayStore store, Object arrayToStore )
+    private long create( Store store, Object arrayToStore )
     {
-        Collection<DynamicRecord> records = store.allocateRecords( arrayToStore );
+        Collection<DynamicRecord> records;
+        if ( arrayToStore instanceof String[] )
+        {
+            records = NeoPropertyArrayStore.allocateFromString( (String[]) arrayToStore, 
+                    Collections.<DynamicRecord>emptyList(), new NewDynamicRecordAllocator( store, DynamicRecord.Type.UNKNOWN ) );
+        }
+        else
+        {
+            records = NeoPropertyArrayStore.allocateFromNumbers( arrayToStore, 
+                    Collections.<DynamicRecord>emptyList(), new NewDynamicRecordAllocator( store, DynamicRecord.Type.UNKNOWN ) );
+        }
         for ( DynamicRecord record : records )
         {
-            store.writeToByteArray( record );
+            store.getRecordStore().writeRecord( record.getId(), NeoDynamicStore.writeToByteArray( record ) );
         }
         return first( records ).getId();
     }
@@ -369,20 +380,20 @@ public class TestDynamicStore
     public void testAddDeleteSequenceEmptyNumberArray()
     {
         createEmptyStore( dynamicStoreFile(), 30 );
-        DynamicArrayStore store = newStore();
+        Store store = newStore();
         try
         {
             byte[] emptyToWrite = createBytes( 0 );
             long blockId = create( store, emptyToWrite );
-            store.getLightRecords( blockId );
-            byte[] bytes = (byte[]) store.getArrayFor( store.getRecords( blockId ) );
+            Collection<DynamicRecord> records = NeoDynamicStore.getRecords( store.getRecordStore(), blockId, DynamicRecord.Type.UNKNOWN );
+            byte[] bytes = (byte[]) NeoPropertyArrayStore.getRightArray(  
+                    NeoDynamicStore.readFullByteArray( records ) ); 
             assertEquals( 0, bytes.length );
 
-            Collection<DynamicRecord> records = store.getLightRecords( blockId );
             for ( DynamicRecord record : records )
             {
                 record.setInUse( false );
-                store.writeToByteArray( record );
+                store.getRecordStore().writeRecord( record.getId(), NeoDynamicStore.writeToByteArray( record ) );
             }
         }
         finally
@@ -396,19 +407,18 @@ public class TestDynamicStore
     public void testAddDeleteSequenceEmptyStringArray()
     {
         createEmptyStore( dynamicStoreFile(), 30 );
-        DynamicArrayStore store = newStore();
+        Store store = newStore();
         try
         {
             long blockId = create( store, new String[0] );
-            store.getLightRecords( blockId );
-            String[] readBack = (String[]) store.getArrayFor( store.getRecords( blockId ) );
+            Collection<DynamicRecord> records = NeoDynamicStore.getRecords( store.getRecordStore(), blockId, DynamicRecord.Type.UNKNOWN );
+            String[] readBack = (String[]) NeoPropertyArrayStore.getRightArray( NeoDynamicStore.readFullByteArray( records ) );
             assertEquals( 0, readBack.length );
 
-            Collection<DynamicRecord> records = store.getLightRecords( blockId );
             for ( DynamicRecord record : records )
             {
                 record.setInUse( false );
-                store.writeToByteArray( record );
+                store.getRecordStore().writeRecord( record.getId(), NeoDynamicStore.writeToByteArray( record ) );
             }
         }
         finally

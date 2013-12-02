@@ -27,6 +27,7 @@ import java.nio.channels.OverlappingFileLockException;
 
 import org.neo4j.helpers.Settings;
 import org.neo4j.kernel.StoreLocker;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
 
 public abstract class FileLock
 {
@@ -66,7 +67,7 @@ public abstract class FileLock
             // For the rest just return placebo locks
             return new PlaceboFileLock();
         }
-        else if ( fileName.getName().equals( NeoStore.DEFAULT_NAME ) )
+        else if ( fileName.getName().equals( StoreFactory.NEO_STORE_NAME ) )
         {
             FileLock regular = wrapOrNull( channel.tryLock() );
             if ( regular == null )

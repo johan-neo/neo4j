@@ -12,7 +12,7 @@ public class FileWithRecords
     private final String name;
     private final FileChannel fileChannel;
     private final int recordSize;
-
+    
     public FileWithRecords( String name, FileChannel fileChannel, int recordSize )
     {
         if ( recordSize < 1 )
@@ -71,11 +71,16 @@ public class FileWithRecords
         try
         {
             int read = fileChannel.read( intoBuffer, startPos );
+            if ( read == -1 )
+            {
+                read = 0;
+            }
             if ( startPos + bytesToRead > fileLength && intoBuffer.hasRemaining() )
             {
-                fileChannel.write( intoBuffer, getFileSize() );
+                read += intoBuffer.remaining();
+                // read += fileChannel.write( intoBuffer, getFileSize() );
             }
-            else
+            if ( read < bytesToRead )
             {
                 throw new UnderlyingStorageException( "Only read " + read + " expected " + bytesToRead );
             }

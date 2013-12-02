@@ -22,7 +22,6 @@ import org.neo4j.kernel.impl.nioneo.store.FileSystemAbstraction;
 import org.neo4j.kernel.impl.nioneo.store.IdGenerator;
 import org.neo4j.kernel.impl.nioneo.store.InvalidIdGeneratorException;
 import org.neo4j.kernel.impl.nioneo.store.InvalidRecordException;
-import org.neo4j.kernel.impl.nioneo.store.NeoStore;
 import org.neo4j.kernel.impl.nioneo.store.NotCurrentStoreVersionException;
 import org.neo4j.kernel.impl.nioneo.store.ReadOnlyIdGenerator;
 import org.neo4j.kernel.impl.nioneo.store.Record;
@@ -35,7 +34,6 @@ public class StoreLoader
     public static abstract class Configuration
     {
         public static final Setting<File> store_dir = InternalAbstractGraphDatabase.Configuration.store_dir;
-        public static final Setting<File> neo_store = InternalAbstractGraphDatabase.Configuration.neo_store;
 
         public static final Setting<Boolean> read_only = GraphDatabaseSettings.read_only;
         public static final Setting<Boolean> backup_slave = GraphDatabaseSettings.backup_slave;
@@ -329,7 +327,7 @@ public class StoreLoader
 
     private String buildTypeDescriptorAndVersion( String typeDescriptor )
     {
-        return NeoStore.buildTypeDescriptorAndVersion( typeDescriptor );
+        return NeoNeoStore.buildTypeDescriptorAndVersion( typeDescriptor );
     }
 
     public boolean isStoreOk()
@@ -367,19 +365,8 @@ public class StoreLoader
             throw new InvalidRecordException( "Illegal blockSize: " +
                 getRecordSize() );
         }
-        File idGeneratorFileName = new File( storageFileName.getPath() + ".id" );
-        if ( isDynamic )
-        {
-            idGenerator.setHighId( 1 ); // reserved first block containing blockSize
-        }
-        
-        if ( isReadOnly() && !isBackupSlave() )
-        {
-            throw new ReadOnlyDbException();
-        }
-
         stringLogger.debug( "Rebuilding id generator for[" + storageFileName + "] ..." );
-        idGenerator.close();
+        File idGeneratorFileName = new File( storageFileName.getPath() + ".id" );
         if ( fileSystemAbstraction.fileExists( new File( storageFileName.getPath() + ".id" ) ) )
         {
             boolean success = fileSystemAbstraction.deleteFile( new File( storageFileName.getPath() + ".id" ) );
@@ -388,6 +375,10 @@ public class StoreLoader
         idGeneratorFactory.create( fileSystemAbstraction, idGeneratorFileName, 0 );
         idGenerator = idGeneratorFactory
                 .open( fileSystemAbstraction, idGeneratorFileName, idType.getGrabSize(), idType, figureOutHighestIdInUse() );
+        if ( isDynamic )
+        {
+            idGenerator.setHighId( 1 ); // reserved first block containing blockSize
+        }
         FileChannel fileChannel = getFileChannel();
         long highId = 1;
         long defraggedCount = 0;
@@ -478,5 +469,42 @@ public class StoreLoader
         }
         byte inUse = buffer.get();
         return (inUse & 0x1) == Record.IN_USE.byteValue();
+    }
+    
+    public void writeTypeAndVersion()
+    {
+        boolean success = false;
+        IOException storedIoe = null;
+        // hack for WINBLOWS
+        if ( !isReadOnly() || isBackupSlave() )
+        {
+            for ( int i = 0; i < 10; i++ )
+            {
+                try
+                {
+                    fileChannel.position( idGenerator.getHighId() * recordSize );
+                    ByteBuffer buffer = ByteBuffer.wrap(
+                            UTF8.encode( getTypeAndVersionDescriptor() ) );
+                    fileChannel.write( buffer );
+                    stringLogger.debug( "Closing " + storageFileName + ", truncating at " + fileChannel.position() +
+                                        " vs file size " + fileChannel.size() );
+                    fileChannel.truncate( fileChannel.position() );
+                    fileChannel.force( false );
+                    success = true;
+                    break;
+                }
+                catch ( IOException e )
+                {
+                    storedIoe = e;
+                    System.gc();
+                }
+            }
+        }
+        if ( !success )
+        {
+            throw new UnderlyingStorageException( "Unable to close store "
+                                                  + storageFileName, storedIoe );
+        }
+
     }
 }

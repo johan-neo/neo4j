@@ -19,6 +19,10 @@
  */
 package org.neo4j.kernel.impl.nioneo.xa;
 
+import static org.neo4j.kernel.api.index.NodePropertyUpdate.add;
+import static org.neo4j.kernel.api.index.NodePropertyUpdate.remove;
+import static org.neo4j.kernel.impl.nioneo.store.labels.NodeLabelsField.parseLabelsField;
+
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -31,33 +35,30 @@ import org.neo4j.kernel.api.index.NodePropertyUpdate;
 import org.neo4j.kernel.api.properties.DefinedProperty;
 import org.neo4j.kernel.impl.api.index.UpdateMode;
 import org.neo4j.kernel.impl.api.index.IndexUpdates;
+import org.neo4j.kernel.impl.api.index.PropertyPhysicalToLogicalConverter;
 import org.neo4j.kernel.impl.core.IteratingPropertyReceiver;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNodeStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStore;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
-import org.neo4j.kernel.impl.nioneo.store.NodeStore;
+import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
-import org.neo4j.kernel.impl.nioneo.store.PropertyStore;
 import org.neo4j.kernel.impl.nioneo.xa.Command.Mode;
 import org.neo4j.kernel.impl.nioneo.xa.Command.NodeCommand;
 import org.neo4j.kernel.impl.nioneo.xa.Command.PropertyCommand;
 import org.neo4j.kernel.impl.nioneo.xa.WriteTransaction.LabelChangeSummary;
 
-import static org.neo4j.kernel.api.index.NodePropertyUpdate.add;
-import static org.neo4j.kernel.api.index.NodePropertyUpdate.remove;
-import static org.neo4j.kernel.impl.nioneo.store.labels.NodeLabelsField.parseLabelsField;
-
 class LazyIndexUpdates implements IndexUpdates
 {
-    private final NodeStore nodeStore;
-    private final PropertyStore propertyStore;
+    private final FlatNeoStores neoStores;
     private final Collection<PropertyCommand> propCommands;
     private final Map<Long, NodeCommand> nodeCommands;
     private Collection<NodePropertyUpdate> updates;
 
-    public LazyIndexUpdates( NodeStore nodeStore, PropertyStore propertyStore,
+    public LazyIndexUpdates( FlatNeoStores neoStores,
                              Collection<PropertyCommand> propCommands, Map<Long, NodeCommand> nodeCommands )
     {
-        this.nodeStore = nodeStore;
-        this.propertyStore = propertyStore;
+        this.neoStores = neoStores;
         this.propCommands = propCommands;
         this.nodeCommands = nodeCommands;
     }
@@ -111,8 +112,8 @@ class LazyIndexUpdates implements IndexUpdates
             NodeCommand nodeChanges = nodeCommands.get( after.getNodeId() );
             if ( nodeChanges != null )
             {
-                nodeLabelsBefore = parseLabelsField( nodeChanges.getBefore() ).get( nodeStore );
-                nodeLabelsAfter = parseLabelsField( nodeChanges.getAfter() ).get( nodeStore );
+                nodeLabelsBefore = parseLabelsField( nodeChanges.getBefore() ).get( neoStores.getLabelStore() );
+                nodeLabelsAfter = parseLabelsField( nodeChanges.getAfter() ).get( neoStores.getLabelStore() );
             }
             else
             {
@@ -131,13 +132,16 @@ class LazyIndexUpdates implements IndexUpdates
                  * if this happens and we're in recovery mode that the node in question will be deleted
                  * in an upcoming transaction, so just skip this update.
                  */
-                NodeRecord nodeRecord = nodeStore.getRecord( after.getNodeId() );
-                nodeLabelsBefore = nodeLabelsAfter = parseLabelsField( nodeRecord ).get( nodeStore );
+                NodeRecord nodeRecord = NeoNodeStore.getRecord( after.getNodeId(), 
+                        neoStores.getNodeStore().getRecordStore().getRecord( after.getNodeId() ) ); 
+
+                nodeLabelsBefore = nodeLabelsAfter = parseLabelsField( nodeRecord ).get( neoStores.getLabelStore() );
             }
 
-            for ( NodePropertyUpdate update :
-                    propertyStore.toLogicalUpdates( propertyCommand.getBefore(), nodeLabelsBefore, after,
-                                                    nodeLabelsAfter ) )
+            Iterable<NodePropertyUpdate> propertyUpdates = new PropertyPhysicalToLogicalConverter( neoStores.getStringStore(), 
+                    neoStores.getArrayStore() ).apply( propertyCommand.getBefore(), nodeLabelsBefore, after,
+                            nodeLabelsAfter );
+            for ( NodePropertyUpdate update : propertyUpdates )
             {
                 updates.add( update );
                 if ( update.getUpdateMode() == UpdateMode.CHANGED )
@@ -154,8 +158,8 @@ class LazyIndexUpdates implements IndexUpdates
         for ( NodeCommand nodeCommand : nodeCommands.values() )
         {
             long nodeId = nodeCommand.getKey();
-            long[] labelsBefore = parseLabelsField( nodeCommand.getBefore() ).get( nodeStore );
-            long[] labelsAfter = parseLabelsField( nodeCommand.getAfter() ).get( nodeStore );
+            long[] labelsBefore = parseLabelsField( nodeCommand.getBefore() ).get( neoStores.getLabelStore() );
+            long[] labelsAfter = parseLabelsField( nodeCommand.getAfter() ).get( neoStores.getLabelStore() );
 
             if ( nodeCommand.getMode() != Mode.UPDATE )
             {
@@ -187,8 +191,23 @@ class LazyIndexUpdates implements IndexUpdates
 
     private Iterator<DefinedProperty> nodeFullyLoadProperties( long nodeId )
     {
+        
+        NodeRecord nodeRecord = NeoNodeStore.getRecord( nodeId, 
+                neoStores.getNodeStore().getRecordStore().getRecord( nodeId ) ); 
         IteratingPropertyReceiver receiver = new IteratingPropertyReceiver();
-        WriteTransaction.loadProperties( propertyStore, nodeCommands.get( nodeId ).getAfter().getNextProp(), receiver );
+        Collection<PropertyRecord> chain = 
+                NeoPropertyStore.getPropertyRecordChain( neoStores.getPropertyStore().getRecordStore(), nodeRecord.getNextProp() );
+
+        if ( chain != null )
+        {
+            for ( PropertyRecord propRecord : chain )
+            {
+                for ( PropertyBlock propBlock : propRecord.getPropertyBlocks() )
+                {
+                    receiver.receive( propBlock.newPropertyData( neoStores ), propRecord.getId() );
+                }
+            }
+        }
         return receiver;
     }
 }

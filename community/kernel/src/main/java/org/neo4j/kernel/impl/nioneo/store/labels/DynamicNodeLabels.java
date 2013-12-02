@@ -21,9 +21,6 @@ package org.neo4j.kernel.impl.nioneo.store.labels;
 
 import static java.lang.String.format;
 import static org.neo4j.helpers.collection.IteratorUtil.first;
-import static org.neo4j.kernel.impl.nioneo.store.AbstractDynamicStore.readFullByteArrayFromHeavyRecords;
-import static org.neo4j.kernel.impl.nioneo.store.DynamicArrayStore.getRightArray;
-import static org.neo4j.kernel.impl.nioneo.store.PropertyType.ARRAY;
 import static org.neo4j.kernel.impl.nioneo.store.labels.LabelIdArray.filter;
 import static org.neo4j.kernel.impl.nioneo.store.labels.LabelIdArray.stripNodeId;
 import static org.neo4j.kernel.impl.nioneo.store.labels.NodeLabelsField.parseLabelsBody;
@@ -33,10 +30,9 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.neo4j.kernel.impl.nioneo.alt.NeoArrayStore;
 import org.neo4j.kernel.impl.nioneo.alt.NeoDynamicStore;
 import org.neo4j.kernel.impl.nioneo.alt.NeoLabelStore;
-import org.neo4j.kernel.impl.nioneo.alt.Store;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyArrayStore;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 
@@ -52,14 +48,14 @@ public class DynamicNodeLabels implements NodeLabels
     }
 
     @Override
-    public long[] get( Store labelStore )
+    public long[] get( NeoLabelStore labelStore )
     {
         if ( node.isLight() )
         {
             node.addLabelDynamicRecords( NeoLabelStore.ensureHeavy( node.getLabelField(), labelStore.getRecordStore() ) );
         }
         byte[] arrayData = NeoDynamicStore.readFullByteArray( node.getDynamicLabelRecords() );
-        return (long[]) NeoArrayStore.getRightArray( arrayData );
+        return (long[]) NeoPropertyArrayStore.getRightArray( arrayData );
     }
 
     @Override
@@ -76,11 +72,12 @@ public class DynamicNodeLabels implements NodeLabels
                 return null;
             }
         }
-        return stripNodeId( (long[]) getRightArray( readFullByteArrayFromHeavyRecords(
-                node.getUsedDynamicLabelRecords(), ARRAY ) ) );
+
+        return stripNodeId( (long[]) NeoPropertyArrayStore.getRightArray( NeoDynamicStore.readFullByteArray(
+                node.getUsedDynamicLabelRecords() ) ) );
     }
 
-    public Collection<DynamicRecord> put( long[] labelIds, Store labelStore )
+    public Collection<DynamicRecord> put( long[] labelIds, NeoLabelStore labelStore )
     {
         Collection<DynamicRecord> changedDynamicRecords = Collections.emptyList();
 
@@ -110,14 +107,14 @@ public class DynamicNodeLabels implements NodeLabels
     }
 
     @Override
-    public Collection<DynamicRecord> add( long labelId, Store labelStore )
+    public Collection<DynamicRecord> add( long labelId, NeoLabelStore labelStore )
     {
         if ( node.isLight() )
         {
             node.addLabelDynamicRecords( NeoLabelStore.ensureHeavy( node.getLabelField(), labelStore.getRecordStore() ) );
         }
         Collection<DynamicRecord> existingRecords = node.getDynamicLabelRecords();
-        long[] existingLabelIds = (long[]) NeoArrayStore.getRightArray( NeoDynamicStore.readFullByteArray( existingRecords ) );
+        long[] existingLabelIds = (long[]) NeoPropertyArrayStore.getRightArray( NeoDynamicStore.readFullByteArray( existingRecords ) );
         long[] newLabelIds = LabelIdArray.concatAndSort( existingLabelIds, labelId );
         Collection<DynamicRecord> changedDynamicRecords =
             NeoLabelStore.allocateRecordsForLabels( node.getId(), newLabelIds, existingRecords, labelStore );
@@ -127,14 +124,14 @@ public class DynamicNodeLabels implements NodeLabels
     }
 
     @Override
-    public Collection<DynamicRecord> remove( long labelId, Store labelStore )
+    public Collection<DynamicRecord> remove( long labelId, NeoLabelStore labelStore )
     {
         if ( node.isLight() )
         {
             node.addLabelDynamicRecords( NeoLabelStore.ensureHeavy( node.getLabelField(), labelStore.getRecordStore() ) );
         }
         Collection<DynamicRecord> existingRecords = node.getDynamicLabelRecords();
-        long[] existingLabelIds = (long[]) NeoArrayStore.getRightArray( NeoDynamicStore.readFullByteArray( existingRecords ) );
+        long[] existingLabelIds = (long[]) NeoPropertyArrayStore.getRightArray( NeoDynamicStore.readFullByteArray( existingRecords ) );
         long[] newLabelIds = filter( existingLabelIds, labelId );
         if ( new InlineNodeLabels( labelField, node ).tryInlineInNodeRecord( newLabelIds, existingRecords ) )
         {
@@ -162,7 +159,7 @@ public class DynamicNodeLabels implements NodeLabels
     }
 
     @Override
-    public void ensureHeavy( Store labelStore )
+    public void ensureHeavy( NeoLabelStore labelStore )
     {
         if ( !node.isLight() )
         {

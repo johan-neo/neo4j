@@ -24,12 +24,13 @@ import java.util.Collection;
 
 import org.junit.Test;
 import org.neo4j.kernel.impl.api.index.IndexingService;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoSchemaStore;
+import org.neo4j.kernel.impl.nioneo.alt.RecordStore;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.IndexRule;
-import org.neo4j.kernel.impl.nioneo.store.NeoStore;
 import org.neo4j.kernel.impl.nioneo.store.RecordSerializer;
 import org.neo4j.kernel.impl.nioneo.store.SchemaRule;
-import org.neo4j.kernel.impl.nioneo.store.SchemaStore;
 import org.neo4j.kernel.impl.nioneo.xa.Command.SchemaRuleCommand;
 import org.neo4j.kernel.impl.transaction.xaframework.InMemoryLogBuffer;
 
@@ -52,14 +53,13 @@ public class SchemaRuleCommandTest
         Collection<DynamicRecord> beforeRecords = serialize( rule, id, false, false);
         Collection<DynamicRecord> afterRecords = serialize( rule, id, true, true);
 
-        SchemaRuleCommand command = new SchemaRuleCommand( neoStore, store, indexes,
-                beforeRecords, afterRecords, rule, txId );
+        SchemaRuleCommand command = new SchemaRuleCommand( beforeRecords, afterRecords, rule, txId );
 
         // WHEN
-        command.execute();
+        command.execute( neoStore, store, indexes );
 
         // THEN
-        verify( store ).updateRecord( first( afterRecords ) );
+        verify( store ).getRecordStore().writeRecord( id, null ); // updateRecord( first( afterRecords ) );
         verify( indexes ).createIndex( rule );
     }
 
@@ -70,15 +70,15 @@ public class SchemaRuleCommandTest
         Collection<DynamicRecord> beforeRecords = serialize( rule, id, true, true);
         Collection<DynamicRecord> afterRecords = serialize( rule, id, true, false);
 
-        SchemaRuleCommand command = new SchemaRuleCommand( neoStore, store, indexes, beforeRecords, afterRecords,
+        SchemaRuleCommand command = new SchemaRuleCommand( beforeRecords, afterRecords,
                 uniquenessConstraintRule( id, labelId, propertyKey, 0 ), txId );
 
         // WHEN
-        command.execute();
+        command.execute( neoStore, store, indexes );
 
         // THEN
-        verify( store ).updateRecord( first( afterRecords ) );
-        verify( neoStore ).setLatestConstraintIntroducingTx( txId );
+        verify( store ).getRecordStore().writeRecord( id, null ); // updateRecord( first( afterRecords ) );
+        verify( neoStore ).getRecordStore().writeRecord( NeoNeoStore.LATEST_CONSTRAINT_TX_POSITION, null ); // setLatestConstraintIntroducingTx( txId );
     }
 
     @Test
@@ -88,13 +88,13 @@ public class SchemaRuleCommandTest
         Collection<DynamicRecord> beforeRecords = serialize( rule, id, true, true);
         Collection<DynamicRecord> afterRecords = serialize( rule, id, false, false);
 
-        SchemaRuleCommand command = new SchemaRuleCommand( neoStore, store, indexes, beforeRecords, afterRecords, rule, txId );
+        SchemaRuleCommand command = new SchemaRuleCommand( beforeRecords, afterRecords, rule, txId );
 
         // WHEN
-        command.execute();
+        command.execute( neoStore, store, indexes  );
 
         // THEN
-        verify( store ).updateRecord( first( afterRecords ) );
+        verify( store ).getRecordStore().writeRecord( id, null ); // updateRecord( first( afterRecords ) );
         verify( indexes ).dropIndex( rule );
     }
 
@@ -105,14 +105,14 @@ public class SchemaRuleCommandTest
         Collection<DynamicRecord> beforeRecords = serialize( rule, id, false, false);
         Collection<DynamicRecord> afterRecords = serialize( rule, id, true, true);
 
-        SchemaRuleCommand command = new SchemaRuleCommand( neoStore, store, indexes, beforeRecords, afterRecords, rule, txId );
+        SchemaRuleCommand command = new SchemaRuleCommand( beforeRecords, afterRecords, rule, txId );
         InMemoryLogBuffer buffer = new InMemoryLogBuffer();
 
-        when( neoStore.getSchemaStore() ).thenReturn( store );
+        // when( neoStore.getSchemaStore() ).thenReturn( store );
 
         // WHEN
         command.writeToFile( buffer );
-        Command readCommand = readCommand( neoStore, indexes, buffer, allocate( 1000 ) );
+        Command readCommand = readCommand( buffer, allocate( 1000 ) );
 
         // THEN
         assertThat( readCommand, instanceOf( SchemaRuleCommand.class ) );
@@ -128,13 +128,13 @@ public class SchemaRuleCommandTest
         Collection<DynamicRecord> beforeRecords = serialize( rule, id, true, true);
         Collection<DynamicRecord> afterRecords = serialize( rule, id, false, false);
 
-        SchemaRuleCommand command = new SchemaRuleCommand( neoStore, store, indexes, beforeRecords, afterRecords, rule, txId );
+        SchemaRuleCommand command = new SchemaRuleCommand( beforeRecords, afterRecords, rule, txId );
         InMemoryLogBuffer buffer = new InMemoryLogBuffer();
-        when( neoStore.getSchemaStore() ).thenReturn( store );
+        // when( neoStore.getSchemaStore() ).thenReturn( store );
 
         // WHEN
         command.writeToFile( buffer );
-        Command readCommand = readCommand( neoStore, indexes, buffer, allocate( 1000 ) );
+        Command readCommand = readCommand( buffer, allocate( 1000 ) );
 
         // THEN
         assertThat( readCommand, instanceOf( SchemaRuleCommand.class ) );
@@ -144,8 +144,8 @@ public class SchemaRuleCommandTest
         assertThat(readSchemaCommand.getSchemaRule(), equalTo((SchemaRule)rule));
     }
 
-    private final NeoStore neoStore = mock( NeoStore.class );
-    private final SchemaStore store = mock( SchemaStore.class );
+    private final NeoNeoStore neoStore = mock( NeoNeoStore.class );
+    private final NeoSchemaStore store = mock( NeoSchemaStore.class );
     private final IndexingService indexes = mock( IndexingService.class );
     private final int labelId = 2;
     private final int propertyKey = 8;
@@ -157,7 +157,7 @@ public class SchemaRuleCommandTest
     {
         RecordSerializer serializer = new RecordSerializer();
         serializer = serializer.append( rule );
-        DynamicRecord record = new DynamicRecord( id );
+        DynamicRecord record = new DynamicRecord( id, DynamicRecord.Type.UNKNOWN );
         record.setData( serializer.serialize() );
         if ( created )
         {

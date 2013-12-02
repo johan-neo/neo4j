@@ -19,25 +19,29 @@
  */
 package org.neo4j.kernel.impl.nioneo.alt;
 
-import org.neo4j.helpers.UTF8;
+import java.io.File;
+import java.nio.ByteBuffer;
+import java.util.LinkedList;
 
+import org.neo4j.kernel.IdType;
+import org.neo4j.kernel.impl.core.Token;
+import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
+import org.neo4j.kernel.impl.nioneo.store.InvalidRecordException;
+import org.neo4j.kernel.impl.nioneo.store.Record;
+import org.neo4j.kernel.impl.nioneo.store.StoreFactory;
+import org.neo4j.kernel.impl.nioneo.store.TokenRecord;
 
 /**
- * Dynamic store that stores strings.
+ * Implementation of the property store.
  */
-public class NeoStringStore extends NeoDynamicStore
+public class NeoTokenNameStore extends Store
 {
-    // store version, each store ends with this string (byte encoded)
+    public static final int NAME_STORE_BLOCK_SIZE = 30;
     public static final String TYPE_DESCRIPTOR = "StringPropertyStore";
-    public static final String VERSION = NeoNeoStore.buildTypeDescriptorAndVersion( TYPE_DESCRIPTOR );
     
-    public static byte[] encodeString( String string )
+    public NeoTokenNameStore( StoreParameter po, String fileName, IdType idType, String typeDescriptor )
     {
-        return UTF8.encode( string );
-    }
-
-    public static String decodeString( byte[] byteArray )
-    {
-        return UTF8.decode( byteArray );
+        super( new File( po.path, fileName ), po.config, idType, po.idGeneratorFactory, 
+                po.fileSystemAbstraction, po.stringLogger, typeDescriptor, true, NAME_STORE_BLOCK_SIZE );
     }
 }

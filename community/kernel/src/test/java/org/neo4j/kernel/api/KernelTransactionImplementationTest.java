@@ -19,15 +19,15 @@
  */
 package org.neo4j.kernel.api;
 
+import static org.mockito.Mockito.mock;
+
 import org.junit.Test;
 
 import org.neo4j.kernel.impl.api.KernelTransactionImplementation;
 import org.neo4j.kernel.impl.api.LockHolder;
 import org.neo4j.kernel.impl.core.TransactionState;
-import org.neo4j.kernel.impl.nioneo.store.NeoStore;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
 import org.neo4j.kernel.impl.transaction.AbstractTransactionManager;
-
-import static org.mockito.Mockito.mock;
 
 public class KernelTransactionImplementationTest
 {
@@ -39,7 +39,7 @@ public class KernelTransactionImplementationTest
     {
         // given
         KernelTransactionImplementation tx = new KernelTransactionImplementation( null, null, false, null, null,
-                null, txm, null, null, mock(LockHolder.class), null, null, mock( NeoStore.class ),
+                null, txm, null, null, mock(LockHolder.class), null, null, mock( FlatNeoStores.class ),
                 mock(TransactionState.class) );
         // when
         tx.prepare();

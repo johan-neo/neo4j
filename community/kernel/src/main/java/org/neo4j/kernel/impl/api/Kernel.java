@@ -19,6 +19,8 @@
  */
 package org.neo4j.kernel.impl.api;
 
+import static org.neo4j.helpers.collection.IteratorUtil.loop;
+
 import javax.transaction.SystemException;
 import javax.transaction.Transaction;
 
@@ -44,15 +46,12 @@ import org.neo4j.kernel.impl.core.RelationshipTypeTokenHolder;
 import org.neo4j.kernel.impl.core.TransactionState;
 import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
 import org.neo4j.kernel.impl.nioneo.alt.NeoSchemaStore;
-import org.neo4j.kernel.impl.nioneo.store.NeoStore;
 import org.neo4j.kernel.impl.nioneo.store.SchemaRule;
 import org.neo4j.kernel.impl.nioneo.store.SchemaStorage;
 import org.neo4j.kernel.impl.persistence.PersistenceManager;
 import org.neo4j.kernel.impl.transaction.AbstractTransactionManager;
 import org.neo4j.kernel.impl.transaction.LockManager;
 import org.neo4j.kernel.lifecycle.LifecycleAdapter;
-
-import static org.neo4j.helpers.collection.IteratorUtil.loop;
 
 /**
  * This is the beginnings of an implementation of the Kernel API, which is meant to be an internal API for
@@ -170,7 +169,7 @@ public class Kernel extends LifecycleAdapter implements KernelAPI
     public void start()
     {
         
-        for ( SchemaRule schemaRule : loop( NeoSchemaStore.loadAllSchemaRules( neoStores.getSchemaStore().getRecordStore() ) ) )
+        for ( SchemaRule schemaRule : loop( NeoSchemaStore.loadAllSchemaRules( neoStores.getSchemaStore() ) ) )
         {
             schemaCache.addSchemaRule( schemaRule );
         }

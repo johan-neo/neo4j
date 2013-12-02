@@ -22,15 +22,15 @@ package org.neo4j.kernel.impl.index;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.neo4j.kernel.impl.nioneo.store.NeoStore.versionStringToLong;
+import static org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore.versionStringToLong;
 
 import java.io.File;
 
 import org.junit.Before;
 import org.junit.Test;
 import org.neo4j.kernel.DefaultFileSystemAbstraction;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
 import org.neo4j.kernel.impl.nioneo.store.FileSystemAbstraction;
-import org.neo4j.kernel.impl.nioneo.store.NeoStore;
 import org.neo4j.kernel.impl.nioneo.store.NotCurrentStoreVersionException;
 import org.neo4j.kernel.impl.storemigration.UpgradeNotAllowedByConfigurationException;
 import org.neo4j.kernel.impl.util.FileUtils;
@@ -78,7 +78,7 @@ public class TestIndexProviderStore
         {   // Good
         }
         store = new IndexProviderStore( file, fileSystem, versionStringToLong( "3.5" ), true );
-        assertEquals( "3.5", NeoStore.versionLongToString( store.getIndexVersion() ) );
+        assertEquals( "3.5", NeoNeoStore.versionLongToString( store.getIndexVersion() ) );
         store.close();
     }
     

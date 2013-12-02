@@ -28,6 +28,11 @@ import org.neo4j.helpers.Predicate;
 import org.neo4j.helpers.collection.PrefetchingIterator;
 import org.neo4j.kernel.api.exceptions.schema.MalformedSchemaRuleException;
 import org.neo4j.kernel.api.exceptions.schema.SchemaRuleNotFoundException;
+import org.neo4j.kernel.impl.nioneo.alt.NeoDynamicStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoSchemaStore;
+import org.neo4j.kernel.impl.nioneo.store.IndexRule;
+import org.neo4j.kernel.impl.nioneo.store.SchemaRule;
+import org.neo4j.kernel.impl.nioneo.store.UniquenessConstraintRule;
 
 import static org.neo4j.helpers.collection.Iterables.filter;
 import static org.neo4j.helpers.collection.Iterables.map;
@@ -64,9 +69,9 @@ public class SchemaStorage implements SchemaRuleAccess
         public abstract boolean isOfKind( IndexRule rule );
     }
 
-    private final RecordStore<DynamicRecord> schemaStore;
+    private final NeoSchemaStore schemaStore;
 
-    public SchemaStorage( RecordStore<DynamicRecord> schemaStore )
+    public SchemaStorage( NeoSchemaStore schemaStore )
     {
         this.schemaStore = schemaStore;
     }
@@ -148,7 +153,7 @@ public class SchemaStorage implements SchemaRuleAccess
                        rule.getKind().getRuleClass() == ruleType &&
                        predicate.accept( (R) rule );
             }
-        }, loadAllSchemaRules() ) );
+        }, NeoSchemaStore.loadAllSchemaRules( schemaStore ) ) );
     }
     
     
@@ -189,7 +194,7 @@ public class SchemaStorage implements SchemaRuleAccess
     {
         return new PrefetchingIterator<SchemaRule>()
         {
-            private final long highestId = schemaStore.getHighestPossibleIdInUse();
+            private final long highestId = schemaStore.getIdGenerator().getHighId();
             private long currentId = 1; /*record 0 contains the block size*/
             private final byte[] scratchData = newRecordBuffer();
 
@@ -199,7 +204,8 @@ public class SchemaStorage implements SchemaRuleAccess
                 while ( currentId <= highestId )
                 {
                     long id = currentId++;
-                    DynamicRecord record = schemaStore.forceGetRecord( id );
+                    byte[] data = new byte[schemaStore.getRecordStore().getRecordSize()];
+                    DynamicRecord record = NeoDynamicStore.getRecord( id, schemaStore.getRecordStore().getRecord( id ), RecordLoad.FORCE, DynamicRecord.Type.UNKNOWN );
                     if ( record.inUse() && record.isStartRecord() )
                     {
                         try
@@ -226,7 +232,7 @@ public class SchemaStorage implements SchemaRuleAccess
 
     private byte[] newRecordBuffer()
     {
-        return new byte[schemaStore.getRecordSize()*4];
+        return new byte[schemaStore.getRecordStore().getRecordSize()*4];
     }
 
     private SchemaRule getSchemaRule( long id, byte[] buffer ) throws MalformedSchemaRuleException
@@ -234,7 +240,7 @@ public class SchemaStorage implements SchemaRuleAccess
         Collection<DynamicRecord> records;
         try
         {
-            records = schemaStore.getRecords( id );
+            records = NeoDynamicStore.getRecords( schemaStore.getRecordStore(), id, DynamicRecord.Type.UNKNOWN );
         }
         catch ( Exception e )
         {

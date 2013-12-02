@@ -2,17 +2,18 @@ package org.neo4j.kernel.impl.nioneo.alt;
 
 import java.util.Iterator;
 
-import org.neo4j.kernel.impl.nioneo.store.AbstractDynamicStore;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecordAllocator;
 
 public class NewDynamicRecordAllocator implements DynamicRecordAllocator
 {
     private final Store store;
+    private final DynamicRecord.Type type;
     
-    public NewDynamicRecordAllocator( Store store )
+    public NewDynamicRecordAllocator( Store store, DynamicRecord.Type type )
     {
         this.store = store;
+        this.type = type;
     }
    
     @Override
@@ -29,7 +30,7 @@ public class NewDynamicRecordAllocator implements DynamicRecordAllocator
         }
         else
         {
-            record = new DynamicRecord( store.getIdGenerator().nextId() );
+            record = new DynamicRecord( store.getIdGenerator().nextId(), type );
             record.setCreated();
         }
         record.setInUse( true );
@@ -39,6 +40,6 @@ public class NewDynamicRecordAllocator implements DynamicRecordAllocator
     @Override
     public int dataSize()
     {
-        return store.getRecordStore().getRecordSize() - AbstractDynamicStore.BLOCK_HEADER_SIZE;
+        return store.getRecordStore().getRecordSize() - NeoDynamicStore.BLOCK_HEADER_SIZE;
     }
 }

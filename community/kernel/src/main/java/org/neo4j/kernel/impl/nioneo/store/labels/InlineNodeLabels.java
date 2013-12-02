@@ -19,24 +19,22 @@
  */
 package org.neo4j.kernel.impl.nioneo.store.labels;
 
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-
-import org.neo4j.kernel.impl.nioneo.alt.Store;
-import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
-import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
-import org.neo4j.kernel.impl.nioneo.store.NodeStore;
-import org.neo4j.kernel.impl.util.Bits;
-
 import static java.lang.Long.highestOneBit;
 import static java.lang.String.format;
-
 import static org.neo4j.kernel.impl.nioneo.store.labels.LabelIdArray.concatAndSort;
 import static org.neo4j.kernel.impl.nioneo.store.labels.LabelIdArray.filter;
 import static org.neo4j.kernel.impl.nioneo.store.labels.NodeLabelsField.parseLabelsBody;
 import static org.neo4j.kernel.impl.util.Bits.bits;
 import static org.neo4j.kernel.impl.util.Bits.bitsFromLongs;
+
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+
+import org.neo4j.kernel.impl.nioneo.alt.NeoLabelStore;
+import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
+import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
+import org.neo4j.kernel.impl.util.Bits;
 
 public class InlineNodeLabels implements NodeLabels
 {
@@ -52,7 +50,7 @@ public class InlineNodeLabels implements NodeLabels
     }
 
     @Override
-    public long[] get( Store nodeStore )
+    public long[] get( NeoLabelStore labelStore )
     {
         return getIfLoaded();
     }
@@ -64,7 +62,7 @@ public class InlineNodeLabels implements NodeLabels
     }
 
     @Override
-    public Collection<DynamicRecord> put( long[] labelIds, Store nodeStore )
+    public Collection<DynamicRecord> put( long[] labelIds, NeoLabelStore labelStore )
     {
         if ( tryInlineInNodeRecord( labelIds, node.getDynamicLabelRecords() ) )
         {
@@ -72,21 +70,21 @@ public class InlineNodeLabels implements NodeLabels
         }
         else
         {
-            return new DynamicNodeLabels( 0, node ).put( labelIds, nodeStore );
+            return new DynamicNodeLabels( 0, node ).put( labelIds, labelStore );
         }
     }
 
     @Override
-    public Collection<DynamicRecord> add( long labelId, Store nodeStore )
+    public Collection<DynamicRecord> add( long labelId, NeoLabelStore labelStore )
     {
         long[] augmentedLabelIds = labelCount( labelField ) == 0 ? new long[]{labelId} :
                                    concatAndSort( parseInlined( labelField ), labelId );
 
-        return put( augmentedLabelIds, nodeStore );
+        return put( augmentedLabelIds, labelStore );
     }
 
     @Override
-    public Collection<DynamicRecord> remove( long labelId, Store nodeStore )
+    public Collection<DynamicRecord> remove( long labelId, NeoLabelStore labelStore )
     {
         long[] newLabelIds = filter( parseInlined( labelField ), labelId );
         boolean inlined = tryInlineInNodeRecord( newLabelIds, node.getDynamicLabelRecords() );
@@ -95,7 +93,7 @@ public class InlineNodeLabels implements NodeLabels
     }
 
     @Override
-    public void ensureHeavy( Store nodeStore )
+    public void ensureHeavy( NeoLabelStore nodeStore )
     {
         // no dynamic records
     }

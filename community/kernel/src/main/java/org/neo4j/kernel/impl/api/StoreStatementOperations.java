@@ -19,6 +19,13 @@
  */
 package org.neo4j.kernel.impl.api;
 
+import static org.neo4j.helpers.collection.Iterables.filter;
+import static org.neo4j.helpers.collection.Iterables.map;
+import static org.neo4j.helpers.collection.IteratorUtil.contains;
+import static org.neo4j.helpers.collection.IteratorUtil.emptyPrimitiveIntIterator;
+import static org.neo4j.kernel.impl.nioneo.store.labels.NodeLabelsField.parseLabelsField;
+import static org.neo4j.kernel.impl.util.IoPrimitiveUtils.safeCastLongToInt;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
@@ -63,30 +70,20 @@ import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
 import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
 import org.neo4j.kernel.impl.nioneo.alt.NeoNodeStore;
 import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoRelationshipStore;
 import org.neo4j.kernel.impl.nioneo.alt.NeoSchemaStore;
 import org.neo4j.kernel.impl.nioneo.store.IndexRule;
 import org.neo4j.kernel.impl.nioneo.store.InvalidRecordException;
-import org.neo4j.kernel.impl.nioneo.store.NeoStore;
 import org.neo4j.kernel.impl.nioneo.store.NeoStoreRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
-import org.neo4j.kernel.impl.nioneo.store.NodeStore;
 import org.neo4j.kernel.impl.nioneo.store.PrimitiveRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
-import org.neo4j.kernel.impl.nioneo.store.PropertyStore;
-import org.neo4j.kernel.impl.nioneo.store.RecordLoad;
-import org.neo4j.kernel.impl.nioneo.store.RelationshipStore;
+import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 import org.neo4j.kernel.impl.nioneo.store.SchemaRule;
 import org.neo4j.kernel.impl.nioneo.store.UnderlyingStorageException;
 import org.neo4j.kernel.impl.nioneo.store.UniquenessConstraintRule;
 import org.neo4j.kernel.impl.persistence.PersistenceManager;
-
-import static org.neo4j.helpers.collection.Iterables.filter;
-import static org.neo4j.helpers.collection.Iterables.map;
-import static org.neo4j.helpers.collection.IteratorUtil.contains;
-import static org.neo4j.helpers.collection.IteratorUtil.emptyPrimitiveIntIterator;
-import static org.neo4j.kernel.impl.nioneo.store.labels.NodeLabelsField.parseLabelsField;
-import static org.neo4j.kernel.impl.util.IoPrimitiveUtils.safeCastLongToInt;
 
 /**
  * This layer interacts with committed data. It currently delegates to several of the older XXXManager-type classes.
@@ -232,7 +229,7 @@ public class StoreStatementOperations implements
         {
             byte[] nodeData = neoStores.getNodeStore().getRecordStore().getRecord( nodeId );
             NodeRecord nodeRecord = NeoNodeStore.getRecord( nodeId, nodeData );
-            final long[] labels = parseLabelsField( nodeRecord ).get( neoStores.getNodeStore() );
+            final long[] labels = parseLabelsField( nodeRecord ).get( neoStores.getLabelStore() );
             return new PrimitiveIntIterator()
             {
                 private int cursor;
@@ -391,7 +388,7 @@ public class StoreStatementOperations implements
 
     private Iterator<IndexDescriptor> getIndexDescriptorsFor( Predicate<SchemaRule> filter )
     {
-        Iterator<SchemaRule> filtered = filter( filter, NeoSchemaStore.loadAllSchemaRules( neoStores.getSchemaStore().getRecordStore() ) );
+        Iterator<SchemaRule> filtered = filter( filter, NeoSchemaStore.loadAllSchemaRules( neoStores.getSchemaStore() ) );
 
         return map( new Function<SchemaRule, IndexDescriptor>()
         {
@@ -541,8 +538,8 @@ public class StoreStatementOperations implements
     {
         try
         {
-            byte[] nodeData = neoStores.getRelationshipStore().getRecordStore().getRecord( relationshipId );
-            NodeRecord relRecord = NeoNodeStore.getRecord( relationshipId, nodeData );
+            byte[] relData = neoStores.getRelationshipStore().getRecordStore().getRecord( relationshipId );
+            RelationshipRecord relRecord = NeoRelationshipStore.getRecord( relationshipId, relData );
             return loadAllPropertiesOf( relRecord );
         }
         catch ( InvalidRecordException e )

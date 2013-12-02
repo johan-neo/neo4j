@@ -39,7 +39,9 @@ public class NodeRecordTest
         long inlinedLabels = 12l;
 
         NodeRecord node = new NodeRecord( 1l, relId, propId );
-        node.setLabelField( inlinedLabels, asList( new DynamicRecord( 1l ), new DynamicRecord( 2l ) ) );
+        node.setLabelField( inlinedLabels ); 
+        node.addLabelDynamicRecords( asList( new DynamicRecord( 1l, DynamicRecord.Type.UNKNOWN ), 
+                new DynamicRecord( 2l, DynamicRecord.Type.UNKNOWN ) ) );
         node.setInUse( true );
 
         // When

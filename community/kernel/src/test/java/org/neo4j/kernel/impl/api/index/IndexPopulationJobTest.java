@@ -591,6 +591,6 @@ public class IndexPopulationJobTest
     {
         return new NeoStoreIndexStoreView( mock( LockService.class, RETURNS_MOCKS ),
                 db.getDependencyResolver().resolveDependency( XaDataSourceManager.class )
-                        .getNeoStoreDataSource().getNeoStore() );
+                        .getNeoStoreDataSource().getNeoStores() );
     }
 }

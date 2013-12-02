@@ -42,6 +42,7 @@ import org.neo4j.kernel.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.IdGeneratorFactory;
 import org.neo4j.kernel.InternalAbstractGraphDatabase;
 import org.neo4j.kernel.configuration.Config;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
 import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.test.ImpermanentGraphDatabase;
 import org.neo4j.test.impl.EphemeralFileSystemAbstraction;
@@ -66,7 +67,7 @@ public class IdGeneratorRebuildFailureEmulationTest
     public static final class FailureBeforeRebuild extends IdGeneratorRebuildFailureEmulationTest
     {
         @Override
-        protected void emulateFailureOnRebuildOf( NeoStore neostore )
+        protected void emulateFailureOnRebuildOf( FlatNeoStores neostores )
         {
             // emulate a failure during rebuild by not issuing this call:
             // neostore.makeStoreOk();
@@ -79,10 +80,11 @@ public class IdGeneratorRebuildFailureEmulationTest
     public static final class FailureDuringRebuild extends IdGeneratorRebuildFailureEmulationTest
     {
         @Override
-        protected void emulateFailureOnRebuildOf( NeoStore neostore )
+        protected void emulateFailureOnRebuildOf( FlatNeoStores neostores )
         {
             // emulate a failure (Id capacity exceeded) during rebuild by breakpoints in this method:
-            neostore.makeStoreOk();
+            // throw new RuntimeException( "Implement this" );
+            // neostore.makeStoreOk();
             fail( "makeStoreOk should have thrown UnderlyingStorageException" );
         }
 
@@ -96,7 +98,8 @@ public class IdGeneratorRebuildFailureEmulationTest
         @BreakpointHandler("setHighId")
         public static void on_setHighId( DebugInterface di, BreakPoint setHighId )
         {
-            if ( setHighId.invocationCount() > 1
+            throw new RuntimeException( "Implemented this" );
+            /*if ( setHighId.invocationCount() > 1
                     || RelationshipTypeTokenStore.class.getName().equals( di.thread().getStackTrace()
                     [2].getClassName() ) )
             {
@@ -104,7 +107,7 @@ public class IdGeneratorRebuildFailureEmulationTest
                 // emulate a failure in recovery by changing the id parameter to setHighId(id) to an invalid value,
                 // causing an exception to be thrown.
                 di.setLocalVariable( "id", -1 );
-            }
+            }*/
         }
     }
 
@@ -115,12 +118,12 @@ public class IdGeneratorRebuildFailureEmulationTest
                 '_', '.' );
         // emulate the need for rebuilding id generators by deleting it
         fs.deleteFile( new File( file + ".id") );
-        NeoStore neostore = null;
+        FlatNeoStores neostores = null;
         try
         {
-            neostore = factory.newNeoStore( new File( prefix + File.separator + "neostore") );
+            neostores = factory.openNeoStore( prefix );  // new File( prefix + File.separator + "neostore") );
             // emulate a failure during rebuild:
-            emulateFailureOnRebuildOf( neostore );
+            emulateFailureOnRebuildOf( neostores );
         }
         catch ( UnderlyingStorageException expected )
         {
@@ -130,14 +133,14 @@ public class IdGeneratorRebuildFailureEmulationTest
         {
             // we want close to not misbehave
             // (and for example truncate the file based on the wrong highId)
-            if ( neostore != null )
+            if ( neostores != null )
             {
-                neostore.close();
+                neostores.close();
             }
         }
     }
 
-    void emulateFailureOnRebuildOf( NeoStore neostore )
+    void emulateFailureOnRebuildOf( FlatNeoStores neostores )
     {
         fail( "emulateFailureOnRebuildOf(NeoStore) must be overridden" );
     }
@@ -158,7 +161,7 @@ public class IdGeneratorRebuildFailureEmulationTest
         config.put( GraphDatabaseSettings.rebuild_idgenerators_fast.name(), Settings.FALSE );
         config.put( GraphDatabaseSettings.store_dir.name(), prefix );
         factory = new StoreFactory( new Config( config, GraphDatabaseSettings.class ),
-                new DefaultIdGeneratorFactory(), new DefaultWindowPoolFactory(), fs, StringLogger.DEV_NULL, null );
+                new DefaultIdGeneratorFactory(), fs, StringLogger.DEV_NULL, null );
     }
 
     @After

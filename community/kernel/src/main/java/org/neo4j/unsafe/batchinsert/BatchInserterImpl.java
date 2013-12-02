@@ -210,7 +210,7 @@ public class BatchInserterImpl implements BatchInserter
             dumpConfiguration( params );
         }
         msgLog.logMessage( Thread.currentThread() + " Starting BatchInserter(" + this + ")" );
-        neoStore = sf.newNeoStore( store );
+        neoStore = sf.openNeoStore( store );
         if ( !neoStore.isStoreOk() )
         {
             throw new IllegalStateException( storeDir + " store is not cleanly shutdown." );

@@ -21,13 +21,14 @@ package org.neo4j.kernel.impl.core;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.neo4j.kernel.impl.nioneo.store.PropertyStore.DEFAULT_DATA_BLOCK_SIZE;
+import static org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStore.DEFAULT_DATA_BLOCK_SIZE;
 
 import java.util.Arrays;
 
 import org.junit.Test;
 import org.neo4j.graphdb.Node;
 import org.neo4j.kernel.impl.AbstractNeo4jTestCase;
+import org.neo4j.kernel.impl.transaction.XaDataSourceManager;
 
 public class TestLengthyArrayPacking extends AbstractNeo4jTestCase
 {
@@ -132,6 +133,16 @@ public class TestLengthyArrayPacking extends AbstractNeo4jTestCase
         {
             return dynamicStringRecordsInUse();
         }
+    }
+    
+    private long dynamicStringRecordsInUse()
+    {
+        return getFlatNeoStore().getStringStore().getIdGenerator().getNumberOfIdsInUse();
+    }
+    
+    private long dynamicArrayRecordsInUse()
+    {
+        return getFlatNeoStore().getArrayStore().getIdGenerator().getNumberOfIdsInUse();
     }
     
     private final DynamicRecordCounter ARRAY_RECORD_COUNTER = new ArrayRecordCounter();

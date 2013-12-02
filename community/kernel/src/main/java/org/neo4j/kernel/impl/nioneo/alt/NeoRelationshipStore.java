@@ -19,17 +19,20 @@
  */
 package org.neo4j.kernel.impl.nioneo.alt;
 
+import java.io.File;
 import java.nio.ByteBuffer;
 
+import org.neo4j.kernel.IdType;
 import org.neo4j.kernel.impl.nioneo.store.InvalidRecordException;
 import org.neo4j.kernel.impl.nioneo.store.Record;
 import org.neo4j.kernel.impl.nioneo.store.RecordLoad;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
+import org.neo4j.kernel.impl.nioneo.store.StoreFactory;
 
 /**
  * Implementation of the relationship store.
  */
-public class NeoRelationshipStore 
+public class NeoRelationshipStore extends Store
 {
     
     public static final String TYPE_DESCRIPTOR = "RelationshipStore";
@@ -40,6 +43,13 @@ public class NeoRelationshipStore
     // second_next_rel_id+next_prop_id(int)
     public static final int RECORD_SIZE = 33;
 
+    public static final IdType ID_TYPE = IdType.RELATIONSHIP;
+    
+    public NeoRelationshipStore( StoreParameter po )
+    {
+        super( new File( po.path, StoreFactory.RELATIONSHIP_STORE_NAME ), po.config, ID_TYPE, po.idGeneratorFactory, 
+                po.fileSystemAbstraction, po.stringLogger, TYPE_DESCRIPTOR, false, RECORD_SIZE );
+    }
 
     public static void updateRecord( RelationshipRecord record,
         byte[] data, boolean force )
@@ -92,6 +102,11 @@ public class NeoRelationshipStore
         }
     }
 
+    public static RelationshipRecord getRecord( long id, byte[] data )
+    {
+        return getRecord( id, data, RecordLoad.NORMAL );
+    }
+    
     public static RelationshipRecord getRecord( long id, byte[] data,
         RecordLoad load )
     {

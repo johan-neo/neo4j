@@ -24,8 +24,8 @@ import java.io.IOException;
 
 import org.neo4j.helpers.Predicate;
 import org.neo4j.helpers.collection.Iterables;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
 import org.neo4j.kernel.impl.nioneo.store.FileSystemAbstraction;
-import org.neo4j.kernel.impl.nioneo.store.NeoStore;
 import org.neo4j.kernel.impl.nioneo.store.StoreFactory;
 import org.neo4j.kernel.impl.storemigration.legacystore.LegacyStore;
 
@@ -77,7 +77,7 @@ public enum StoreFile
     
     public String storeFileName()
     {
-        return NeoStore.DEFAULT_NAME + storeFileNamePart;
+        return StoreFactory.NEO_STORE_NAME + storeFileNamePart;
     }
     
     public String idFileName()

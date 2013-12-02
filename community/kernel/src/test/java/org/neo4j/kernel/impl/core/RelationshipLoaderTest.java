@@ -57,12 +57,12 @@ public class RelationshipLoaderTest
         relsFromDisk.put( RelIdArray.DirectionWrapper.OUTGOING, asList( new RelationshipRecord( fromDiskRelId ) ));
         relsFromDisk.put( RelIdArray.DirectionWrapper.INCOMING, Collections.<RelationshipRecord>emptyList() );
 
-        when( persistenceManager.getMoreRelationships( 1337l, 0l ) ).thenReturn(Pair.of( relsFromDisk, -1l));
+        when( persistenceManager.getMoreRelationships( 1337l, 0l, 25 ) ).thenReturn(Pair.of( relsFromDisk, -1l));
 
         RelationshipLoader loader = new RelationshipLoader( persistenceManager, relCache );
 
         // When
-        Triplet<ArrayMap<Integer,RelIdArray>,List<RelationshipImpl>,Long> result = loader.getMoreRelationships( node );
+        Triplet<ArrayMap<Integer,RelIdArray>,List<RelationshipImpl>,Long> result = loader.getMoreRelationships( node, 25 );
 
         // Then
         List<RelationshipImpl> relsThatWereNotInCache = result.second();

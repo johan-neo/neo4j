@@ -24,7 +24,6 @@ import java.util.Iterator;
 import org.junit.Test;
 
 import static java.util.Arrays.asList;
-
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -39,8 +38,8 @@ public class ExistingThenNewRecordAllocatorTest
         when( mock.nextId() ).thenReturn( 3L ).thenReturn( 4L );
 
         ExistingThenNewRecordAllocator allocator = new ExistingThenNewRecordAllocator(
-                mock( DynamicBlockSize.class ), mock );
-        Iterator<DynamicRecord> existing = asList( new DynamicRecord( 1 ), new DynamicRecord( 2 ) ).iterator();
+                mock( DynamicBlockSize.class), mock, DynamicRecord.Type.UNKNOWN );
+        Iterator<DynamicRecord> existing = asList( new DynamicRecord( 1, DynamicRecord.Type.UNKNOWN ), new DynamicRecord( 2, DynamicRecord.Type.UNKNOWN ) ).iterator();
 
         // when
         DynamicRecord record1 = allocator.nextUsedRecordOrNew( existing );

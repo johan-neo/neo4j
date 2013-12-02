@@ -77,7 +77,7 @@ import org.neo4j.kernel.impl.nioneo.alt.NeoSchemaStore;
 import org.neo4j.kernel.impl.nioneo.store.IdGenerator;
 import org.neo4j.kernel.impl.nioneo.store.IndexRule;
 import org.neo4j.kernel.impl.nioneo.store.PropertyKeyTokenRecord;
-import org.neo4j.kernel.impl.nioneo.store.PropertyStore;
+import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
 import org.neo4j.kernel.impl.nioneo.store.SchemaRule;
 import org.neo4j.kernel.impl.nioneo.store.StoreFactory;
 import org.neo4j.kernel.impl.nioneo.store.StoreId;
@@ -123,9 +123,8 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
     {
         public static final Setting<Boolean> read_only= GraphDatabaseSettings.read_only;
         public static final Setting<File> store_dir = InternalAbstractGraphDatabase.Configuration.store_dir;
-        public static final Setting<File> neo_store = InternalAbstractGraphDatabase.Configuration.neo_store;
-        public static final Setting<File> logical_log = InternalAbstractGraphDatabase.Configuration.logical_log;
     }
+    
     public static final byte BRANCH_ID[] = UTF8.encode( "414141" );
 
     public static final String LOGICAL_LOG_DEFAULT_NAME = "nioneo_logical.log";
@@ -311,7 +310,6 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
         readOnly = config.get( Configuration.read_only );
 
         storeDir = config.get( Configuration.store_dir );
-        File store = config.get( Configuration.neo_store );
         storeFactory.ensureStoreExists();
 
         final TransactionFactory tf;
@@ -323,7 +321,7 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
         {
             tf = new TransactionFactory();
         }
-        neoStores = storeFactory.newFlatNeoStore( storeDir.getCanonicalPath(), store );
+        neoStores = storeFactory.openNeoStore( storeDir.getPath() ); // .getCanonicalPath() );
         schemaCache = new SchemaCache( Collections.<SchemaRule>emptyList() );
 
         final NodeManager nodeManager = dependencyResolver.resolveDependency( NodeManager.class );
@@ -358,7 +356,7 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
 
             integrityValidator = new IntegrityValidator( neoStores, indexingService );
 
-            xaContainer = xaFactory.newXaContainer(this, config.get( Configuration.logical_log ),
+            xaContainer = xaFactory.newXaContainer(this, storeDir.getPath(),
                     new CommandFactory(),
                     new NeoStoreInjectedTransactionValidator(integrityValidator), tf,
                     stateFactory, providers, readOnly  );
@@ -403,7 +401,7 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
             this.idGenerators.put( Relationship.class, neoStores.getRelationshipStore().getIdGenerator() );
             this.idGenerators.put( RelationshipType.class, neoStores.getRelationshipTypeTokenStore().getIdGenerator() );
             this.idGenerators.put( Label.class, neoStores.getLabelTokenStore().getIdGenerator() );
-            this.idGenerators.put( PropertyStore.class, neoStores.getPropertyStore().getIdGenerator() );
+            this.idGenerators.put( PropertyRecord.class, neoStores.getPropertyStore().getIdGenerator() );
             this.idGenerators.put( PropertyKeyTokenRecord.class,
                     neoStores.getPropertyKeyTokenStore().getIdGenerator() );
             setLogicalLogAtCreationTime( xaContainer.getLogicalLog() );
@@ -491,7 +489,7 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
     @Override
     public NeoStoreXaConnection getXaConnection()
     {
-        return new NeoStoreXaConnection( neoStores.getBaseFileName(),
+        return new NeoStoreXaConnection( neoStores.getPath(),
             xaContainer.getResourceManager(), getBranchId() );
     }
 
@@ -535,10 +533,11 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
             msgLog.debug( "Rebuilding id generators as needed. "
                     + "This can take a while for large stores..." );
             forceEverything();
-            throw new RuntimeException( "Not implemented yet" );
             // neoStore.makeStoreOk();
-            // neoStore.setVersion( xaContainer.getLogicalLog().getHighestLogVersion() );
-            // msgLog.debug( "Rebuild of id generators complete." );
+            
+            NeoNeoStore.writeLong( neoStores.getNeoStore().getRecordStore(), 
+                    NeoNeoStore.LOG_VERSION_POSITION, xaContainer.getLogicalLog().getHighestLogVersion() );
+            msgLog.debug( "Rebuild of id generators complete." );
         }
 
         @Override

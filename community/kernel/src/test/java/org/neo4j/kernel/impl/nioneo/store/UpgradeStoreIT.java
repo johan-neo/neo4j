@@ -19,12 +19,17 @@
  */
 package org.neo4j.kernel.impl.nioneo.store;
 
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+import static org.neo4j.helpers.collection.MapUtil.stringMap;
+import static org.neo4j.kernel.impl.AbstractNeo4jTestCase.deleteFileOrDirectory;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -37,20 +42,10 @@ import org.neo4j.graphdb.factory.GraphDatabaseFactory;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.helpers.Settings;
 import org.neo4j.helpers.UTF8;
-import org.neo4j.kernel.DefaultFileSystemAbstraction;
-import org.neo4j.kernel.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.IdGeneratorFactory;
 import org.neo4j.kernel.IdType;
-import org.neo4j.kernel.configuration.Config;
-import org.neo4j.kernel.impl.util.StringLogger;
+import org.neo4j.kernel.impl.nioneo.alt.NeoDynamicStore;
 import org.neo4j.unsafe.batchinsert.BatchInserters;
-
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
-import static org.neo4j.helpers.collection.IteratorUtil.first;
-import static org.neo4j.helpers.collection.MapUtil.stringMap;
-import static org.neo4j.kernel.impl.AbstractNeo4jTestCase.deleteFileOrDirectory;
 
 @Ignore
 public class UpgradeStoreIT
@@ -68,7 +63,7 @@ public class UpgradeStoreIT
         return new File( PATH, "" + i );
     }
 
-    @Test
+/*    @Test
     public void makeSureStoreWithTooManyRelationshipTypesCannotBeUpgraded() throws Exception
     {
         File path = path( 0 );
@@ -84,7 +79,7 @@ public class UpgradeStoreIT
         new GraphDatabaseFactory().newEmbeddedDatabase(  path.getPath() ).shutdown();
         createManyRelationshipTypes( path, 0xFFFF );
         assertCanStart( path );
-    }
+    }*/
 
     @Test( expected=TransactionFailureException.class )
     public void makeSureStoreWithTooBigStringBlockSizeCannotBeCreated() throws Exception
@@ -281,7 +276,7 @@ public class UpgradeStoreIT
     private void setOlderNeoStoreVersion( File path ) throws IOException
     {
         String oldVersion = "NeoStore v0.9.6";
-        FileChannel channel = new RandomAccessFile( new File( path, NeoStore.DEFAULT_NAME ), "rw" ).getChannel();
+        FileChannel channel = new RandomAccessFile( new File( path, StoreFactory.NEO_STORE_NAME ), "rw" ).getChannel();
         channel.position( channel.size() - UTF8.encode( oldVersion ).length );
         ByteBuffer buffer = ByteBuffer.wrap( UTF8.encode( oldVersion ) );
         channel.write( buffer );
@@ -292,7 +287,7 @@ public class UpgradeStoreIT
     {
         FileChannel channel = new RandomAccessFile( file, "rw" ).getChannel();
         ByteBuffer buffer = ByteBuffer.wrap( new byte[4] );
-        buffer.putInt( blockSize + AbstractDynamicStore.BLOCK_HEADER_SIZE );
+        buffer.putInt( blockSize + NeoDynamicStore.BLOCK_HEADER_SIZE );
         buffer.flip();
         channel.write( buffer );
 
@@ -303,12 +298,12 @@ public class UpgradeStoreIT
         channel.close();
     }
 
-    private void createManyRelationshipTypes( File path, int numberOfTypes )
+/*    private void createManyRelationshipTypes( File path, int numberOfTypes )
     {
         File fileName = new File( path, "neostore.relationshiptypestore.db" );
-        DynamicStringStore stringStore = new DynamicStringStore( new File( fileName.getPath() + ".names"), null, IdType.RELATIONSHIP_TYPE_TOKEN_NAME,
-                new DefaultIdGeneratorFactory(), new DefaultWindowPoolFactory(), new DefaultFileSystemAbstraction(), StringLogger.DEV_NULL );
-        RelationshipTypeTokenStore store = new RelationshipTypeTokenStoreWithOneOlderVersion( fileName, stringStore );
+        Store stringStore = new Store( new File( fileName.getPath() + ".names"), null, IdType.RELATIONSHIP_TYPE_TOKEN_NAME,
+                new DefaultFileSystemAbstraction(), StringLogger.DEV_NULL, NeoStringStore.TYPE_DESCRIPTOR, true, NeoStringStore.BLOCK_HEADER_SIZE );
+        Store store = new RelationshipTypeTokenStoreWithOneOlderVersion( fileName, stringStore );
         for ( int i = 0; i < numberOfTypes; i++ )
         {
             String name = "type" + i;
@@ -324,13 +319,14 @@ public class UpgradeStoreIT
         store.close();
     }
 
-    private static class RelationshipTypeTokenStoreWithOneOlderVersion extends RelationshipTypeTokenStore
+    private static class RelationshipTypeTokenStoreWithOneOlderVersion extends Store
     {
         private boolean versionCalled;
+        
 
-        public RelationshipTypeTokenStoreWithOneOlderVersion( File fileName, DynamicStringStore stringStore )
+        public RelationshipTypeTokenStoreWithOneOlderVersion( File fileName )
         {
-            super( fileName, new Config( stringMap() ), new NoLimitIdGeneratorFactory(), new DefaultWindowPoolFactory(),
+            super( fileName, new Config( stringMap() ), new NoLimitIdGeneratorFactory(),
                     new DefaultFileSystemAbstraction(), StringLogger.DEV_NULL, stringStore );
         }
 
@@ -352,7 +348,7 @@ public class UpgradeStoreIT
                 return "RelationshipTypeStore v0.9.5";
             }
         }
-    }
+    }*/
     
     private static class NoLimitIdGeneratorFactory implements IdGeneratorFactory
     {

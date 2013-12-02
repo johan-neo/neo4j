@@ -25,7 +25,6 @@ import static org.neo4j.helpers.collection.IteratorUtil.asPrimitiveIterator;
 import static org.neo4j.helpers.collection.IteratorUtil.first;
 import static org.neo4j.kernel.api.index.NodePropertyUpdate.add;
 import static org.neo4j.kernel.api.index.NodePropertyUpdate.remove;
-import static org.neo4j.kernel.impl.nioneo.store.PropertyStore.encodeString;
 import static org.neo4j.kernel.impl.nioneo.store.labels.NodeLabelsField.parseLabelsField;
 import static org.neo4j.kernel.impl.nioneo.xa.Command.Mode.CREATE;
 import static org.neo4j.kernel.impl.nioneo.xa.Command.Mode.DELETE;
@@ -74,6 +73,7 @@ import org.neo4j.kernel.impl.nioneo.alt.NeoNodeStore;
 import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStore;
 import org.neo4j.kernel.impl.nioneo.alt.NeoRelationshipStore;
 import org.neo4j.kernel.impl.nioneo.alt.NeoSchemaStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStringStore;
 import org.neo4j.kernel.impl.nioneo.alt.NeoTokenStore;
 import org.neo4j.kernel.impl.nioneo.alt.NewDynamicRecordAllocator;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
@@ -93,7 +93,9 @@ import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeTokenRecord;
 import org.neo4j.kernel.impl.nioneo.store.SchemaRule;
 import org.neo4j.kernel.impl.nioneo.store.UnderlyingStorageException;
+import org.neo4j.kernel.impl.nioneo.store.DynamicRecord.Type;
 import org.neo4j.kernel.impl.nioneo.store.labels.NodeLabels;
+import org.neo4j.kernel.impl.nioneo.xa.Command.Mode;
 import org.neo4j.kernel.impl.nioneo.xa.Command.NodeCommand;
 import org.neo4j.kernel.impl.nioneo.xa.Command.PropertyCommand;
 import org.neo4j.kernel.impl.nioneo.xa.Command.RelationshipCommand;
@@ -107,17 +109,6 @@ import org.neo4j.kernel.impl.transaction.xaframework.XaTransaction;
 import org.neo4j.kernel.impl.util.ArrayMap;
 import org.neo4j.kernel.impl.util.PrimitiveLongIterator;
 import org.neo4j.kernel.impl.util.RelIdArray.DirectionWrapper;
-
-import static java.util.Arrays.binarySearch;
-import static java.util.Arrays.copyOf;
-
-import static org.neo4j.helpers.collection.IteratorUtil.asPrimitiveIterator;
-import static org.neo4j.helpers.collection.IteratorUtil.first;
-import static org.neo4j.kernel.impl.nioneo.store.PropertyStore.encodeString;
-import static org.neo4j.kernel.impl.nioneo.store.labels.NodeLabelsField.parseLabelsField;
-import static org.neo4j.kernel.impl.nioneo.xa.Command.Mode.CREATE;
-import static org.neo4j.kernel.impl.nioneo.xa.Command.Mode.DELETE;
-import static org.neo4j.kernel.impl.nioneo.xa.Command.Mode.UPDATE;
 
 /**
  * Transaction containing {@link Command commands} reflecting the operations
@@ -203,11 +194,11 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
                     {
                         if ( block.getType() == PropertyType.STRING )
                         {
-                            NeoPropertyStore.ensureHeavy( block, neoStores.getStringStore().getRecordStore(), block.getSingleValueLong() );  
+                            NeoPropertyStore.ensureHeavy( block, neoStores.getStringStore().getRecordStore(), block.getSingleValueLong(), DynamicRecord.Type.STRING );  
                         }
                         else if ( block.getType() == PropertyType.ARRAY )
                         {
-                            NeoPropertyStore.ensureHeavy( block, neoStores.getArrayStore().getRecordStore(), block.getSingleValueLong() );
+                            NeoPropertyStore.ensureHeavy( block, neoStores.getArrayStore().getRecordStore(), block.getSingleValueLong(), DynamicRecord.Type.ARRAY );
                         }
                     }
                 }
@@ -251,13 +242,13 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
         public Collection<DynamicRecord> newUnused(Long key, SchemaRule additionalData)
         {
             return NeoSchemaStore.allocateFrom( additionalData, neoStores.getSchemaStore().getRecordStore(), 
-                    new NewDynamicRecordAllocator( neoStores.getSchemaStore() ) );
+                    new NewDynamicRecordAllocator( neoStores.getSchemaStore(), DynamicRecord.Type.STRING ) );
         }
 
         @Override
         public Collection<DynamicRecord> load(Long key, SchemaRule additionalData)
         {
-            return NeoDynamicStore.getRecords( neoStores.getSchemaStore().getRecordStore(), key, RecordLoad.NORMAL );
+            return NeoDynamicStore.getRecords( neoStores.getSchemaStore().getRecordStore(), key, RecordLoad.NORMAL, DynamicRecord.Type.STRING );
         }
 
         @Override
@@ -787,7 +778,7 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
                 java.util.Collections.sort( relationshipTypeTokenCommands, sorter );
                 for ( Command.RelationshipTypeTokenCommand command : relationshipTypeTokenCommands )
                 {
-                    command.execute( neoStores.getRelationshipTypeTokenStore().getRecordStore(), neoStores.getRelationshipTypeTokenNameStore().getRecordStore() );
+                    command.execute( neoStores.getRelationshipTypeTokenStore(), neoStores.getRelationshipTypeTokenNameStore() );
                     if ( isRecovered )
                     {
                         addRelationshipType( (int) command.getKey() );
@@ -800,7 +791,7 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
                 java.util.Collections.sort( labelTokenCommands, sorter );
                 for ( Command.LabelTokenCommand command : labelTokenCommands )
                 {
-                    command.execute( neoStores.getLabelTokenStore().getRecordStore(), neoStores.getLabelTokenNameStore().getRecordStore(), NeoTokenStore.LABEL_TOKEN_RECORD_SIZE );
+                    command.execute( neoStores.getLabelTokenStore(), neoStores.getLabelTokenNameStore(), NeoTokenStore.LABEL_TOKEN_RECORD_SIZE );
                     if ( isRecovered )
                     {
                         addLabel( (int) command.getKey() );
@@ -813,7 +804,7 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
                 java.util.Collections.sort( propertyKeyTokenCommands, sorter );
                 for ( Command.PropertyKeyTokenCommand command : propertyKeyTokenCommands )
                 {
-                    command.execute( neoStores.getLabelTokenStore().getRecordStore(), neoStores.getLabelTokenNameStore().getRecordStore(), NeoTokenStore.PROPERTY_KEY_TOKEN_RECORD_SIZE );
+                    command.execute( neoStores.getPropertyKeyTokenStore(), neoStores.getPropertyKeyTokenNameStore(), NeoTokenStore.PROPERTY_KEY_TOKEN_RECORD_SIZE );
                     if ( isRecovered )
                     {
                         addPropertyKey( (int) command.getKey() );
@@ -836,10 +827,12 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
                 cacheAccess.applyLabelUpdates( labelUpdates );
             }
 
-            if ( !nodeCommands.isEmpty() || !propCommands.isEmpty() )
+            if ( indexes.hasActiveIndexes() && (!nodeCommands.isEmpty() || !propCommands.isEmpty()) )
             {
+                // TODO: fix this, this will load records that are not in use. 
+                // We should use physical log her here with before and after records instead
                 indexes.updateIndexes( new LazyIndexUpdates(
-                        getNodeStore(), getPropertyStore(),
+                        neoStores,
                         new ArrayList<>( propCommands ), new HashMap<>( nodeCommands ) ) );
             }
 
@@ -855,7 +848,7 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
             for ( SchemaRuleCommand command : schemaRuleCommands )
             {
                 command.setTxId( getCommitTxId() );
-                command.execute( neoStores.getNeoStore().getRecordStore(), neoStores.getSchemaStore().getRecordStore(), indexes );
+                command.execute( neoStores.getNeoStore(), neoStores.getSchemaStore(), indexes );
                 switch ( command.getMode() )
                 {
                 case DELETE:
@@ -868,7 +861,7 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
 
             if ( neoStoreCommand != null )
             {
-                neoStoreCommand.execute( neoStores.getNeoStore().getRecordStore() );
+                neoStoreCommand.execute( neoStores.getNeoStore() );
                 if ( isRecovered )
                 {
                     removeGraphPropertiesFromCache();
@@ -986,7 +979,14 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
     {
         for ( NodeCommand nodeCommand : nodeCommands.values() )
         {
-            labelScanStore.updateAndCommit( labelUpdates.iterator() );
+            try
+            {
+                labelScanStore.updateAndCommit( labelUpdates.iterator() );
+            }
+            catch ( IOException e )
+            {
+                throw new UnderlyingStorageException( e );
+            }
         }
     }
 
@@ -1080,13 +1080,53 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
         {
             if ( propCommand.getMode() == mode )
             {
-                propCommand.execute( neoStores.getPropertyStore().getRecordStore(), neoStores.getStringStore().getRecordStore(), neoStores.getArrayStore().getRecordStore() );
+                propCommand.execute( neoStores.getPropertyStore(), neoStores.getStringStore(), neoStores.getArrayStore() );
+                if ( !isRecovered() )
+                {
+                    if ( !propCommand.getAfter().inUse() )
+                    {
+                        neoStores.getPropertyStore().getIdGenerator().freeId( propCommand.getKey() );
+                    }
+                    for ( PropertyBlock block : propCommand.getAfter().getPropertyBlocks() )
+                    {
+                        for ( DynamicRecord record : block.getValueRecords() )
+                        {
+                            if ( !record.inUse() )
+                            {
+                                if ( record.getType() == DynamicRecord.Type.STRING )
+                                {
+                                    neoStores.getStringStore().getIdGenerator().freeId( record.getId() );
+                                }
+                                else if ( record.getType() == DynamicRecord.Type.ARRAY )
+                                {
+                                    neoStores.getArrayStore().getIdGenerator().freeId( record.getId() );
+                                }
+                            }
+                        }
+                    }
+                    for ( PropertyBlock block : propCommand.getAfter().getRemovedPropertyBlocks() )
+                    {
+                        for ( DynamicRecord record : block.getValueRecords() )
+                        {
+                            if ( !record.inUse() )
+                            {
+                                if ( record.getType() == DynamicRecord.Type.STRING )
+                                {
+                                    neoStores.getStringStore().getIdGenerator().freeId( record.getId() );
+                                }
+                                else if ( record.getType() == DynamicRecord.Type.ARRAY )
+                                {
+                                    neoStores.getArrayStore().getIdGenerator().freeId( record.getId() );
+                                }
+                            }
+                        }
+                    }
+                }
             }
             if ( removeFromCache )
             {
                 propCommand.removeFromCache( cacheAccess );
             }
-            
         }
         for ( RelationshipCommand relCommand : relCommands )
         {
@@ -1096,7 +1136,11 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
                 {
                     lockEntity( lockGroup, command );
                 }
-                relCommand.execute( neoStores.getRelationshipStore().getRecordStore() );
+                relCommand.execute( neoStores.getRelationshipStore() );
+                if ( mode == Mode.DELETE && !isRecovered() )
+                {
+                    neoStores.getRelationshipStore().getIdGenerator().freeId( relCommand.getKey() );
+                }
             }
             if ( removeFromCache )
             {
@@ -1115,10 +1159,13 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
                  * are in cache).
                  */
                     lockEntity( lockGroup, command );
-                    command.execute();
                     command.removeFromCache( cacheAccess );
                 }
-                nodeCommand.execute( neoStores.getNodeStore().getRecordStore(), neoStores.getLabelStore().getRecordStore() );
+                nodeCommand.execute( neoStores.getNodeStore(), neoStores.getLabelStore() );
+                if ( mode == Mode.DELETE && !isRecovered() )
+                {
+                    neoStores.getNodeStore().getIdGenerator().freeId( nodeCommand.getKey() );
+                }
             }
             if ( removeFromCache )
             {
@@ -1610,7 +1657,7 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
             record.setInUse( false ); // , block.getType().intValue() );
             // propertyRecord.addDeletedRecord( record );
         }
-        NeoPropertyStore.encodeValue( block, propertyKey, value );
+        NeoPropertyStore.encodeValue( block, propertyKey, value, neoStores );
         if ( propertyRecord.size() > PropertyType.getPayloadSize() )
         {
             propertyRecord.removePropertyBlock( propertyKey );
@@ -1636,7 +1683,7 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
         P record = node.forReadingLinkage();
         assert assertPropertyChain( record );
         PropertyBlock block = new PropertyBlock();
-        NeoPropertyStore.encodeValue( block, propertyKey, value );
+        NeoPropertyStore.encodeValue( block, propertyKey, value, neoStores );
         addPropertyBlockToPrimitive( block, node );
         assert assertPropertyChain( record );
         return Property.property( propertyKey, value );
@@ -1797,8 +1844,8 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
         record.setInUse( true );
         record.setCreated();
         
-        Collection<DynamicRecord> nameRecords = NeoDynamicStore.allocateRecordsFromBytes( encodeString( key ), null, 
-                new NewDynamicRecordAllocator( neoStores.getPropertyKeyTokenNameStore() ) );
+        Collection<DynamicRecord> nameRecords = NeoDynamicStore.allocateRecordsFromBytes( NeoPropertyStringStore.encodeString( key ), null, 
+                new NewDynamicRecordAllocator( neoStores.getPropertyKeyTokenNameStore(), DynamicRecord.Type.STRING ) );
         record.setNameId( (int) first( nameRecords ).getId() );
         record.addNameRecords( nameRecords );
         addPropertyKeyTokenRecord( record );
@@ -1810,8 +1857,8 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
         LabelTokenRecord record = new LabelTokenRecord( id );
         record.setInUse( true );
         record.setCreated();
-        Collection<DynamicRecord> nameRecords = NeoDynamicStore.allocateRecordsFromBytes( encodeString( name ), null, 
-                new NewDynamicRecordAllocator( neoStores.getLabelTokenNameStore() ) );
+        Collection<DynamicRecord> nameRecords = NeoDynamicStore.allocateRecordsFromBytes( NeoPropertyStringStore.encodeString( name ), null, 
+                new NewDynamicRecordAllocator( neoStores.getLabelTokenNameStore(), DynamicRecord.Type.STRING ) );
         record.setNameId( (int) first( nameRecords ).getId() );
         record.addNameRecords( nameRecords );
         addLabelIdRecord( record );
@@ -1823,8 +1870,8 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
         RelationshipTypeTokenRecord record = new RelationshipTypeTokenRecord( id );
         record.setInUse( true );
         record.setCreated();
-        Collection<DynamicRecord> typeNameRecords = NeoDynamicStore.allocateRecordsFromBytes( encodeString( name ), null, 
-                new NewDynamicRecordAllocator( neoStores.getRelationshipTypeTokenNameStore() ) );
+        Collection<DynamicRecord> typeNameRecords = NeoDynamicStore.allocateRecordsFromBytes( NeoPropertyStringStore.encodeString( name ), null, 
+                new NewDynamicRecordAllocator( neoStores.getRelationshipTypeTokenNameStore(), DynamicRecord.Type.STRING ) );
         record.setNameId( (int) first( typeNameRecords ).getId() );
         record.addNameRecords( typeNameRecords );
         addRelationshipTypeRecord( record );
@@ -2107,7 +2154,7 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
          * since an exception could be thrown in encodeValue now and tx not marked
          * rollback only.
          */
-        NeoPropertyStore.encodeValue( block, propertyKey, value );
+        NeoPropertyStore.encodeValue( block, propertyKey, value, neoStores );
         RecordChange<Long, NeoStoreRecord, Void> change = getOrLoadNeoStoreRecord();
         addPropertyBlockToPrimitive( block, change );
         assert assertPropertyChain( change.forReadingLinkage() );
@@ -2160,14 +2207,14 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
     public void addLabelToNode( int labelId, long nodeId )
     {
         NodeRecord nodeRecord = nodeRecords.getOrLoad( nodeId, null ).forChangingData();
-        parseLabelsField( nodeRecord ).add( labelId, neoStores.getNodeStore() );
+        parseLabelsField( nodeRecord ).add( labelId, neoStores.getLabelStore() );
     }
 
     @Override
     public void removeLabelFromNode( int labelId, long nodeId )
     {
         NodeRecord nodeRecord = nodeRecords.getOrLoad( nodeId, null ).forChangingData();
-        parseLabelsField( nodeRecord ).remove( labelId, neoStores.getNodeStore() );
+        parseLabelsField( nodeRecord ).remove( labelId, neoStores.getLabelStore() );
     }
 
     @Override
@@ -2176,7 +2223,7 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
         // Don't consider changes in this transaction
         NodeRecord node = NeoNodeStore.getRecord( nodeId, neoStores.getNodeStore().getRecordStore().getRecord( nodeId ) );
                 // getNodeStore().getRecord( nodeId );
-        return asPrimitiveIterator( parseLabelsField( node ).get( neoStores.getNodeStore() ) );
+        return asPrimitiveIterator( parseLabelsField( node ).get( neoStores.getLabelStore() ) );
     }
 
     @Override
@@ -2192,7 +2239,7 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
 
         records.addAll(        
                 NeoSchemaStore.allocateFrom( indexRule, neoStores.getSchemaStore().getRecordStore(), 
-                new NewDynamicRecordAllocator( neoStores.getSchemaStore() ) ) );
+                new NewDynamicRecordAllocator( neoStores.getSchemaStore(), DynamicRecord.Type.STRING ) ) );
     }
 
     public Pair<Map<DirectionWrapper, Iterable<RelationshipRecord>>, Long> getMoreRelationships(

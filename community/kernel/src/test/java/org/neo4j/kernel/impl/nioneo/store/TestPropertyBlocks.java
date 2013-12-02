@@ -36,6 +36,7 @@ import org.neo4j.graphdb.DynamicRelationshipType;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
 import org.neo4j.kernel.impl.AbstractNeo4jTestCase;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
 
 public class TestPropertyBlocks extends AbstractNeo4jTestCase
 {
@@ -44,7 +45,26 @@ public class TestPropertyBlocks extends AbstractNeo4jTestCase
     {
         return true;
     }
+    
+    private long propertyRecordsInUse()
+    {
+        FlatNeoStores neoStores = getFlatNeoStore();
+        return neoStores.getPropertyStore().getIdGenerator().getNumberOfIdsInUse();
+    }
 
+    private long dynamicStringRecordsInUse()
+    {
+        FlatNeoStores neoStores = getFlatNeoStore();
+        return neoStores.getStringStore().getIdGenerator().getNumberOfIdsInUse();
+    }
+
+    private long dynamicArrayRecordsInUse()
+    {
+        FlatNeoStores neoStores = getFlatNeoStore();
+        return neoStores.getArrayStore().getIdGenerator().getNumberOfIdsInUse();
+
+    }
+ 
     @Test
     public void simpleAddIntegers()
     {
@@ -902,23 +922,23 @@ public class TestPropertyBlocks extends AbstractNeo4jTestCase
     @Test
     public void deleteNodeWithNewPropertyRecordShouldFreeTheNewRecord() throws Exception
     {
-        final long propcount = getNodeManager().getNumberOfIdsInUse( PropertyStore.class );
+        final long propcount = propertyRecordsInUse();
         Node node = getGraphDb().createNode();
         node.setProperty( "one", 1 );
         node.setProperty( "two", 2 );
         node.setProperty( "three", 3 );
         node.setProperty( "four", 4 );
         assertEquals( "Invalid assumption: property record count", propcount + 1,
-                      getNodeManager().getNumberOfIdsInUse( PropertyStore.class ) );
+                propertyRecordsInUse() );
         newTransaction();
         assertEquals( "Invalid assumption: property record count", propcount + 1,
-                      getNodeManager().getNumberOfIdsInUse( PropertyStore.class ) );
+                propertyRecordsInUse() );
         node.setProperty( "final", 666 );
         assertEquals( "Invalid assumption: property record count", propcount + 2,
-                      getNodeManager().getNumberOfIdsInUse( PropertyStore.class ) );
+                propertyRecordsInUse() );
         node.delete();
         commit();
         assertEquals( "All property records should be freed", propcount,
-                      getNodeManager().getNumberOfIdsInUse( PropertyStore.class ) );
+                propertyRecordsInUse() );
     }
 }

@@ -19,6 +19,11 @@
  */
 package org.neo4j.kernel.impl.nioneo.xa;
 
+import static org.neo4j.kernel.api.index.NodePropertyUpdate.EMPTY_LONG_ARRAY;
+import static org.neo4j.kernel.api.labelscan.NodeLabelUpdate.labelChanges;
+import static org.neo4j.kernel.impl.nioneo.store.labels.NodeLabelsField.parseLabelsField;
+import static org.neo4j.kernel.impl.util.IoPrimitiveUtils.safeCastLongToInt;
+
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -35,10 +40,12 @@ import org.neo4j.kernel.impl.api.index.StoreScan;
 import org.neo4j.kernel.impl.locking.Lock;
 import org.neo4j.kernel.impl.locking.LockService;
 import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNodeStore;
 import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStore;
+import org.neo4j.kernel.impl.nioneo.alt.Processor;
+import org.neo4j.kernel.impl.nioneo.alt.RecordStore;
+import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
-import org.neo4j.kernel.impl.nioneo.store.OldRecordStore;
-import org.neo4j.kernel.impl.nioneo.store.OldRecordStore.Processor;
 import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyType;
@@ -68,7 +75,7 @@ public class NeoStoreIndexStoreView implements IndexStoreView
     public <FAILURE extends Exception> StoreScan<FAILURE> visitNodesWithPropertyAndLabel(
             IndexDescriptor descriptor, final Visitor<NodePropertyUpdate, FAILURE> visitor )
     {
-        final int soughtLabelId = descriptor.getLabelId();
+<       final int soughtLabelId = descriptor.getLabelId();
         final int soughtPropertyKeyId = descriptor.getPropertyKeyId();
         return new NodeStoreScan<NodePropertyUpdate, FAILURE>()
         {
@@ -169,7 +176,9 @@ public class NeoStoreIndexStoreView implements IndexStoreView
     @Override
     public Iterable<NodePropertyUpdate> nodeAsUpdates( long nodeId )
     {
-        NodeRecord node = nodeStore.forceGetRecord( nodeId );
+        NodeRecord node = NeoNodeStore.getRecord( nodeId, 
+                neoStores.getNodeStore().getRecordStore().getRecord( nodeId ), RecordLoad.FORCE ); 
+
         if ( !node.inUse() )
         {
             return Iterables.empty(); // node not in use => no updates
@@ -179,17 +188,30 @@ public class NeoStoreIndexStoreView implements IndexStoreView
         {
             return Iterables.empty(); // no properties => no updates (it's not going to be in any index)
         }
-        long[] labels = parseLabelsField( node ).get( nodeStore );
+        long[] labels = parseLabelsField( node ).get( neoStores.getLabelStore() );
         if ( labels.length == 0 )
         {
             return Iterables.empty(); // no labels => no updates (it's not going to be in any index)
         }
         ArrayList<NodePropertyUpdate> updates = new ArrayList<>();
-        for ( PropertyRecord propertyRecord : propertyStore.getPropertyRecordChain( firstPropertyId ) )
+        for ( PropertyRecord propertyRecord : NeoPropertyStore.getPropertyRecordChain( neoStores.getPropertyStore().getRecordStore(), firstPropertyId ) )
         {
             for ( PropertyBlock property : propertyRecord.getPropertyBlocks() )
             {
-                Object value = property.getType().getValue( property, propertyStore );
+                Object value = null;
+                if ( property.getType() == PropertyType.STRING )
+                {
+                    value = property.getType().getValue( property, neoStores.getStringStore().getRecordStore() );
+                }
+                else if ( property.getType() == PropertyType.ARRAY )
+                {
+                    value = property.getType().getValue( property, neoStores.getArrayStore().getRecordStore() );
+                }
+                else
+                {
+                    value = property.getType().getValue( property, null );
+                }
+ 
                 updates.add( NodePropertyUpdate.add( node.getId(), property.getKeyIndexId(), value, labels ) );
             }
         }

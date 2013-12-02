@@ -19,7 +19,6 @@
  */
 package org.neo4j.kernel.impl.nioneo.store;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assume.assumeTrue;
 import static org.neo4j.graphdb.factory.GraphDatabaseSettings.nodestore_mapped_memory_size;
 import static org.neo4j.helpers.Settings.osIsWindows;
@@ -32,6 +31,10 @@ import org.neo4j.kernel.DefaultFileSystemAbstraction;
 import org.neo4j.kernel.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.DefaultTxHook;
 import org.neo4j.kernel.configuration.Config;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNodeStore;
+import org.neo4j.kernel.impl.nioneo.alt.StoreLoader;
+import org.neo4j.kernel.impl.nioneo.alt.StoreParameter;
 import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.test.TargetDirectory;
 
@@ -50,35 +53,36 @@ public class TestGrowingFileMemoryMapping
 
         File storeDir = TargetDirectory.forTest( getClass() ).graphDbDir( true );
         Config config = new Config( stringMap(
-                nodestore_mapped_memory_size.name(), mmapSize( NUMBER_OF_RECORDS, NodeStore.RECORD_SIZE ),
-                NodeStore.Configuration.use_memory_mapped_buffers.name(), "true",
-                NodeStore.Configuration.store_dir.name(), storeDir.getPath() ), NodeStore.Configuration.class );
+                nodestore_mapped_memory_size.name(), mmapSize( NUMBER_OF_RECORDS, NeoNodeStore.RECORD_SIZE ),
+                StoreLoader.Configuration.use_memory_mapped_buffers.name(), "true",
+                StoreLoader.Configuration.store_dir.name(), storeDir.getPath() ), StoreLoader.Configuration.class );
         DefaultIdGeneratorFactory idGeneratorFactory = new DefaultIdGeneratorFactory();
         StoreFactory storeFactory = new StoreFactory( config, idGeneratorFactory,
-                new DefaultWindowPoolFactory(), new DefaultFileSystemAbstraction(), StringLogger.DEV_NULL,
-                new DefaultTxHook() );
+                new DefaultFileSystemAbstraction(), StringLogger.DEV_NULL, new DefaultTxHook() );
 
-        File fileName = new File( storeDir, NeoStore.DEFAULT_NAME + ".nodestore.db" );
-        storeFactory.createEmptyStore( fileName, storeFactory.buildTypeDescriptorAndVersion(
-                NodeStore.TYPE_DESCRIPTOR ) );
+        storeFactory.createEmptyStore( storeDir.getPath(), StoreFactory.NODE_STORE_NAME, NeoNeoStore.buildTypeDescriptorAndVersion(
+                NeoNodeStore.TYPE_DESCRIPTOR ) );
 
-        NodeStore nodeStore = new NodeStore( fileName, config, idGeneratorFactory, new DefaultWindowPoolFactory(),
-                new DefaultFileSystemAbstraction(), StringLogger.DEV_NULL, null );
+        StoreParameter sp = new StoreParameter( storeDir.getPath(), config, idGeneratorFactory, new DefaultFileSystemAbstraction(), StringLogger.DEV_NULL );
+        NeoNodeStore nodeStore = new NeoNodeStore( sp );
 
         // when
         for ( int i = 0; i < 2 * NUMBER_OF_RECORDS; i++ )
         {
-            NodeRecord record = new NodeRecord( nodeStore.nextId(), 0, 0 );
+            NodeRecord record = new NodeRecord( nodeStore.getIdGenerator().nextId(), 0, 0 );
             record.setInUse( true );
-            nodeStore.updateRecord( record );
+            byte[] data = NeoNodeStore.updateRecord( record, new byte[NeoNodeStore.RECORD_SIZE], false );
+            nodeStore.getRecordStore().writeRecord( record.getId(), data );
+
         }
 
         // then
-        WindowPoolStats stats = nodeStore.getWindowPoolStats();
+        // WindowPoolStats stats = nodeStore.getWindowPoolStats();
 
         nodeStore.close();
 
-        assertEquals( stats.toString(), 0, stats.getMissCount() );
+        // assertEquals( stats.toString(), 0, stats.getMissCount() );
+        throw new RuntimeException( "Implement this somehow" );
     }
 
     private String mmapSize( int numberOfRecords, int recordSize )

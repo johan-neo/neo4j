@@ -484,7 +484,6 @@ public class TestLogPruneStrategy
             this.totalSize = totalSize;
         }
         
-        @Override
         public void execute()
         {   // Do nothing
         }

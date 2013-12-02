@@ -35,13 +35,13 @@ import java.nio.channels.WritableByteChannel;
 
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.helpers.Function;
-import org.neo4j.kernel.impl.nioneo.store.AbstractDynamicStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoDynamicStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNodeStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoRelationshipStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoSchemaStore;
 import org.neo4j.kernel.impl.nioneo.store.FileLock;
 import org.neo4j.kernel.impl.nioneo.store.FileSystemAbstraction;
-import org.neo4j.kernel.impl.nioneo.store.NodeStore;
-import org.neo4j.kernel.impl.nioneo.store.PropertyStore;
-import org.neo4j.kernel.impl.nioneo.store.RelationshipStore;
-import org.neo4j.kernel.impl.nioneo.store.SchemaStore;
 import org.neo4j.kernel.lifecycle.LifecycleAdapter;
 import org.neo4j.test.impl.ChannelInputStream;
 import org.neo4j.test.impl.ChannelOutputStream;
@@ -186,20 +186,20 @@ public class JumpingFileSystemAbstraction extends LifecycleAdapter implements Fi
     {
         if ( fileName.getName().endsWith( "nodestore.db" ) )
         {
-            return NodeStore.RECORD_SIZE;
+            return NeoNodeStore.RECORD_SIZE;
         }
         else if ( fileName.getName().endsWith( "relationshipstore.db" ) )
         {
-            return RelationshipStore.RECORD_SIZE;
+            return NeoRelationshipStore.RECORD_SIZE;
         }
         else if ( fileName.getName().endsWith( "propertystore.db.strings" ) ||
                 fileName.getName().endsWith( "propertystore.db.arrays" ) )
         {
-            return AbstractDynamicStore.getRecordSize( PropertyStore.DEFAULT_DATA_BLOCK_SIZE );
+            return NeoDynamicStore.getRecordSize( NeoPropertyStore.DEFAULT_DATA_BLOCK_SIZE );
         }
         else if ( fileName.getName().endsWith( "propertystore.db" ) )
         {
-            return PropertyStore.RECORD_SIZE;
+            return NeoPropertyStore.RECORD_SIZE;
         }
         else if ( fileName.getName().endsWith( "nodestore.db.labels" ) )
         {
@@ -207,7 +207,7 @@ public class JumpingFileSystemAbstraction extends LifecycleAdapter implements Fi
         }
         else if ( fileName.getName().endsWith( "schemastore.db" ) )
         {
-            return SchemaStore.getRecordSize( SchemaStore.BLOCK_SIZE );
+            return NeoDynamicStore.getRecordSize( NeoSchemaStore.BLOCK_SIZE );
         }
         throw new IllegalArgumentException( fileName.getPath() );
     }

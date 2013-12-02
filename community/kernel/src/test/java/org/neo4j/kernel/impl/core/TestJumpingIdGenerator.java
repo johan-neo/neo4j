@@ -20,7 +20,7 @@
 package org.neo4j.kernel.impl.core;
 
 import static org.junit.Assert.assertEquals;
-import static org.neo4j.kernel.impl.nioneo.store.NodeStore.RECORD_SIZE;
+import static org.neo4j.kernel.impl.nioneo.alt.NeoNodeStore.RECORD_SIZE;
 
 import java.io.File;
 import java.io.IOException;
@@ -33,7 +33,7 @@ import org.neo4j.kernel.impl.core.JumpingFileSystemAbstraction.JumpingFileChanne
 import org.neo4j.kernel.impl.nioneo.store.IdGenerator;
 
 public class TestJumpingIdGenerator
-{
+{    
     @Test
     public void testIt() throws Exception
     {

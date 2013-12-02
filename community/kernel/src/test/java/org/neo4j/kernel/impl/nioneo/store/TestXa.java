@@ -19,6 +19,15 @@
  */
 package org.neo4j.kernel.impl.nioneo.store;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.neo4j.kernel.impl.nioneo.xa.NeoStoreXaDataSource.LOGICAL_LOG_DEFAULT_NAME;
+import static org.neo4j.kernel.impl.util.StringLogger.DEV_NULL;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -65,9 +74,9 @@ import org.neo4j.kernel.impl.core.NodeManager;
 import org.neo4j.kernel.impl.core.PropertyKeyTokenHolder;
 import org.neo4j.kernel.impl.core.RelationshipTypeTokenHolder;
 import org.neo4j.kernel.impl.core.Token;
-import org.neo4j.kernel.impl.nioneo.alt.WriteTransaction;
 import org.neo4j.kernel.impl.nioneo.xa.NeoStoreXaConnection;
 import org.neo4j.kernel.impl.nioneo.xa.NeoStoreXaDataSource;
+import org.neo4j.kernel.impl.nioneo.xa.WriteTransaction;
 import org.neo4j.kernel.impl.persistence.NeoStoreTransaction.PropertyReceiver;
 import org.neo4j.kernel.impl.persistence.PersistenceManager;
 import org.neo4j.kernel.impl.transaction.LockManager;
@@ -85,11 +94,6 @@ import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.kernel.logging.DevNullLoggingService;
 import org.neo4j.kernel.logging.SingleLoggingService;
 import org.neo4j.test.impl.EphemeralFileSystemAbstraction;
-
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
-import static org.neo4j.kernel.impl.nioneo.xa.NeoStoreXaDataSource.LOGICAL_LOG_DEFAULT_NAME;
-import static org.neo4j.kernel.impl.util.StringLogger.DEV_NULL;
 
 public class TestXa
 {
@@ -129,8 +133,8 @@ public class TestXa
 
         StoreFactory sf = new StoreFactory( new Config( Collections.<String, String>emptyMap(),
                 GraphDatabaseSettings.class ), new DefaultIdGeneratorFactory(),
-                new DefaultWindowPoolFactory(), fileSystem, StringLogger.DEV_NULL, null );
-        sf.createNeoStore( file( "neo" ) ).close();
+                fileSystem, StringLogger.DEV_NULL, null );
+        sf.createNeoStore( path().getPath() ).close();
 
         ds = newNeoStore();
         xaCon = ds.getXaConnection();
@@ -344,11 +348,9 @@ public class TestXa
     {
         final Config config = new Config( MapUtil.stringMap(
                         InternalAbstractGraphDatabase.Configuration.store_dir.name(), path().getPath(),
-                        InternalAbstractGraphDatabase.Configuration.neo_store.name(), file( "neo" ).getPath(),
-                        InternalAbstractGraphDatabase.Configuration.logical_log.name(),
                         file( LOGICAL_LOG_DEFAULT_NAME ).getPath() ), GraphDatabaseSettings.class );
 
-        StoreFactory sf = new StoreFactory( config, new DefaultIdGeneratorFactory(), new DefaultWindowPoolFactory(),
+        StoreFactory sf = new StoreFactory( config, new DefaultIdGeneratorFactory(), 
                 fileSystem, StringLogger.DEV_NULL, null );
 
         PlaceboTm txManager = new PlaceboTm( null, TxIdGenerator.DEFAULT );

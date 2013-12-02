@@ -32,7 +32,7 @@ import org.neo4j.kernel.api.Statement;
 import org.neo4j.kernel.api.TokenWriteOperations;
 import org.neo4j.kernel.api.exceptions.KernelException;
 import org.neo4j.kernel.impl.core.ThreadToStatementContextBridge;
-import org.neo4j.kernel.impl.nioneo.store.NeoStore;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
 import org.neo4j.kernel.impl.nioneo.xa.NeoStoreXaDataSource;
 import org.neo4j.kernel.impl.transaction.XaDataSourceManager;
 import org.neo4j.test.TestGraphDatabaseBuilder;
@@ -132,9 +132,9 @@ public abstract class KernelIntegrationTest
         startDb();
     }
 
-    protected NeoStore neoStore()
+    protected FlatNeoStores neoStore()
     {
         return ((NeoStoreXaDataSource)db.getDependencyResolver().resolveDependency( XaDataSourceManager.class ).getXaDataSource(
-                NeoStoreXaDataSource.DEFAULT_DATA_SOURCE_NAME )).getNeoStore();
+                NeoStoreXaDataSource.DEFAULT_DATA_SOURCE_NAME )).getNeoStores();
     }
 }

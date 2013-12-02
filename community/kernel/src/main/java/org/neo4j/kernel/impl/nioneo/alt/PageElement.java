@@ -8,4 +8,6 @@ public interface PageElement
     
     void force();
     boolean free();
+
+    boolean isAllocated();
 }

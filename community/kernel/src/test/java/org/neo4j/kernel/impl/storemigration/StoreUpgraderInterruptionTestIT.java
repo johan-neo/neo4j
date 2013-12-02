@@ -24,7 +24,6 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.neo4j.kernel.CommonFactories.defaultFileSystemAbstraction;
 import static org.neo4j.kernel.CommonFactories.defaultIdGeneratorFactory;
-import static org.neo4j.kernel.impl.nioneo.store.CommonAbstractStore.ALL_STORES_VERSION;
 import static org.neo4j.kernel.impl.storemigration.MigrationTestUtils.allStoreFilesHaveVersion;
 import static org.neo4j.kernel.impl.storemigration.MigrationTestUtils.alwaysAllowed;
 import static org.neo4j.kernel.impl.storemigration.MigrationTestUtils.defaultConfig;
@@ -35,8 +34,9 @@ import java.io.IOException;
 
 import org.junit.Test;
 import org.neo4j.kernel.DefaultFileSystemAbstraction;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
 import org.neo4j.kernel.impl.nioneo.store.FileSystemAbstraction;
-import org.neo4j.kernel.impl.nioneo.store.NeoStore;
 import org.neo4j.kernel.impl.storemigration.legacystore.LegacyStore;
 import org.neo4j.kernel.impl.storemigration.monitoring.SilentMigrationProgressMonitor;
 
@@ -45,16 +45,16 @@ public class StoreUpgraderInterruptionTestIT
     @Test
     public void shouldSucceedWithUpgradeAfterPreviousAttemptDiedDuringMigration() throws IOException
     {
-        File workingDirectory = new File( "target/" + StoreUpgraderInterruptionTestIT.class.getSimpleName() );
+        String workingPath = "target/" + StoreUpgraderInterruptionTestIT.class.getSimpleName();
+        File workingDirectory = new File( workingPath );
         MigrationTestUtils.prepareSampleLegacyDatabase( fileSystem, workingDirectory );
-
         StoreMigrator failingStoreMigrator = new StoreMigrator( new SilentMigrationProgressMonitor() )
         {
 
             @Override
-            public void migrate( LegacyStore legacyStore, NeoStore neoStore ) throws IOException
+            public void migrate( LegacyStore legacyStore, FlatNeoStores neoStores ) throws IOException
             {
-                super.migrate( legacyStore, neoStore );
+                super.migrate( legacyStore, neoStores );
                 throw new RuntimeException( "This upgrade is failing" );
             }
         };
@@ -63,8 +63,7 @@ public class StoreUpgraderInterruptionTestIT
 
         try
         {
-            newUpgrader( failingStoreMigrator, new DatabaseFiles( fileSystem ) ).attemptUpgrade(
-                    new File( workingDirectory, NeoStore.DEFAULT_NAME ) );
+            newUpgrader( failingStoreMigrator, new DatabaseFiles( fileSystem ) ).attemptUpgrade( workingPath );
             fail( "Should throw exception" );
         }
         catch ( RuntimeException e )
@@ -75,9 +74,9 @@ public class StoreUpgraderInterruptionTestIT
         assertTrue( allStoreFilesHaveVersion( fileSystem, workingDirectory, LEGACY_VERSION ) );
 
         newUpgrader( new StoreMigrator( new SilentMigrationProgressMonitor() ), new DatabaseFiles(fileSystem) )
-            .attemptUpgrade( new File( workingDirectory, NeoStore.DEFAULT_NAME ) );
+            .attemptUpgrade( workingPath );
 
-        assertTrue( allStoreFilesHaveVersion( fileSystem, workingDirectory, ALL_STORES_VERSION ) );
+        assertTrue( allStoreFilesHaveVersion( fileSystem, workingDirectory, NeoNeoStore.ALL_STORES_VERSION ) );
     }
     
     private StoreUpgrader newUpgrader( StoreMigrator migrator, DatabaseFiles files )
@@ -89,8 +88,8 @@ public class StoreUpgraderInterruptionTestIT
     @Test
     public void shouldFailOnSecondAttemptIfPreviousAttemptMadeABackupToAvoidDamagingBackup() throws IOException
     {
-        File workingDirectory = new File( "target/" + StoreUpgraderInterruptionTestIT.class.getSimpleName() );
-        MigrationTestUtils.prepareSampleLegacyDatabase( fileSystem, workingDirectory );
+        String workingPath = "target/" + StoreUpgraderInterruptionTestIT.class.getSimpleName();
+        MigrationTestUtils.prepareSampleLegacyDatabase( fileSystem, new File( workingPath ) );
 
         DatabaseFiles failsOnBackup = new DatabaseFiles( fileSystem )
         {
@@ -102,11 +101,11 @@ public class StoreUpgraderInterruptionTestIT
             }
         };
 
-        assertTrue( allStoreFilesHaveVersion( fileSystem, workingDirectory, LEGACY_VERSION ) );
+        assertTrue( allStoreFilesHaveVersion( fileSystem, new File( workingPath ), LEGACY_VERSION ) );
 
         try
         {
-            newUpgrader( new StoreMigrator( new SilentMigrationProgressMonitor() ), failsOnBackup ).attemptUpgrade( new File( workingDirectory, NeoStore.DEFAULT_NAME ) );
+            newUpgrader( new StoreMigrator( new SilentMigrationProgressMonitor() ), failsOnBackup ).attemptUpgrade( workingPath );
             fail( "Should throw exception" );
         }
         catch ( RuntimeException e )
@@ -117,7 +116,7 @@ public class StoreUpgraderInterruptionTestIT
         try
         {
             newUpgrader( new StoreMigrator( new SilentMigrationProgressMonitor() ) , new DatabaseFiles( fileSystem ) )
-                    .attemptUpgrade( new File( workingDirectory, NeoStore.DEFAULT_NAME ) );
+                    .attemptUpgrade( workingPath );
             fail( "Should throw exception" );
         }
         catch ( Exception e )

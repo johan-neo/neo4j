@@ -22,10 +22,10 @@ package org.neo4j.kernel.impl.storemigration.legacystore;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
-import static org.neo4j.kernel.impl.nioneo.store.CommonAbstractStore.ALL_STORES_VERSION;
 import static org.neo4j.kernel.impl.storemigration.legacystore.LegacyStore.assertLegacyAndCurrentVersionHaveSameLength;
 
 import org.junit.Test;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
 
 public class LegacyStoreTest
 {
@@ -35,7 +35,7 @@ public class LegacyStoreTest
         try
         {
             // WHEN
-            assertLegacyAndCurrentVersionHaveSameLength( "111", ALL_STORES_VERSION );
+            assertLegacyAndCurrentVersionHaveSameLength( "111", NeoNeoStore.ALL_STORES_VERSION );
             fail( "Should have thrown exception" );
         }
         catch ( IllegalStateException e )

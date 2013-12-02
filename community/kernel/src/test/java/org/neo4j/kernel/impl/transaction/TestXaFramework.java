@@ -125,7 +125,6 @@ public class TestXaFramework extends AbstractNeo4jTestCase
             this.type = type;
         }
 
-        @Override
         public void execute()
         {
         }
@@ -268,7 +267,7 @@ public class TestXaFramework extends AbstractNeo4jTestCase
                 };
 
                 map.put( "store_dir", path().getPath() );
-                xaContainer = xaFactory.newXaContainer( this, resourceFile(),
+                xaContainer = xaFactory.newXaContainer( this, resourceFile().getPath(),
                         new DummyCommandFactory(),
                         ALLOW_ALL,
                         new DummyTransactionFactory(), stateFactory, new TransactionInterceptorProviders(

@@ -27,10 +27,11 @@ import java.util.Map;
 import java.util.Set;
 
 import org.neo4j.kernel.api.index.NodePropertyUpdate;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyArrayStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStringStore;
 import org.neo4j.kernel.impl.nioneo.alt.RecordStore;
 import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
-import org.neo4j.kernel.impl.nioneo.store.PropertyStore;
 import org.neo4j.kernel.impl.nioneo.store.PropertyType;
 
 public class PropertyPhysicalToLogicalConverter
@@ -38,10 +39,10 @@ public class PropertyPhysicalToLogicalConverter
     private final RecordStore stringStore;
     private final RecordStore arrayStore;
 
-    public PropertyPhysicalToLogicalConverter( RecordStore stringStore, RecordStore arrayStore )
+    public PropertyPhysicalToLogicalConverter( NeoPropertyStringStore stringStore, NeoPropertyArrayStore arrayStore )
     {
-        this.stringStore = stringStore;
-        this.arrayStore = arrayStore;
+        this.stringStore = stringStore.getRecordStore();
+        this.arrayStore = arrayStore.getRecordStore();
     }
 
     public Iterable<NodePropertyUpdate> apply(

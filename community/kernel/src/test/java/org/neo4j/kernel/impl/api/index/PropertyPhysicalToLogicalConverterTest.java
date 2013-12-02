@@ -33,10 +33,11 @@ import org.neo4j.kernel.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.DefaultTxHook;
 import org.neo4j.kernel.api.index.NodePropertyUpdate;
 import org.neo4j.kernel.configuration.Config;
-import org.neo4j.kernel.impl.nioneo.store.DefaultWindowPoolFactory;
+import org.neo4j.kernel.impl.api.UpdateMode;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStore;
 import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
-import org.neo4j.kernel.impl.nioneo.store.PropertyStore;
 import org.neo4j.kernel.impl.nioneo.store.StoreFactory;
 import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.test.EphemeralFileSystemRule;
@@ -164,12 +165,12 @@ public class PropertyPhysicalToLogicalConverterTest
     private PropertyBlock property( long key, Object value )
     {
         PropertyBlock block = new PropertyBlock();
-        store.encodeValue( block, (int) key, value );
+        NeoPropertyStore.encodeValue( block, (int) key, value, stores );
         return block;
     }
     
     @Rule public EphemeralFileSystemRule fs = new EphemeralFileSystemRule();
-    private PropertyStore store;
+    private FlatNeoStores stores;
     private final String longString = "my super looooooooooooooooooooooooooooooooooooooong striiiiiiiiiiiiiiiiiiiiiiing";
     private final String longerString = "my super looooooooooooooooooooooooooooooooooooooong striiiiiiiiiiiiiiiiiiiiiiingdd";
     private PropertyPhysicalToLogicalConverter converter;
@@ -179,16 +180,16 @@ public class PropertyPhysicalToLogicalConverterTest
     public void before() throws Exception
     {
         StoreFactory storeFactory = new StoreFactory( new Config(), new DefaultIdGeneratorFactory(),
-                new DefaultWindowPoolFactory(), fs.get(), StringLogger.DEV_NULL, new DefaultTxHook() );
-        File storeFile = new File( "propertystore" );
-        storeFactory.createPropertyStore( storeFile );
-        store = storeFactory.newPropertyStore( storeFile );
-        converter = new PropertyPhysicalToLogicalConverter( store );
+                fs.get(), StringLogger.DEV_NULL, new DefaultTxHook() );
+        File storeFile = new File( "neostore" );
+        stores = storeFactory.openNeoStore( "" ); //, storeFile ); 
+        converter = new PropertyPhysicalToLogicalConverter( stores.getStringStore(), 
+                stores.getArrayStore() );
     }
 
     @After
     public void after() throws Exception
     {
-        store.close();
+        stores.close();
     }
 }

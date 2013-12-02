@@ -112,6 +112,8 @@ public class XaLogicalLog implements LogLoader
 
     private final TransactionStateFactory stateFactory;
 
+    public static final String DEFAULT_FILE_PREFIX = "nioneo_logical.log";
+    
     public XaLogicalLog( File fileName, XaResourceManager xaRm, XaCommandFactory cf,
                          XaTransactionFactory xaTf, LogBufferFactory logBufferFactory, FileSystemAbstraction fileSystem,
                          Logging logging, LogPruneStrategy pruneStrategy, TransactionStateFactory stateFactory,

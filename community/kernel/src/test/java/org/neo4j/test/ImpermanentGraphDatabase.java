@@ -162,6 +162,7 @@ public class ImpermanentGraphDatabase extends EmbeddedGraphDatabase
         result.put( use_memory_mapped_buffers.name(), FALSE );
 
         // To signal to index provides that we should be in-memory
+        System.out.println( ephemeral );
         result.put( ephemeral.name(), TRUE );
         return result;
     }

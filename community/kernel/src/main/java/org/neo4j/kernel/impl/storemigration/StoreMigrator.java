@@ -19,27 +19,32 @@
  */
 package org.neo4j.kernel.impl.storemigration;
 
+import static org.neo4j.helpers.collection.IteratorUtil.first;
+import static org.neo4j.helpers.collection.IteratorUtil.loop;
+
 import java.io.IOException;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
 import org.neo4j.kernel.impl.core.Token;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
+import org.neo4j.kernel.impl.nioneo.alt.NeoDynamicStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNodeStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStringStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoTokenNameStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoTokenStore;
+import org.neo4j.kernel.impl.nioneo.alt.NewDynamicRecordAllocator;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
-import org.neo4j.kernel.impl.nioneo.store.NeoStore;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
-import org.neo4j.kernel.impl.nioneo.store.NodeStore;
 import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
 import org.neo4j.kernel.impl.nioneo.store.PropertyKeyTokenRecord;
-import org.neo4j.kernel.impl.nioneo.store.PropertyKeyTokenStore;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
-import org.neo4j.kernel.impl.nioneo.store.PropertyStore;
 import org.neo4j.kernel.impl.storemigration.legacystore.LegacyStore;
 import org.neo4j.kernel.impl.storemigration.monitoring.MigrationProgressMonitor;
-
-import static org.neo4j.helpers.UTF8.encode;
-import static org.neo4j.helpers.collection.IteratorUtil.first;
-import static org.neo4j.helpers.collection.IteratorUtil.loop;
 
 /**
  * Migrates a neo4j database from one version to the next. Instantiated with a {@link LegacyStore}
@@ -57,68 +62,69 @@ public class StoreMigrator
         this.progressMonitor = progressMonitor;
     }
 
-    public void migrate( LegacyStore legacyStore, NeoStore neoStore ) throws IOException
+    public void migrate( LegacyStore legacyStore, FlatNeoStores neoStores ) throws IOException
     {
         progressMonitor.started();
-        new Migration( legacyStore, neoStore ).migrate();
+        new Migration( legacyStore, neoStores ).migrate();
         progressMonitor.finished();
     }
     
     protected class Migration
     {
         private final LegacyStore legacyStore;
-        private final NeoStore neoStore;
+        private final FlatNeoStores neoStores;
         private final long totalEntities;
         private int percentComplete;
 
-        public Migration( LegacyStore legacyStore, NeoStore neoStore )
+        public Migration( LegacyStore legacyStore, FlatNeoStores neoStores )
         {
             this.legacyStore = legacyStore;
-            this.neoStore = neoStore;
+            this.neoStores = neoStores;
             totalEntities = legacyStore.getNodeStoreReader().getMaxId();
         }
 
         private void migrate() throws IOException
         {
             // Migrate
-            migrateNeoStore( neoStore );
-            migrateNodes( neoStore.getNodeStore() );
-            migratePropertyIndexes( neoStore.getPropertyStore() );
+            migrateNeoStore( neoStores );
+            migrateNodes( neoStores.getNodeStore() ); 
+            migratePropertyIndexes( neoStores );
 
             // Close
-            neoStore.close();
+            neoStores.close();
             legacyStore.close();
 
             // Just copy unchanged stores that doesn't need migration
-            legacyStore.copyRelationshipStore( neoStore );
-            legacyStore.copyRelationshipTypeTokenStore( neoStore );
-            legacyStore.copyRelationshipTypeTokenNameStore( neoStore );
-            legacyStore.copyDynamicStringPropertyStore( neoStore );
-            legacyStore.copyDynamicArrayPropertyStore( neoStore );
+            legacyStore.copyRelationshipStore( neoStores );
+            legacyStore.copyRelationshipTypeTokenStore( neoStores );
+            legacyStore.copyRelationshipTypeTokenNameStore( neoStores );
+            legacyStore.copyDynamicStringPropertyStore( neoStores );
+            legacyStore.copyDynamicArrayPropertyStore( neoStores );
         }
 
-        private void migratePropertyIndexes( PropertyStore propertyStore ) throws IOException
+        private void migratePropertyIndexes( FlatNeoStores neoStores ) throws IOException
         {
             Token[] tokens = legacyStore.getPropertyIndexReader().readTokens();
             
             // dedup and write new property key token store (incl. names)
             Map<Integer, Integer> propertyKeyTranslation =
-                    dedupAndWritePropertyKeyTokenStore( propertyStore, tokens );
+                    dedupAndWritePropertyKeyTokenStore( neoStores.getPropertyKeyTokenStore(), neoStores.getPropertyKeyTokenNameStore(), tokens );
             
             // read property store, replace property key ids
-            migratePropertyStore( propertyKeyTranslation, propertyStore );
+            migratePropertyStore( propertyKeyTranslation, neoStores.getPropertyStore() );
         }
 
-        private void migrateNeoStore( NeoStore neoStore ) throws IOException
+        private void migrateNeoStore( FlatNeoStores neoStores ) throws IOException
         {
-            legacyStore.copyNeoStore( neoStore );
-            neoStore.setStoreVersion( NeoStore.versionStringToLong( NeoStore.ALL_STORES_VERSION ) );
+            legacyStore.copyNeoStore( neoStores );
+            byte[] data = new byte[NeoNeoStore.RECORD_SIZE];
+            NeoNeoStore.updateLong( data, NeoNeoStore.versionStringToLong( NeoNeoStore.ALL_STORES_VERSION ) );
+            neoStores.getNeoStore().getRecordStore().writeRecord( NeoNeoStore.STORE_VERSION_POSITION, data );
         }
 
-        private Map<Integer, Integer> dedupAndWritePropertyKeyTokenStore( PropertyStore propertyStore,
+        private Map<Integer, Integer> dedupAndWritePropertyKeyTokenStore( NeoTokenStore propertyKeyTokenStore, NeoTokenNameStore propertyKeyTokenNameStore, 
                 Token[] tokens /*ordered ASC*/ )
         {
-            PropertyKeyTokenStore keyTokenStore = propertyStore.getPropertyKeyTokenStore();
             Map<Integer/*duplicate*/, Integer/*use this instead*/> translations = new HashMap<Integer, Integer>();
             Map<String, Integer> createdTokens = new HashMap<String, Integer>();
             for ( Token token : tokens )
@@ -126,15 +132,17 @@ public class StoreMigrator
                 Integer id = createdTokens.get( token.name() );
                 if ( id == null )
                 {   // Not a duplicate, add to store
-                    id = (int) keyTokenStore.nextId();
+                    id = (int) propertyKeyTokenStore.getIdGenerator().nextId();
                     PropertyKeyTokenRecord record = new PropertyKeyTokenRecord( id );
                     Collection<DynamicRecord> nameRecords =
-                            keyTokenStore.allocateNameRecords( encode( token.name() ) );
+                            NeoDynamicStore.allocateRecordsFromBytes( NeoPropertyStringStore.encodeString( token.name() ), 
+                                    Collections.<DynamicRecord>emptyList().iterator(), new NewDynamicRecordAllocator( propertyKeyTokenNameStore, DynamicRecord.Type.UNKNOWN ) ); 
                     record.setNameId( (int) first( nameRecords ).getId() );
                     record.addNameRecords( nameRecords );
                     record.setInUse( true );
                     record.setCreated();
-                    keyTokenStore.updateRecord( record );
+                    NeoTokenStore.updateToken( propertyKeyTokenStore.getRecordStore(), propertyKeyTokenNameStore.getRecordStore(), 
+                            record, new byte[NeoTokenStore.LABEL_TOKEN_RECORD_SIZE] );
                     createdTokens.put( token.name(), id );
                 }
                 translations.put( token.id(), id );
@@ -143,7 +151,7 @@ public class StoreMigrator
         }
         
         private void migratePropertyStore( Map<Integer, Integer> propertyKeyTranslation,
-                PropertyStore propertyStore ) throws IOException
+                NeoPropertyStore propertyStore ) throws IOException
         {
             long lastInUseId = -1;
             for ( PropertyRecord propertyRecord : loop( legacyStore.getPropertyStoreReader().readPropertyStore() ) )
@@ -158,29 +166,32 @@ public class StoreMigrator
                         block.setKeyIndexId( translation );
                     }
                 }
-                propertyStore.setHighId( propertyRecord.getId()+1 );
-                propertyStore.updateRecord( propertyRecord );
+                propertyStore.getIdGenerator().setHighId( propertyRecord.getId()+1 );
+                propertyStore.getRecordStore().writeRecord(propertyRecord.getId(), 
+                        NeoPropertyStore.updateRecord( propertyRecord, new byte[NeoPropertyStore.RECORD_SIZE] ) );
                 for ( long id = lastInUseId+1; id < propertyRecord.getId(); id++ )
                 {
-                    propertyStore.freeId( id );
+                    propertyStore.getIdGenerator().freeId( id );
                 }
                 lastInUseId = propertyRecord.getId();
             }
         }
         
-        private void migrateNodes( NodeStore nodeStore ) throws IOException
+        private void migrateNodes( NeoNodeStore nodeStore ) throws IOException
         {
             for ( NodeRecord nodeRecord : loop( legacyStore.getNodeStoreReader().readNodeStore() ) )
             {
                 reportProgress( nodeRecord.getId() );
-                nodeStore.setHighId( nodeRecord.getId() + 1 );
+                nodeStore.getIdGenerator().setHighId( nodeRecord.getId() + 1 );
                 if ( nodeRecord.inUse() )
                 {
-                    nodeStore.updateRecord( nodeRecord );
+                    byte[] data = new byte[NeoNodeStore.RECORD_SIZE];
+                    NeoNodeStore.updateRecord( nodeRecord, data, false );
+                    nodeStore.getRecordStore().writeRecord( nodeRecord.getId(), data );
                 }
                 else
                 {
-                    nodeStore.freeId( nodeRecord.getId() );
+                    nodeStore.getIdGenerator().freeId( nodeRecord.getId() );
                 }
             }
             legacyStore.getNodeStoreReader().close();

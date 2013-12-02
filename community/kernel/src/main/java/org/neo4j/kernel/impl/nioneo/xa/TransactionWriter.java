@@ -21,15 +21,18 @@ package org.neo4j.kernel.impl.nioneo.xa;
 
 import java.io.IOException;
 import java.util.Collection;
+
 import javax.transaction.xa.Xid;
 
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStringStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoTokenStore;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.LabelTokenRecord;
 import org.neo4j.kernel.impl.nioneo.store.NeoStoreRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyKeyTokenRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
-import org.neo4j.kernel.impl.nioneo.store.PropertyStore;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeTokenRecord;
 import org.neo4j.kernel.impl.nioneo.store.TokenRecord;
@@ -41,7 +44,6 @@ import static java.lang.System.currentTimeMillis;
 
 import static org.neo4j.kernel.impl.nioneo.store.Record.NO_NEXT_PROPERTY;
 import static org.neo4j.kernel.impl.nioneo.store.Record.NO_PREV_RELATIONSHIP;
-import static org.neo4j.kernel.impl.nioneo.store.TokenStore.NAME_STORE_BLOCK_SIZE;
 import static org.neo4j.kernel.impl.transaction.XidImpl.DEFAULT_SEED;
 import static org.neo4j.kernel.impl.transaction.XidImpl.getNewGlobalId;
 
@@ -106,17 +108,17 @@ public class TransactionWriter
 
     public void propertyKey( int id, String key, int... dynamicIds ) throws IOException
     {
-        write( new Command.PropertyKeyTokenCommand( withName( new PropertyKeyTokenRecord( id ), dynamicIds, key ) ) );
+        write( new Command.PropertyKeyTokenCommand( withName( new PropertyKeyTokenRecord( id ), dynamicIds, key, DynamicRecord.Type.STRING ) ) );
     }
 
     public void label( int id, String name, int... dynamicIds ) throws IOException
     {
-        write( new Command.LabelTokenCommand( withName( new LabelTokenRecord( id ), dynamicIds, name ) ) );
+        write( new Command.LabelTokenCommand( withName( new LabelTokenRecord( id ), dynamicIds, name, DynamicRecord.Type.STRING ) ) );
     }
 
     public void relationshipType( int id, String label, int... dynamicIds ) throws IOException
     {
-        write( new Command.RelationshipTypeTokenCommand( withName( new RelationshipTypeTokenRecord( id ), dynamicIds, label ) ) );
+        write( new Command.RelationshipTypeTokenCommand( withName( new RelationshipTypeTokenRecord( id ), dynamicIds, label, DynamicRecord.Type.STRING ) ) );
     }
 
     public void update( NeoStoreRecord record ) throws IOException
@@ -243,20 +245,20 @@ public class TransactionWriter
         LogIoUtils.writeCommand( buffer, identifier, command );
     }
 
-    private static <T extends TokenRecord> T withName( T record, int[] dynamicIds, String name )
+    private static <T extends TokenRecord> T withName( T record, int[] dynamicIds, String name, DynamicRecord.Type type )
     {
         if ( dynamicIds == null || dynamicIds.length == 0 )
         {
             throw new IllegalArgumentException( "No dynamic records for storing the name." );
         }
         record.setInUse( true );
-        byte[] data = PropertyStore.encodeString( name );
-        if ( data.length > dynamicIds.length * NAME_STORE_BLOCK_SIZE )
+        byte[] data = NeoPropertyStringStore.encodeString( name );
+        if ( data.length > dynamicIds.length * NeoTokenStore.NAME_STORE_BLOCK_SIZE )
         {
             throw new IllegalArgumentException(
                     String.format( "[%s] is too long to fit in %d blocks", name, dynamicIds.length ) );
         }
-        else if ( data.length <= (dynamicIds.length - 1) * NAME_STORE_BLOCK_SIZE )
+        else if ( data.length <= (dynamicIds.length - 1) * NeoTokenStore.NAME_STORE_BLOCK_SIZE )
         {
             throw new IllegalArgumentException(
                     String.format( "[%s] is to short to fill %d blocks", name, dynamicIds.length ) );
@@ -264,10 +266,10 @@ public class TransactionWriter
 
         for ( int i = 0; i < dynamicIds.length; i++ )
         {
-            byte[] part = new byte[Math.min( NAME_STORE_BLOCK_SIZE, data.length - i * NAME_STORE_BLOCK_SIZE )];
-            System.arraycopy( data, i * NAME_STORE_BLOCK_SIZE, part, 0, part.length );
+            byte[] part = new byte[Math.min( NeoTokenStore.NAME_STORE_BLOCK_SIZE, data.length - i * NeoTokenStore.NAME_STORE_BLOCK_SIZE )];
+            System.arraycopy( data, i * NeoTokenStore.NAME_STORE_BLOCK_SIZE, part, 0, part.length );
 
-            DynamicRecord dynamicRecord = new DynamicRecord( dynamicIds[i] );
+            DynamicRecord dynamicRecord = new DynamicRecord( dynamicIds[i], type );
             dynamicRecord.setInUse( true );
             dynamicRecord.setData( part );
             dynamicRecord.setCreated();

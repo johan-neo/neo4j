@@ -19,25 +19,36 @@
  */
 package org.neo4j.kernel.impl.nioneo.alt;
 
+import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Collections;
 
+import org.neo4j.kernel.IdType;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.InvalidRecordException;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.Record;
 import org.neo4j.kernel.impl.nioneo.store.RecordLoad;
+import org.neo4j.kernel.impl.nioneo.store.StoreFactory;
 
 /**
  * Implementation of the node store.
  */
-public class NeoNodeStore
+public class NeoNodeStore extends Store
 {
     public static final String TYPE_DESCRIPTOR = "NodeStore";
     // in_use(byte)+next_rel_id(int)+next_prop_id(int)+labels(5)
     public static final int RECORD_SIZE = 14;
+    
+    public static final IdType ID_TYPE = IdType.NODE;
 
+    public NeoNodeStore( StoreParameter po )
+    {
+        super( new File( po.path, StoreFactory.NODE_STORE_NAME ), po.config, ID_TYPE, po.idGeneratorFactory, 
+                po.fileSystemAbstraction, po.stringLogger, TYPE_DESCRIPTOR, false, RECORD_SIZE );
+    }
+    
     public static NodeRecord getRecord( long id, byte[] data )
     {
         return getRecord( id, data, RecordLoad.NORMAL );
@@ -65,11 +76,14 @@ public class NeoNodeStore
         }
         long nextRel = NeoNeoStore.unsginedInt( buffer.getInt() );
         long nextProp = NeoNeoStore.unsginedInt( buffer.getInt() );
+        
         long relModifier = (inUseByte & 0xEL) << 31;
         long propModifier = (inUseByte & 0xF0L) << 28;
+        
         long lsbLabels = NeoNeoStore.unsginedInt( buffer.getInt() );
-        long hsbLabels = buffer.get();
+        long hsbLabels = buffer.get() & 0xFF; // so that a negative bye won't fill the "extended" bits with ones.
         long labels = lsbLabels | (hsbLabels << 32);
+        
         NodeRecord nodeRecord = new NodeRecord( id, NeoNeoStore.longFromIntAndMod( nextRel, relModifier ),
                 NeoNeoStore.longFromIntAndMod( nextProp, propModifier ) );
         nodeRecord.setInUse( inUse );
@@ -77,7 +91,7 @@ public class NeoNodeStore
         return nodeRecord;
     }
 
-    public static void updateRecord( NodeRecord record, byte[] data, boolean force )
+    public static byte[] updateRecord( NodeRecord record, byte[] data, boolean force )
     {
         // registerIdFromUpdateRecord( id );
         ByteBuffer buffer = ByteBuffer.wrap( data );
@@ -105,5 +119,6 @@ public class NeoNodeStore
         {
             buffer.put( Record.NOT_IN_USE.byteValue() );
         }
+        return data;
     }
 }

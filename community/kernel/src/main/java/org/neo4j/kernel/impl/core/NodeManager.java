@@ -177,16 +177,18 @@ public class NodeManager implements Lifecycle, EntityFactory
             if ( ds.getName().equals( NeoStoreXaDataSource.DEFAULT_DATA_SOURCE_NAME ) )
             {
                 FlatNeoStores neoStores = ((NeoStoreXaDataSource) ds).getNeoStores();
-
+                int highId = (int) neoStores.getRelationshipTypeTokenStore().getIdGenerator().getHighId();
                 addRawRelationshipTypes( 
                         NeoTokenStore.getTokens( neoStores.getRelationshipTypeTokenStore().getRecordStore(), 
-                                neoStores.getRelationshipTypeTokenNameStore().getRecordStore(), Integer.MAX_VALUE ) );
-
+                                neoStores.getRelationshipTypeTokenNameStore().getRecordStore(), highId ) );
+                
+                highId = (int) neoStores.getPropertyKeyTokenStore().getIdGenerator().getHighId();
                 addPropertyKeyTokens( NeoTokenStore.getTokens( neoStores.getPropertyKeyTokenStore().getRecordStore(), 
-                        neoStores.getPropertyKeyTokenNameStore().getRecordStore(), Integer.MAX_VALUE ) );
-
+                        neoStores.getPropertyKeyTokenNameStore().getRecordStore(), highId ) );
+                
+                highId = (int) neoStores.getLabelTokenStore().getIdGenerator().getHighId();
                 addLabelTokens(  NeoTokenStore.getTokens( neoStores.getLabelTokenStore().getRecordStore(), 
-                        neoStores.getLabelTokenNameStore().getRecordStore(), Integer.MAX_VALUE ) );
+                        neoStores.getLabelTokenNameStore().getRecordStore(), highId ) );
 
             }
         }

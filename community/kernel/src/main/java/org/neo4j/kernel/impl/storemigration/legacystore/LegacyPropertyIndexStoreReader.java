@@ -19,6 +19,8 @@
  */
 package org.neo4j.kernel.impl.storemigration.legacystore;
 
+import static org.neo4j.kernel.impl.storemigration.legacystore.LegacyStore.readIntoBuffer;
+
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -32,9 +34,6 @@ import org.neo4j.kernel.impl.core.Token;
 import org.neo4j.kernel.impl.nioneo.store.FileSystemAbstraction;
 import org.neo4j.kernel.impl.nioneo.store.InvalidRecordException;
 import org.neo4j.kernel.impl.nioneo.store.Record;
-
-import static org.neo4j.kernel.impl.nioneo.store.StoreFactory.KEYS_PART;
-import static org.neo4j.kernel.impl.storemigration.legacystore.LegacyStore.readIntoBuffer;
 
 public class LegacyPropertyIndexStoreReader implements Closeable
 {
@@ -50,7 +49,7 @@ public class LegacyPropertyIndexStoreReader implements Closeable
         int endHeaderSize = UTF8.encode( FROM_VERSION ).length;
         maxId = (fileChannel.size() - endHeaderSize) / RECORD_SIZE;
         
-        nameStoreReader = new LegacyDynamicStringStoreReader( fs, new File( file.getPath() + KEYS_PART ),
+        nameStoreReader = new LegacyDynamicStringStoreReader( fs, new File( file.getPath() + ".keys" ),
                 "StringPropertyStore" );
     }
     

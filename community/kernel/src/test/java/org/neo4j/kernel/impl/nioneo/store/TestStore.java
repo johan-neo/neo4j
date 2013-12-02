@@ -25,7 +25,6 @@ import static org.junit.Assert.fail;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
-import java.util.List;
 
 import org.junit.Test;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
@@ -36,15 +35,14 @@ import org.neo4j.kernel.IdGeneratorFactory;
 import org.neo4j.kernel.IdType;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.AbstractNeo4jTestCase;
-import org.neo4j.kernel.impl.nioneo.store.windowpool.WindowPoolFactory;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
+import org.neo4j.kernel.impl.nioneo.alt.Store;
 import org.neo4j.kernel.impl.util.StringLogger;
 
 public class TestStore
 {
     public static IdGeneratorFactory ID_GENERATOR_FACTORY =
             new DefaultIdGeneratorFactory();
-    public static WindowPoolFactory WINDOW_POOL_FACTORY =
-            new DefaultWindowPoolFactory();
     public static FileSystemAbstraction FILE_SYSTEM =
             new DefaultFileSystemAbstraction();
 
@@ -78,16 +76,16 @@ public class TestStore
         {
             try
             {
-                Store.createStore( null );
+                StoreHolder.createStore( null );
                 fail( "Null fileName should throw exception" );
             }
             catch ( IllegalArgumentException e )
             { // good
             }
-            Store store = Store.createStore( storeFile() );
+            StoreHolder store = StoreHolder.createStore( storeFile() );
             try
             {
-                Store.createStore( storeFile() );
+                StoreHolder.createStore( storeFile() );
                 fail( "Creating existing store should throw exception" );
             }
             catch ( IllegalStateException e )
@@ -120,13 +118,12 @@ public class TestStore
     {
         try
         {
-            Store.createStore( storeFile() ).close();
+            StoreHolder.createStore( storeFile() ).close();
             java.nio.channels.FileChannel fileChannel = new java.io.RandomAccessFile(
                     storeFile(), "rw" ).getChannel();
             fileChannel.truncate( fileChannel.size() - 2 );
             fileChannel.close();
-            Store store = new Store( storeFile() );
-            store.makeStoreOk();
+            StoreHolder store = new StoreHolder( storeFile() );
             store.close();
         }
         finally
@@ -140,7 +137,7 @@ public class TestStore
     {
         try
         {
-            Store store = Store.createStore( storeFile() );
+            StoreHolder store = StoreHolder.createStore( storeFile() );
             store.close();
         }
         finally
@@ -149,16 +146,19 @@ public class TestStore
         }
     }
 
-    private static class Store extends AbstractStore
+    private static class StoreHolder
     {
         public static final String TYPE_DESCRIPTOR = "TestVersion";
         private static final int RECORD_SIZE = 1;
+        
+        private Store store;
 
-        public Store( File fileName ) throws IOException
+        public StoreHolder( File fileName ) throws IOException
         {
-            super( fileName, new Config( MapUtil.stringMap( "store_dir", "target/var/teststore" ),
+            store = new Store( fileName, new Config( MapUtil.stringMap( "store_dir", "target/var/teststore" ),
                     GraphDatabaseSettings.class ),
-                    IdType.NODE, ID_GENERATOR_FACTORY, WINDOW_POOL_FACTORY, FILE_SYSTEM, StringLogger.DEV_NULL );
+                    IdType.NODE, ID_GENERATOR_FACTORY, FILE_SYSTEM, StringLogger.DEV_NULL,
+                    TYPE_DESCRIPTOR, false, RECORD_SIZE );
         }
 
         public int getRecordSize()
@@ -171,24 +171,18 @@ public class TestStore
             return TYPE_DESCRIPTOR;
         }
 
-        public static Store createStore( File fileName ) throws IOException
+        public static StoreHolder createStore( File fileName ) throws IOException
         {
             new StoreFactory( new Config( Collections.<String, String>emptyMap(), GraphDatabaseSettings.class ),
-                    ID_GENERATOR_FACTORY, new DefaultWindowPoolFactory(),
+                    ID_GENERATOR_FACTORY,
                     FILE_SYSTEM, StringLogger.DEV_NULL, null ).
-                    createEmptyStore( fileName, buildTypeDescriptorAndVersion( TYPE_DESCRIPTOR ) );
-            return new Store( fileName );
+                    createEmptyStore( fileName, NeoNeoStore.buildTypeDescriptorAndVersion( TYPE_DESCRIPTOR ) );
+            return new StoreHolder( fileName );
         }
 
-        protected void rebuildIdGenerator()
+        public void close()
         {
-        }
-
-        @Override
-        public List<WindowPoolStats> getAllWindowPoolStats()
-        {
-            // TODO Auto-generated method stub
-            return null;
+            store.close();
         }
     }
 }

@@ -28,19 +28,16 @@ import java.util.ArrayList;
 import java.util.Collection;
 
 import org.neo4j.helpers.UTF8;
-import org.neo4j.kernel.impl.nioneo.store.CommonAbstractStore;
-import org.neo4j.kernel.impl.nioneo.store.DynamicArrayStore;
-import org.neo4j.kernel.impl.nioneo.store.DynamicStringStore;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyArrayStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoRelationshipStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStringStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoTokenStore;
 import org.neo4j.kernel.impl.nioneo.store.FileSystemAbstraction;
 import org.neo4j.kernel.impl.nioneo.store.IdGeneratorImpl;
-import org.neo4j.kernel.impl.nioneo.store.NeoStore;
-import org.neo4j.kernel.impl.nioneo.store.PropertyKeyTokenStore;
-import org.neo4j.kernel.impl.nioneo.store.PropertyStore;
-import org.neo4j.kernel.impl.nioneo.store.RelationshipStore;
-import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeTokenStore;
 import org.neo4j.kernel.impl.nioneo.store.StoreFactory;
-
-import static org.neo4j.kernel.impl.nioneo.store.CommonAbstractStore.buildTypeDescriptorAndVersion;
 
 /**
  * Reader for a database in an older store format version. 
@@ -54,7 +51,7 @@ public class LegacyStore implements Closeable
 {
     public static final String LEGACY_VERSION = "v0.A.0";
 
-    private final File storageFileName;
+    private final File path;
     private final Collection<Closeable> allStoreReaders = new ArrayList<Closeable>();
     private LegacyNodeStoreReader nodeStoreReader;
     private LegacyPropertyIndexStoreReader propertyIndexReader;
@@ -62,11 +59,11 @@ public class LegacyStore implements Closeable
 
     private final FileSystemAbstraction fs;
 
-    public LegacyStore( FileSystemAbstraction fs, File storageFileName ) throws IOException
+    public LegacyStore( FileSystemAbstraction fs, File path ) throws IOException
     {
         this.fs = fs;
-        this.storageFileName = storageFileName;
-        assertLegacyAndCurrentVersionHaveSameLength( LEGACY_VERSION, CommonAbstractStore.ALL_STORES_VERSION );
+        this.path = path;
+        assertLegacyAndCurrentVersionHaveSameLength( LEGACY_VERSION, NeoNeoStore.ALL_STORES_VERSION ); 
         initStorage();
     }
     
@@ -83,14 +80,14 @@ public class LegacyStore implements Closeable
 
     protected void initStorage() throws IOException
     {
-        allStoreReaders.add( nodeStoreReader = new LegacyNodeStoreReader( fs, new File( getStorageFileName().getPath() + StoreFactory.NODE_STORE_NAME ) ) );
-        allStoreReaders.add( propertyIndexReader = new LegacyPropertyIndexStoreReader( fs, new File( getStorageFileName().getPath() + StoreFactory.PROPERTY_KEY_TOKEN_STORE_NAME ) ) );
-        allStoreReaders.add( propertyStoreReader = new LegacyPropertyStoreReader( fs, new File( getStorageFileName().getPath() + StoreFactory.PROPERTY_STORE_NAME ) ) );
+        allStoreReaders.add( nodeStoreReader = new LegacyNodeStoreReader( fs, new File( path, getBaseFileName() + StoreFactory.NODE_STORE_NAME ) ) );
+        allStoreReaders.add( propertyIndexReader = new LegacyPropertyIndexStoreReader( fs, new File( path, getBaseFileName() + StoreFactory.PROPERTY_KEY_TOKEN_STORE_NAME ) ) );
+        allStoreReaders.add( propertyStoreReader = new LegacyPropertyStoreReader( fs, new File( path, getBaseFileName() + StoreFactory.PROPERTY_STORE_NAME ) ) );
     }
 
-    public File getStorageFileName()
+    private String getBaseFileName()
     {
-        return storageFileName;
+        return StoreFactory.NEO_STORE_NAME;
     }
     
     public static long getUnsignedInt(ByteBuffer buf)
@@ -114,12 +111,12 @@ public class LegacyStore implements Closeable
             throws IOException
     {
         File targetStoreFileName = new File( targetBaseStorageFileName.getPath() + storeNamePart );
-        fs.copyFile( new File( storageFileName + storeNamePart ), targetStoreFileName );
+        fs.copyFile( new File( path, getBaseFileName() + storeNamePart ), targetStoreFileName );
         
         setStoreVersionTrailer( targetStoreFileName, versionTrailer );
         
         fs.copyFile(
-                new File( storageFileName + storeNamePart + ".id" ),
+                new File( path, getBaseFileName() + storeNamePart + ".id" ),
                 new File( targetBaseStorageFileName + storeNamePart + ".id" ) );
     }
 
@@ -138,57 +135,58 @@ public class LegacyStore implements Closeable
         }
     }
 
-    public void copyNeoStore( NeoStore neoStore ) throws IOException
+    public void copyNeoStore( FlatNeoStores neoStores ) throws IOException
     {
-        copyStore( neoStore.getStorageFileName(), "", neoStore.getTypeAndVersionDescriptor() );
+        copyStore( new File( neoStores.getPath() ), StoreFactory.NEO_STORE_NAME, 
+                NeoNeoStore.buildTypeDescriptorAndVersion( NeoNeoStore.TYPE_DESCRIPTOR ) );
     }
 
-    public void copyRelationshipStore( NeoStore neoStore ) throws IOException
+    public void copyRelationshipStore( FlatNeoStores neoStores ) throws IOException
     {
-        copyStore( neoStore.getStorageFileName(), StoreFactory.RELATIONSHIP_STORE_NAME,
-                buildTypeDescriptorAndVersion( RelationshipStore.TYPE_DESCRIPTOR ) );
+        copyStore( new File( neoStores.getPath() ), StoreFactory.RELATIONSHIP_STORE_NAME,
+                NeoNeoStore.buildTypeDescriptorAndVersion( NeoRelationshipStore.TYPE_DESCRIPTOR ) );
     }
 
-    public void copyRelationshipTypeTokenStore( NeoStore neoStore ) throws IOException
+    public void copyRelationshipTypeTokenStore(  FlatNeoStores neoStores ) throws IOException
     {
-        copyStore( neoStore.getStorageFileName(), StoreFactory.RELATIONSHIP_TYPE_TOKEN_STORE_NAME,
-                buildTypeDescriptorAndVersion( RelationshipTypeTokenStore.TYPE_DESCRIPTOR ) );
+        copyStore( new File( neoStores.getPath() ), StoreFactory.RELATIONSHIP_TYPE_TOKEN_STORE_NAME,
+                NeoNeoStore.buildTypeDescriptorAndVersion( NeoTokenStore.RELATIONSHIP_TYPE_TOKEN_TYPE_DESCRIPTOR ) );
     }
 
-    public void copyRelationshipTypeTokenNameStore( NeoStore neoStore ) throws IOException
+    public void copyRelationshipTypeTokenNameStore( FlatNeoStores neoStores ) throws IOException
     {
-        copyStore( neoStore.getStorageFileName(), StoreFactory.RELATIONSHIP_TYPE_TOKEN_NAMES_STORE_NAME,
-                buildTypeDescriptorAndVersion( DynamicStringStore.TYPE_DESCRIPTOR ) );
+        copyStore( new File( neoStores.getPath() ), StoreFactory.RELATIONSHIP_TYPE_TOKEN_NAMES_STORE_NAME,
+                NeoNeoStore.buildTypeDescriptorAndVersion( NeoPropertyStringStore.TYPE_DESCRIPTOR ) );
     }
 
-    public void copyPropertyStore( NeoStore neoStore ) throws IOException
+    public void copyPropertyStore( FlatNeoStores neoStores ) throws IOException
     {
-        copyStore( neoStore.getStorageFileName(), StoreFactory.PROPERTY_STORE_NAME,
-                buildTypeDescriptorAndVersion( PropertyStore.TYPE_DESCRIPTOR ) );
+        copyStore( new File( neoStores.getPath() ), StoreFactory.PROPERTY_STORE_NAME,
+                NeoNeoStore.buildTypeDescriptorAndVersion( NeoPropertyStore.TYPE_DESCRIPTOR ) );
+   }
+
+    public void copyPropertyKeyTokenStore( FlatNeoStores neoStores ) throws IOException
+    {
+        copyStore( new File( neoStores.getPath() ), StoreFactory.PROPERTY_KEY_TOKEN_STORE_NAME,
+                NeoNeoStore.buildTypeDescriptorAndVersion( NeoTokenStore.PROPERTY_KEY_TOKEN_TYPE_DESCRIPTOR ) );
     }
 
-    public void copyPropertyKeyTokenStore( NeoStore neoStore ) throws IOException
+    public void copyPropertyKeyTokenNameStore( FlatNeoStores neoStores ) throws IOException
     {
-        copyStore( neoStore.getStorageFileName(), StoreFactory.PROPERTY_KEY_TOKEN_STORE_NAME,
-                buildTypeDescriptorAndVersion( PropertyKeyTokenStore.TYPE_DESCRIPTOR ) );
+        copyStore( new File( neoStores.getPath() ), StoreFactory.PROPERTY_KEY_TOKEN_NAMES_STORE_NAME,
+                NeoNeoStore.buildTypeDescriptorAndVersion( NeoPropertyStringStore.TYPE_DESCRIPTOR ) );
     }
 
-    public void copyPropertyKeyTokenNameStore( NeoStore neoStore ) throws IOException
+    public void copyDynamicStringPropertyStore( FlatNeoStores neoStores ) throws IOException
     {
-        copyStore( neoStore.getStorageFileName(), StoreFactory.PROPERTY_KEY_TOKEN_NAMES_STORE_NAME,
-                buildTypeDescriptorAndVersion( DynamicStringStore.TYPE_DESCRIPTOR ) );
+        copyStore( new File( neoStores.getPath() ), StoreFactory.PROPERTY_STRINGS_STORE_NAME,
+                NeoNeoStore.buildTypeDescriptorAndVersion( NeoPropertyStringStore.TYPE_DESCRIPTOR ) );  
     }
 
-    public void copyDynamicStringPropertyStore( NeoStore neoStore ) throws IOException
+    public void copyDynamicArrayPropertyStore( FlatNeoStores neoStores ) throws IOException
     {
-        copyStore( neoStore.getStorageFileName(), StoreFactory.PROPERTY_STRINGS_STORE_NAME,
-                buildTypeDescriptorAndVersion( DynamicStringStore.TYPE_DESCRIPTOR ) );
-    }
-
-    public void copyDynamicArrayPropertyStore( NeoStore neoStore ) throws IOException
-    {
-        copyStore( neoStore.getStorageFileName(), StoreFactory.PROPERTY_ARRAYS_STORE_NAME,
-                buildTypeDescriptorAndVersion( DynamicArrayStore.TYPE_DESCRIPTOR ) );
+        copyStore( new File( neoStores.getPath() ), StoreFactory.PROPERTY_ARRAYS_STORE_NAME,
+                NeoNeoStore.buildTypeDescriptorAndVersion( NeoPropertyArrayStore.TYPE_DESCRIPTOR ) );  
     }
 
     public LegacyNodeStoreReader getNodeStoreReader()

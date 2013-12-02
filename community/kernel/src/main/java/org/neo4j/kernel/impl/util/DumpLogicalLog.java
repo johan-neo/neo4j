@@ -36,8 +36,9 @@ import org.neo4j.helpers.Args;
 import org.neo4j.helpers.Format;
 import org.neo4j.helpers.Pair;
 import org.neo4j.kernel.DefaultFileSystemAbstraction;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
 import org.neo4j.kernel.impl.nioneo.store.FileSystemAbstraction;
-import org.neo4j.kernel.impl.nioneo.store.NeoStore;
+import org.neo4j.kernel.impl.nioneo.store.StoreFactory;
 import org.neo4j.kernel.impl.nioneo.xa.Command;
 import org.neo4j.kernel.impl.transaction.xaframework.LogEntry;
 import org.neo4j.kernel.impl.transaction.xaframework.LogIoUtils;
@@ -91,7 +92,7 @@ public class DumpLogicalLog
     protected static boolean isAGraphDatabaseDirectory( String fileName )
     {
         File file = new File( fileName );
-        return file.isDirectory() && new File( file, NeoStore.DEFAULT_NAME ).exists();
+        return file.isDirectory() && new File( file, StoreFactory.NEO_STORE_NAME ).exists();
     }
 
     protected boolean readAndPrintEntry( FileChannel fileChannel, ByteBuffer buffer, XaCommandFactory cf, TimeZone timeZone )

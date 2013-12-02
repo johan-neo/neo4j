@@ -33,7 +33,8 @@ import org.neo4j.helpers.collection.PrefetchingIterator;
 import org.neo4j.kernel.api.labelscan.LabelScanStore;
 import org.neo4j.kernel.impl.api.index.IndexingService;
 import org.neo4j.kernel.impl.index.IndexStore;
-import org.neo4j.kernel.impl.nioneo.store.NeoStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
+import org.neo4j.kernel.impl.nioneo.store.StoreFactory;
 import org.neo4j.kernel.impl.transaction.xaframework.XaContainer;
 
 import static org.neo4j.helpers.SillyUtils.nonNull;
@@ -92,11 +93,11 @@ public class NeoStoreFileListing
             // maybe should be
             if ( dbFile.isFile() )
             {
-                if ( name.equals( NeoStore.DEFAULT_NAME ) )
+                if ( name.equals( StoreFactory.NEO_STORE_NAME ) )
                 {
                     neostoreFile = dbFile;
                 }
-                else if ( (name.startsWith( NeoStore.DEFAULT_NAME ) ||
+                else if ( (name.startsWith( StoreFactory.NEO_STORE_NAME ) ||
                         name.equals( IndexStore.INDEX_DB_FILE_NAME )) && !name.endsWith( ".id" ) )
                 {   // Store files
                     targetFiles.add( dbFile );

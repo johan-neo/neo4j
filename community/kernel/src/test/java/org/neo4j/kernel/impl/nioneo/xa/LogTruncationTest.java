@@ -46,12 +46,11 @@ public class LogTruncationTest
     public void testSerializationInFaceOfLogTruncation() throws Exception
     {
         // TODO: add support for other commands and permutations as well...
-        assertHandlesLogTruncation( new Command.NodeCommand( null,
-                                                             new NodeRecord( 12l, 13l, 13l ),
+        assertHandlesLogTruncation( new Command.NodeCommand(new NodeRecord( 12l, 13l, 13l ),
                                                              new NodeRecord( 0,0,0 ) ) );
-        assertHandlesLogTruncation( new Command.LabelTokenCommand( null, new LabelTokenRecord( 1 )) );
+        assertHandlesLogTruncation( new Command.LabelTokenCommand( new LabelTokenRecord( 1 )) );
 
-        assertHandlesLogTruncation( new Command.NeoStoreCommand( null, new NeoStoreRecord() ) );
+        assertHandlesLogTruncation( new Command.NeoStoreCommand( new NeoStoreRecord() ) );
 //        assertHandlesLogTruncation( new Command.PropertyCommand( null,
 //                new PropertyRecord( 1, true, new NodeRecord(1, 12, 12, true) ),
 //                new PropertyRecord( 1, true, new NodeRecord(1, 12, 12, true) ) ) );
@@ -63,7 +62,7 @@ public class LogTruncationTest
         cmd.writeToFile( inMemoryBuffer );
 
         int bytesSuccessfullyWritten = inMemoryBuffer.bytesWritten();
-        assertEquals( cmd, Command.readCommand( null, null, inMemoryBuffer, ByteBuffer.allocate( 100 ) ));
+        assertEquals( cmd, Command.readCommand( inMemoryBuffer, ByteBuffer.allocate( 100 ) ));
 
         bytesSuccessfullyWritten--;
 
@@ -73,7 +72,7 @@ public class LogTruncationTest
             cmd.writeToFile( inMemoryBuffer );
             inMemoryBuffer.truncateTo( bytesSuccessfullyWritten );
 
-            Command deserialized = Command.readCommand( null, null, inMemoryBuffer, ByteBuffer.allocate( 100 ) );
+            Command deserialized = Command.readCommand( inMemoryBuffer, ByteBuffer.allocate( 100 ) );
 
             assertNull( "Deserialization did not detect log truncation! Record: " + cmd +
                         ", deserialized: " + deserialized, deserialized );

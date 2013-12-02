@@ -37,6 +37,7 @@ public class PropertyRecord extends Abstract64BitRecord
     private long nextProp = Record.NO_NEXT_PROPERTY.intValue();
     private long prevProp = Record.NO_PREVIOUS_PROPERTY.intValue();
     private final List<PropertyBlock> blockRecords = new ArrayList<PropertyBlock>( 4 );
+    private final List<PropertyBlock> removedBlocks = new ArrayList<PropertyBlock>( 2 );
     private long entityId = -1;
     private Boolean nodeIdSet;
     private boolean isChanged;
@@ -111,6 +112,11 @@ public class PropertyRecord extends Abstract64BitRecord
     {
         return blockRecords;
     }
+    
+    public List<PropertyBlock> getRemovedPropertyBlocks()
+    {
+        return removedBlocks;
+    }
 
 //    public List<Pair<PropertyType,DynamicRecord>> getDeletedRecords()
 //    {
@@ -157,7 +163,9 @@ public class PropertyRecord extends Abstract64BitRecord
         {
             if ( blockRecords.get( i ).getKeyIndexId() == keyIndex )
             {
-                return blockRecords.remove( i );
+                PropertyBlock toRemove = blockRecords.remove( i );
+                removedBlocks.add(  toRemove );
+                return toRemove;
             }
         }
         return null;

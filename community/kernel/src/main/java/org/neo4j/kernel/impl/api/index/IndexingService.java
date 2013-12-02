@@ -620,6 +620,11 @@ public class IndexingService extends LifecycleAdapter
         }
     }
 
+    public boolean hasActiveIndexes()
+    {
+        return indexMapReference.getAllIndexProxies().iterator().hasNext();
+    }
+    
     private void closeAllIndexes()
     {
         Iterable<IndexProxy> indexesToStop = indexMapReference.clear();

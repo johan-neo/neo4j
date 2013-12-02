@@ -27,8 +27,7 @@ import org.junit.Test;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
-import org.neo4j.kernel.impl.nioneo.store.AbstractDynamicStore;
-import org.neo4j.kernel.impl.nioneo.store.PropertyStore;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
 import org.neo4j.kernel.impl.nioneo.store.TestShortString;
 import org.neo4j.kernel.impl.transaction.XaDataSourceManager;
 import org.neo4j.test.DatabaseRule;
@@ -210,25 +209,11 @@ public class TestShortStringProperties extends TestShortString
         assertEquals( string, node.getProperty( "key" ) );
     }
 
-    // === Here be (reflection) dragons ===
-
-    private static Field storeField;
-    static
-    {
-        try
-        {
-            storeField = PropertyStore.class.getDeclaredField( "stringPropertyStore" );
-            storeField.setAccessible( true );
-        }
-        catch ( Exception e )
-        {
-            throw new RuntimeException( e );
-        }
-    }
-
     private long propertyRecordsInUse()
     {
-        return propertyStore().getNumberOfIdsInUse();
+        FlatNeoStores neoStores = 
+                graphdb.getGraphDatabaseAPI().getXaDataSourceManager().getNeoStoreDataSource().getNeoStores();
+        return neoStores.getPropertyStore().getIdGenerator().getNumberOfIdsInUse();
     }
 
     private long dynamicRecordsInUse()
@@ -247,6 +232,7 @@ public class TestShortStringProperties extends TestShortString
     {
         XaDataSourceManager dsMgr = graphdb.getGraphDatabaseAPI().getDependencyResolver()
                 .resolveDependency( XaDataSourceManager.class );
-        return dsMgr.getNeoStoreDataSource().getXaConnection().getPropertyStore();
+        FlatNeoStores neoStores = dsMgr.getNeoStoreDataSource().getNeoStores();
+        return neoStores.getStringStore().getIdGenerator().getNumberOfIdsInUse();
     }
 }

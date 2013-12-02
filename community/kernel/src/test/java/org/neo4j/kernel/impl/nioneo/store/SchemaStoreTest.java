@@ -19,7 +19,14 @@
  */
 package org.neo4j.kernel.impl.nioneo.store;
 
-import java.io.File;
+import static java.nio.ByteBuffer.wrap;
+import static org.junit.Assert.assertEquals;
+import static org.neo4j.helpers.collection.IteratorUtil.asCollection;
+import static org.neo4j.helpers.collection.IteratorUtil.first;
+import static org.neo4j.helpers.collection.MapUtil.stringMap;
+import static org.neo4j.kernel.impl.api.index.TestSchemaIndexProviderDescriptor.PROVIDER_DESCRIPTOR;
+import static org.neo4j.kernel.impl.util.StringLogger.DEV_NULL;
+
 import java.util.Arrays;
 import java.util.Collection;
 
@@ -27,21 +34,14 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
-
 import org.neo4j.kernel.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.DefaultTxHook;
 import org.neo4j.kernel.configuration.Config;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
+import org.neo4j.kernel.impl.nioneo.alt.NeoDynamicStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoSchemaStore;
+import org.neo4j.kernel.impl.nioneo.alt.NewDynamicRecordAllocator;
 import org.neo4j.test.EphemeralFileSystemRule;
-
-import static java.nio.ByteBuffer.wrap;
-
-import static org.junit.Assert.assertEquals;
-
-import static org.neo4j.helpers.collection.IteratorUtil.asCollection;
-import static org.neo4j.helpers.collection.IteratorUtil.first;
-import static org.neo4j.helpers.collection.MapUtil.stringMap;
-import static org.neo4j.kernel.impl.api.index.TestSchemaIndexProviderDescriptor.PROVIDER_DESCRIPTOR;
-import static org.neo4j.kernel.impl.util.StringLogger.DEV_NULL;
 
 public class SchemaStoreTest
 {
@@ -51,7 +51,7 @@ public class SchemaStoreTest
         // GIVEN
         int propertyKey = 4;
         int labelId = 1;
-        IndexRule indexRule = IndexRule.indexRule( store.nextId(), labelId, propertyKey, PROVIDER_DESCRIPTOR );
+        IndexRule indexRule = IndexRule.indexRule( schemaStore.getIdGenerator().nextId(), labelId, propertyKey, PROVIDER_DESCRIPTOR );
 
         // WHEN
         byte[] serialized = new RecordSerializer().append( indexRule ).serialize();
@@ -70,16 +70,16 @@ public class SchemaStoreTest
     {
         // GIVEN
         Collection<SchemaRule> rules = Arrays.<SchemaRule>asList(
-                IndexRule.indexRule( store.nextId(), 0, 5, PROVIDER_DESCRIPTOR ),
-                IndexRule.indexRule( store.nextId(), 1, 6, PROVIDER_DESCRIPTOR ),
-                IndexRule.indexRule( store.nextId(), 1, 7, PROVIDER_DESCRIPTOR ) );
+                IndexRule.indexRule( schemaStore.getIdGenerator().nextId(), 0, 5, PROVIDER_DESCRIPTOR ),
+                IndexRule.indexRule( schemaStore.getIdGenerator().nextId(), 1, 6, PROVIDER_DESCRIPTOR ),
+                IndexRule.indexRule( schemaStore.getIdGenerator().nextId(), 1, 7, PROVIDER_DESCRIPTOR ) );
         for ( SchemaRule rule : rules )
         {
             storeRule( rule );
         }
 
         // WHEN
-        Collection<SchemaRule> readRules = asCollection( store.loadAllSchemaRules() );
+        Collection<SchemaRule> readRules = asCollection( NeoSchemaStore.loadAllSchemaRules( schemaStore ) );
 
         // THEN
         assertEquals( rules, readRules );
@@ -128,16 +128,19 @@ public class SchemaStoreTest
 
     private long storeRule( SchemaRule rule )
     {
-        Collection<DynamicRecord> records = store.allocateFrom( rule );
+        Collection<DynamicRecord> records = NeoSchemaStore.allocateFrom( rule, 
+                schemaStore.getRecordStore(), new NewDynamicRecordAllocator( schemaStore, DynamicRecord.Type.UNKNOWN )  );
         for ( DynamicRecord record : records )
         {
-            store.writeToByteArray( record );
+            byte[] data = NeoDynamicStore.writeToByteArray( record );
+            schemaStore.getRecordStore().writeRecord( record.getId(), data );
         }
         return first( records ).getId();
     }
 
     private Config config;
-    private SchemaStore store;
+    private FlatNeoStores neoStores;
+    private NeoSchemaStore schemaStore;
     @Rule public EphemeralFileSystemRule fs = new EphemeralFileSystemRule();
     private StoreFactory storeFactory;
 
@@ -146,17 +149,21 @@ public class SchemaStoreTest
     {
         config = new Config( stringMap() );
         DefaultIdGeneratorFactory idGeneratorFactory = new DefaultIdGeneratorFactory();
-        DefaultWindowPoolFactory windowPoolFactory = new DefaultWindowPoolFactory();
-        storeFactory = new StoreFactory( config, idGeneratorFactory, windowPoolFactory, fs.get(), DEV_NULL,
+        storeFactory = new StoreFactory( config, idGeneratorFactory, fs.get(), DEV_NULL,
                 new DefaultTxHook() );
-        File file = new File( "schema-store" );
-        storeFactory.createSchemaStore( file );
-        store = storeFactory.newSchemaStore( file );
+        neoStores = storeFactory.openNeoStore( "" );
+//        File file = new File( "schema-store" );
+//        storeFactory.createSchemaStore( file );
+//        schemaStore = storeFactory.newSchemaStore( file );
+        schemaStore = neoStores.getSchemaStore();
     }
 
     @After
     public void after() throws Exception
     {
-        store.close();
+        if ( neoStores != null )
+        {
+            neoStores.close();
+        }
     }
 }

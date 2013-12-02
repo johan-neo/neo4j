@@ -31,14 +31,12 @@ import org.neo4j.kernel.impl.api.index.IndexingService;
 import org.neo4j.kernel.impl.core.CacheAccessBackDoor;
 import org.neo4j.kernel.impl.core.TransactionState;
 import org.neo4j.kernel.impl.locking.LockService;
+import org.neo4j.kernel.impl.nioneo.xa.WriteTransaction;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
 import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
-import org.neo4j.kernel.impl.nioneo.store.NeoStore;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
-import org.neo4j.kernel.impl.nioneo.store.NodeStore;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
-import org.neo4j.kernel.impl.nioneo.store.PropertyStore;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
-import org.neo4j.kernel.impl.nioneo.store.RelationshipStore;
 import org.neo4j.kernel.impl.transaction.xaframework.XaLogicalLog;
 
 import static org.hamcrest.Matchers.equalTo;
@@ -49,16 +47,16 @@ import static org.mockito.Mockito.*;
 public class WriteTransactionCommandOrderingTest
 {
     private final AtomicReference<List<String>> currentRecording = new AtomicReference<>();
-    private final NeoStore store = mock( NeoStore.class );
-    private final RecordingRelationshipStore relationshipStore = new RecordingRelationshipStore( currentRecording );
-    private final RecordingNodeStore nodeStore = new RecordingNodeStore( currentRecording );
-    private final RecordingPropertyStore propertyStore = new RecordingPropertyStore( currentRecording );
+    private final FlatNeoStores store = mock( FlatNeoStores.class );
+//    private final RecordingRelationshipStore relationshipStore = new RecordingRelationshipStore( currentRecording );
+//    private final RecordingNodeStore nodeStore = new RecordingNodeStore( currentRecording );
+//    private final RecordingPropertyStore propertyStore = new RecordingPropertyStore( currentRecording );
 
     public WriteTransactionCommandOrderingTest()
     {
-        when( store.getPropertyStore() ).thenReturn( propertyStore );
-        when( store.getNodeStore() ).thenReturn( nodeStore );
-        when( store.getRelationshipStore() ).thenReturn( relationshipStore );
+//        when( store.getPropertyStore() ).thenReturn( propertyStore );
+//        when( store.getNodeStore() ).thenReturn( nodeStore );
+//        when( store.getRelationshipStore() ).thenReturn( relationshipStore );
     }
 
     @Test
@@ -90,15 +88,15 @@ public class WriteTransactionCommandOrderingTest
 
     private void injectAllPossibleCommands( WriteTransaction tx )
     {
-        tx.injectCommand( new Command.NodeCommand( nodeStore, inUseNode(), inUseNode() ) ); // update
-        tx.injectCommand( new Command.NodeCommand( nodeStore, inUseNode(), missingNode() ) ); // delete
-        tx.injectCommand( new Command.NodeCommand( nodeStore, missingNode(), createdNode() ) ); // create
-        tx.injectCommand( new Command.PropertyCommand( propertyStore, inUseProperty(), inUseProperty() ) ); // update
-        tx.injectCommand( new Command.PropertyCommand( propertyStore, inUseProperty(), missingProperty() ) ); // delete
-        tx.injectCommand( new Command.PropertyCommand( propertyStore, missingProperty(), createdProperty() ) ); // create
-        tx.injectCommand( new Command.RelationshipCommand( relationshipStore, inUseRelationship() ) ); // update
-        tx.injectCommand( new Command.RelationshipCommand( relationshipStore, missingRelationship() ) ); // delete
-        tx.injectCommand( new Command.RelationshipCommand( relationshipStore, createdRelationship() ) ); // create
+        tx.injectCommand( new Command.NodeCommand( inUseNode(), inUseNode() ) ); // update
+        tx.injectCommand( new Command.NodeCommand( inUseNode(), missingNode() ) ); // delete
+        tx.injectCommand( new Command.NodeCommand( missingNode(), createdNode() ) ); // create
+        tx.injectCommand( new Command.PropertyCommand( inUseProperty(), inUseProperty() ) ); // update
+        tx.injectCommand( new Command.PropertyCommand( inUseProperty(), missingProperty() ) ); // delete
+        tx.injectCommand( new Command.PropertyCommand( missingProperty(), createdProperty() ) ); // create
+        tx.injectCommand( new Command.RelationshipCommand( inUseRelationship() ) ); // update
+        tx.injectCommand( new Command.RelationshipCommand( missingRelationship() ) ); // delete
+        tx.injectCommand( new Command.RelationshipCommand( createdRelationship() ) ); // create
     }
 
     private static RelationshipRecord missingRelationship()
@@ -170,7 +168,7 @@ public class WriteTransactionCommandOrderingTest
         return tx;
     }
 
-    private static String commandActionToken( AbstractBaseRecord record )
+/*    private static String commandActionToken( AbstractBaseRecord record )
     {
         if ( !record.inUse() )
         {
@@ -246,7 +244,7 @@ public class WriteTransactionCommandOrderingTest
         }
     }
 
-    private static class RecordingRelationshipStore extends RelationshipStore
+    private static class RecordingRelationshipStore extends RecordS
     {
         private final AtomicReference<List<String>> currentRecording;
 
@@ -272,5 +270,5 @@ public class WriteTransactionCommandOrderingTest
         @Override
         protected void loadStorage() {
         }
-    }
+    }*/ 
 }

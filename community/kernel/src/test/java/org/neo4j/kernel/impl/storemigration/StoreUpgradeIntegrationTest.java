@@ -31,12 +31,12 @@ import org.neo4j.graphdb.factory.GraphDatabaseFactory;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.helpers.Exceptions;
 import org.neo4j.kernel.DefaultFileSystemAbstraction;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
 import org.neo4j.kernel.impl.nioneo.store.FileSystemAbstraction;
 import org.neo4j.kernel.impl.storemigration.StoreUpgrader.UnableToUpgradeException;
 import org.neo4j.test.TargetDirectory;
 
 import static org.junit.Assert.*;
-import static org.neo4j.kernel.impl.nioneo.store.CommonAbstractStore.ALL_STORES_VERSION;
 import static org.neo4j.kernel.impl.storemigration.MigrationTestUtils.allStoreFilesHaveVersion;
 import static org.neo4j.kernel.impl.storemigration.MigrationTestUtils.prepareSampleLegacyDatabase;
 import static org.neo4j.kernel.impl.storemigration.MigrationTestUtils.truncateFile;
@@ -59,7 +59,7 @@ public class StoreUpgradeIntegrationTest
         database.shutdown();
 
         assertTrue( "Some store files did not have the correct version",
-                allStoreFilesHaveVersion( fileSystem, workingDirectory, ALL_STORES_VERSION ) );
+                allStoreFilesHaveVersion( fileSystem, workingDirectory, NeoNeoStore.ALL_STORES_VERSION ) );
     }
 
     @Test

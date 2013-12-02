@@ -21,12 +21,15 @@ package org.neo4j.kernel.impl.nioneo.store;
 
 import org.junit.Rule;
 import org.junit.Test;
-
 import org.neo4j.graphdb.config.Setting;
+import org.neo4j.kernel.impl.nioneo.alt.NeoDynamicStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNodeStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoRelationshipStore;
 import org.neo4j.test.docs.DocsIncludeFile;
 
 import static java.util.Arrays.asList;
-
 import static org.neo4j.kernel.impl.nioneo.store.StoreFactory.Configuration.array_block_size;
 import static org.neo4j.kernel.impl.nioneo.store.StoreFactory.Configuration.string_block_size;
 import static org.neo4j.kernel.impl.nioneo.store.StoreFactory.NODE_STORE_NAME;
@@ -46,9 +49,9 @@ public class RecordSizesDocTest
         writer.println( "|======================================" );
         writer.println( "| Store file  | Record size  | Contents" );
         for ( Store store : asList(
-                store( NODE_STORE_NAME, NodeStore.RECORD_SIZE, "Nodes" ),
-                store( RELATIONSHIP_STORE_NAME, RelationshipStore.RECORD_SIZE, "Relationships" ),
-                store( PROPERTY_STORE_NAME, PropertyStore.RECORD_SIZE, "Properties for nodes and relationships" ),
+                store( NODE_STORE_NAME, NeoNodeStore.RECORD_SIZE, "Nodes" ),
+                store( RELATIONSHIP_STORE_NAME, NeoRelationshipStore.RECORD_SIZE, "Relationships" ),
+                store( PROPERTY_STORE_NAME, NeoPropertyStore.RECORD_SIZE, "Properties for nodes and relationships" ),
                 dynamicStore( PROPERTY_STRINGS_STORE_NAME, string_block_size, "Values of string properties" ),
                 dynamicStore( PROPERTY_ARRAYS_STORE_NAME, array_block_size, "Values of array properties" )
         ) )
@@ -66,12 +69,12 @@ public class RecordSizesDocTest
 
     private static Store store( String storeFileName, int recordSize, String contentsDescription )
     {
-        return new Store( NeoStore.DEFAULT_NAME + storeFileName, recordSize, contentsDescription );
+        return new Store( StoreFactory.NEO_STORE_NAME + storeFileName, recordSize, contentsDescription );
     }
 
     private static int defaultDynamicSize( Setting<Integer> setting )
     {
-        return AbstractDynamicStore.BLOCK_HEADER_SIZE + Integer.parseInt( setting.getDefaultValue() );
+        return NeoDynamicStore.BLOCK_HEADER_SIZE + Integer.parseInt( setting.getDefaultValue() );
     }
 
     private static class Store

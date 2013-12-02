@@ -21,18 +21,15 @@ package org.neo4j.kernel.impl.nioneo.alt;
 
 import java.nio.ByteBuffer;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
-import org.neo4j.kernel.impl.nioneo.store.AbstractStore;
-import org.neo4j.kernel.impl.nioneo.store.Buffer;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecordAllocator;
 import org.neo4j.kernel.impl.nioneo.store.IdGenerator;
 import org.neo4j.kernel.impl.nioneo.store.InvalidRecordException;
-import org.neo4j.kernel.impl.nioneo.store.OperationType;
-import org.neo4j.kernel.impl.nioneo.store.PersistenceWindow;
 import org.neo4j.kernel.impl.nioneo.store.Record;
 import org.neo4j.kernel.impl.nioneo.store.RecordLoad;
 
@@ -75,7 +72,12 @@ public abstract class NeoDynamicStore
 
     public static byte[] writeToByteArray( DynamicRecord record )
     {
-        byte[] data = new byte[ 4 + 4 + record.getData().length ];
+        int dataLength = 0;
+        if ( record.getData() != null )
+        {
+            dataLength = record.getData().length;
+        }
+        byte[] data = new byte[ 4 + 4 + dataLength ];
         // registerIdFromUpdateRecord( blockId );
         ByteBuffer buffer = ByteBuffer.wrap( data );
         if ( record.inUse() )
@@ -121,12 +123,16 @@ public abstract class NeoDynamicStore
 //    }
 
     public static Collection<DynamicRecord> allocateRecordsFromBytes(
-            byte src[], Collection<DynamicRecord> recordsToUseFirst,
+            byte src[], Iterator<DynamicRecord> recordsToUseFirst,
             DynamicRecordAllocator dynamicRecordAllocator )
     {
         assert src != null : "Null src argument";
+        if ( recordsToUseFirst == null )
+        {
+            recordsToUseFirst = Collections.<DynamicRecord>emptyList().iterator(); 
+        }
         List<DynamicRecord> recordList = new LinkedList<>();
-        DynamicRecord nextRecord = dynamicRecordAllocator.nextUsedRecordOrNew( recordsToUseFirst.iterator() );
+        DynamicRecord nextRecord = dynamicRecordAllocator.nextUsedRecordOrNew( recordsToUseFirst );
         int srcOffset = 0;
         int dataSize = dynamicRecordAllocator.dataSize();
         do
@@ -138,7 +144,7 @@ public abstract class NeoDynamicStore
                 byte data[] = new byte[dataSize];
                 System.arraycopy( src, srcOffset, data, 0, dataSize );
                 record.setData( data );
-                nextRecord = dynamicRecordAllocator.nextUsedRecordOrNew( recordsToUseFirst.iterator() );
+                nextRecord = dynamicRecordAllocator.nextUsedRecordOrNew( recordsToUseFirst );
                 record.setNextBlock( nextRecord.getId() );
                 srcOffset += dataSize;
             }
@@ -197,9 +203,9 @@ public abstract class NeoDynamicStore
     }
 
     
-    public static DynamicRecord getRecord( long blockId, byte[] data, RecordLoad load )
+    public static DynamicRecord getRecord( long blockId, byte[] data, RecordLoad load, DynamicRecord.Type type )
     {
-        DynamicRecord record = new DynamicRecord( blockId );
+        DynamicRecord record = new DynamicRecord( blockId, type );
         ByteBuffer buffer = ByteBuffer.wrap( data );
 
         /*
@@ -230,14 +236,19 @@ public abstract class NeoDynamicStore
         long nextModifier = ( firstInteger & 0xF000000L ) << 8;
 
         long longNextBlock = NeoNeoStore.longFromIntAndMod( nextBlock, nextModifier );
-        boolean readData = load != RecordLoad.CHECK;
+        boolean readData = true; // load != RecordLoad.CHECK;
         if ( longNextBlock != Record.NO_NEXT_BLOCK.intValue()
             && nrOfBytes < dataSize || nrOfBytes > dataSize )
         {
-            readData = false;
             if ( load != RecordLoad.FORCE )
+            {
                 throw new InvalidRecordException( "Next block set[" + nextBlock
                 + "] current block illegal size[" + nrOfBytes + "/" + dataSize + "]" );
+            }
+            else
+            {
+                readData = false;
+            }
         }
         record.setInUse( inUse );
         record.setStartRecord( isStartRecord );
@@ -300,15 +311,15 @@ public abstract class NeoDynamicStore
         return bArray;
     }
 
-    public static Collection<DynamicRecord> getRecords( RecordStore store, long startBlockId, RecordLoad loadFlag )
+    public static Collection<DynamicRecord> getRecords( RecordStore store, long startBlockId, RecordLoad loadFlag, DynamicRecord.Type type )
     {
         List<DynamicRecord> recordList = new LinkedList<>();
         long blockId = startBlockId;
         while ( blockId != Record.NO_NEXT_BLOCK.intValue() )
         {
             byte[] data = store.getRecord( blockId );
-            DynamicRecord record = getRecord( blockId, data, loadFlag );
-            if ( ! record.inUse() )
+            DynamicRecord record = getRecord( blockId, data, loadFlag, type );
+            if ( !record.inUse() )
             {
                 return recordList;
             }
@@ -318,9 +329,9 @@ public abstract class NeoDynamicStore
         return recordList;
     }
     
-    public static byte[] readByteArray( RecordStore store, long blockId )
+    public static byte[] readByteArray( RecordStore store, long blockId, DynamicRecord.Type type )
     {
-        return readFullByteArray( getRecords( store, blockId, RecordLoad.NORMAL ) );
+        return readFullByteArray( getRecords( store, blockId, RecordLoad.NORMAL, type ) );
     }
 
     @Deprecated
@@ -341,5 +352,16 @@ public abstract class NeoDynamicStore
         byte bytes[] = new byte[record.getLength()];
         buf.get( bytes );
         record.setData( bytes );
+    }
+
+    public static Collection<DynamicRecord> allocateRecordsFromBytes( byte[] data, Store store, DynamicRecord.Type type )
+    {
+        return allocateRecordsFromBytes( data, Collections.<DynamicRecord>emptyList().iterator(), 
+                new NewDynamicRecordAllocator( store, type ) );
+    }
+
+    public static Collection<DynamicRecord> getRecords( RecordStore recordStore, long blockId, DynamicRecord.Type type )
+    {
+        return getRecords( recordStore, blockId, RecordLoad.NORMAL, type );
     }
 }

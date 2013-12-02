@@ -26,6 +26,7 @@ import static org.junit.Assert.assertTrue;
 import java.util.List;
 
 import org.junit.Test;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStore;
 import org.neo4j.kernel.impl.nioneo.store.TestShortString.Charset;
 
 public class TestLongerShortString
@@ -70,7 +71,7 @@ public class TestLongerShortString
                 for ( String string : list )
                 {
                     PropertyBlock record = new PropertyBlock();
-                    if ( LongerShortString.encode( 10, string, record, PropertyStore.DEFAULT_PAYLOAD_SIZE ) )
+                    if ( LongerShortString.encode( 10, string, record, NeoPropertyStore.DEFAULT_PAYLOAD_SIZE ) )
                     {
                         assertEquals( string, LongerShortString.decode( record ) );
                     }
@@ -129,7 +130,7 @@ public class TestLongerShortString
 
     private void assertCanEncodeAndDecodeToSame( String string )
     {
-        assertCanEncodeAndDecodeToSame( string, PropertyStore.DEFAULT_PAYLOAD_SIZE );
+        assertCanEncodeAndDecodeToSame( string, NeoPropertyStore.DEFAULT_PAYLOAD_SIZE );
     }
 
     private void assertCanEncodeAndDecodeToSame( String string, int payloadSize )
@@ -141,7 +142,7 @@ public class TestLongerShortString
 
     private void assertCannotEncode( String string )
     {
-        assertCannotEncode( string, PropertyStore.DEFAULT_PAYLOAD_SIZE );
+        assertCannotEncode( string, NeoPropertyStore.DEFAULT_PAYLOAD_SIZE );
     }
 
     private void assertCannotEncode( String string, int payloadSize )

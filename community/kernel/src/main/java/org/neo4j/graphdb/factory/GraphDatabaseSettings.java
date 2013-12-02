@@ -101,13 +101,14 @@ public abstract class GraphDatabaseSettings
     @Description("The directory where the database files are located.")
     public static final Setting<File> store_dir = setting("store_dir", PATH, NO_DEFAULT );
 
-    @Description("The base name for the Neo4j Store files, either an absolute path or relative to the store_dir " +
-            "setting. This should generally not be changed.")
-    public static final Setting<File> neo_store = setting("neo_store", PATH, "neostore", basePath(store_dir) );
+    // Use store_dir instead
+    // @Description("The base name for the Neo4j Store files, either an absolute path or relative to the store_dir " +
+    //        "setting. This should generally not be changed.")
+    // public static final Setting<File> neo_store = setting("neo_store", PATH, "neostore", basePath(store_dir) );
 
-    @Description("The base name for the logical log files, either an absolute path or relative to the store_dir " +
-            "setting. This should generally not be changed.")
-    public static final Setting<File> logical_log = setting("logical_log", PATH, "nioneo_logical.log", basePath(store_dir));
+    // @Description("The base name for the logical log files, either an absolute path or relative to the store_dir " +
+    //        "setting. This should generally not be changed.")
+    // public static final Setting<File> logical_log = setting("logical_log", PATH, "nioneo_logical.log", basePath(store_dir));
 
     // Remote logging
     @Description("Whether to enable logging to a remote server or not.")

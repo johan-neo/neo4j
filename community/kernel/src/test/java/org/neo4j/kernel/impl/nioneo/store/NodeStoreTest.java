@@ -19,30 +19,30 @@
  */
 package org.neo4j.kernel.impl.nioneo.store;
 
+import static java.util.Arrays.asList;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.neo4j.kernel.impl.nioneo.alt.NeoPropertyArrayStore.allocateFromNumbers;
+import static org.neo4j.kernel.impl.nioneo.alt.NeoLabelStore.readOwnerFromDynamicLabelsRecord;
+import static org.neo4j.kernel.impl.nioneo.store.Record.NO_NEXT_PROPERTY;
+import static org.neo4j.kernel.impl.nioneo.store.Record.NO_NEXT_RELATIONSHIP;
+import static org.neo4j.kernel.impl.util.StringLogger.DEV_NULL;
+
 import java.io.File;
 import java.util.Collections;
 import java.util.List;
 
 import org.junit.Test;
-
 import org.neo4j.kernel.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.DefaultTxHook;
 import org.neo4j.kernel.IdGeneratorFactory;
 import org.neo4j.kernel.configuration.Config;
-import org.neo4j.kernel.impl.nioneo.store.windowpool.WindowPoolFactory;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNodeStore;
+import org.neo4j.kernel.impl.nioneo.alt.RecordStore;
 import org.neo4j.test.impl.EphemeralFileSystemAbstraction;
-
-import static java.util.Arrays.asList;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
-import static org.neo4j.kernel.impl.nioneo.store.DynamicArrayStore.allocateFromNumbers;
-import static org.neo4j.kernel.impl.nioneo.store.NodeStore.readOwnerFromDynamicLabelsRecord;
-import static org.neo4j.kernel.impl.nioneo.store.Record.NO_NEXT_PROPERTY;
-import static org.neo4j.kernel.impl.nioneo.store.Record.NO_NEXT_RELATIONSHIP;
-import static org.neo4j.kernel.impl.util.StringLogger.DEV_NULL;
 
 public class NodeStoreTest
 {
@@ -52,9 +52,9 @@ public class NodeStoreTest
         // GIVEN
         Long expectedId = 12l;
         long[] ids = new long[] { expectedId, 23l, 42l };
-        DynamicRecord firstRecord = new DynamicRecord( 0l );
+        DynamicRecord firstRecord = new DynamicRecord( 0l, DynamicRecord.Type.UNKNOWN );
         List<DynamicRecord> dynamicRecords = asList( firstRecord );
-        allocateFromNumbers( ids, dynamicRecords.iterator(), new PreAllocatedRecords( 60 ) );
+        allocateFromNumbers( ids, dynamicRecords, new PreAllocatedRecords( 60 ) );
 
         // WHEN
         Long firstId = readOwnerFromDynamicLabelsRecord( firstRecord );
@@ -69,9 +69,9 @@ public class NodeStoreTest
         // GIVEN
         Long expectedId = null;
         long[] ids = new long[] { };
-        DynamicRecord firstRecord = new DynamicRecord( 0l );
+        DynamicRecord firstRecord = new DynamicRecord( 0l, DynamicRecord.Type.UNKNOWN );
         List<DynamicRecord> dynamicRecords = asList( firstRecord );
-        allocateFromNumbers( ids, dynamicRecords.iterator(), new PreAllocatedRecords( 60 ) );
+        allocateFromNumbers( ids, dynamicRecords, new PreAllocatedRecords( 60 ) );
 
         // WHEN
         Long firstId = readOwnerFromDynamicLabelsRecord( firstRecord );
@@ -86,9 +86,9 @@ public class NodeStoreTest
         // GIVEN
         Long expectedId = 12l;
         long[] ids = new long[] { expectedId, 1l, 2l, 3l, 4l, 5l, 6l, 7l, 8l, 9l, 10l, 11l };
-        DynamicRecord firstRecord = new DynamicRecord( 0l );
-        List<DynamicRecord> dynamicRecords = asList( firstRecord, new DynamicRecord( 1l ) );
-        allocateFromNumbers( ids, dynamicRecords.iterator(), new PreAllocatedRecords( 8 ) );
+        DynamicRecord firstRecord = new DynamicRecord( 0l, DynamicRecord.Type.UNKNOWN );
+        List<DynamicRecord> dynamicRecords = asList( firstRecord, new DynamicRecord( 1l, DynamicRecord.Type.UNKNOWN ) );
+        allocateFromNumbers( ids, dynamicRecords, new PreAllocatedRecords( 8 ) );
 
         // WHEN
         Long firstId = readOwnerFromDynamicLabelsRecord( firstRecord );
@@ -105,22 +105,24 @@ public class NodeStoreTest
         EphemeralFileSystemAbstraction fs = new EphemeralFileSystemAbstraction();
         Config config = new Config();
         IdGeneratorFactory idGeneratorFactory = new DefaultIdGeneratorFactory();
-        WindowPoolFactory windowPoolFactory = new DefaultWindowPoolFactory();
-        StoreFactory factory = new StoreFactory( config, idGeneratorFactory, windowPoolFactory, fs, DEV_NULL, new DefaultTxHook() );
-        File nodeStoreFileName = new File( "nodestore" );
-        factory.createNodeStore( nodeStoreFileName );
-        NodeStore nodeStore = factory.newNodeStore( nodeStoreFileName );
+        StoreFactory factory = new StoreFactory( config, idGeneratorFactory, fs, DEV_NULL, new DefaultTxHook() );
+        FlatNeoStores neoStores = factory.createNeoStore( "" ); // factory.newNeoStore( "" );
+        RecordStore nodeStore = neoStores.getNodeStore().getRecordStore();
+//        File nodeStoreFileName = new File( "nodestore" );
+//        factory.createNodeStore( nodeStoreFileName );
+//        NodeStore nodeStore = factory.newNodeStore( nodeStoreFileName );
 
         // -- a record with the msb carrying a negative value
         long nodeId = 0, labels = 0x8000000001L;
         NodeRecord record = new NodeRecord( nodeId, NO_NEXT_RELATIONSHIP.intValue(), NO_NEXT_PROPERTY.intValue() );
         record.setInUse( true );
-        record.setLabelField( labels, Collections.<DynamicRecord>emptyList() );
-        nodeStore.updateRecord( record );
+        record.setLabelField( labels );
+        record.addLabelDynamicRecords( Collections.<DynamicRecord>emptyList() );
+        nodeStore.writeRecord( record.getId(), NeoNodeStore.updateRecord( record, new byte[NeoNodeStore.RECORD_SIZE], false ) );
 
         // WHEN
         // -- reading that record back
-        NodeRecord readRecord = nodeStore.getRecord( nodeId );
+        NodeRecord readRecord = NeoNodeStore.getRecord( nodeId, nodeStore.getRecord( nodeId ) );
 
         // THEN
         // -- the label field must be the same
@@ -138,7 +140,8 @@ public class NodeStoreTest
         NodeRecord record = new NodeRecord( 0, NO_NEXT_RELATIONSHIP.intValue(), NO_NEXT_PROPERTY.intValue() );
 
         // WHEN
-        record.setLabelField( 0, Collections.<DynamicRecord>emptyList() );
+        record.setLabelField( 0 );
+        record.addLabelDynamicRecords( Collections.<DynamicRecord>emptyList() );
 
         // THEN
         assertTrue( record.isLight() );
@@ -151,8 +154,9 @@ public class NodeStoreTest
         NodeRecord record = new NodeRecord( 0, NO_NEXT_RELATIONSHIP.intValue(), NO_NEXT_PROPERTY.intValue() );
 
         // WHEN
-        DynamicRecord dynamicRecord = new DynamicRecord( 1 );
-        record.setLabelField( 0x8000000001L, asList( dynamicRecord ) );
+        DynamicRecord dynamicRecord = new DynamicRecord( 1, DynamicRecord.Type.UNKNOWN );
+        record.setLabelField( 0x8000000001L );
+        record.addLabelDynamicRecords( asList( dynamicRecord ) );
 
         // THEN
         assertFalse( record.isLight() );

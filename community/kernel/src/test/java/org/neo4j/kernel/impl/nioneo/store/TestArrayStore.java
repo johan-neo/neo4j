@@ -27,6 +27,7 @@ import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Map;
 
 import org.junit.After;
@@ -38,8 +39,12 @@ import org.neo4j.helpers.collection.MapUtil;
 import org.neo4j.kernel.DefaultFileSystemAbstraction;
 import org.neo4j.kernel.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.DefaultTxHook;
-import org.neo4j.kernel.IdType;
 import org.neo4j.kernel.configuration.Config;
+import org.neo4j.kernel.impl.nioneo.alt.NeoDynamicStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyArrayStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStore;
+import org.neo4j.kernel.impl.nioneo.alt.NewDynamicRecordAllocator;
+import org.neo4j.kernel.impl.nioneo.alt.StoreParameter;
 import org.neo4j.kernel.impl.util.Bits;
 import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.test.TargetDirectory;
@@ -47,7 +52,7 @@ import org.neo4j.test.TargetDirectory;
 public class TestArrayStore
 {
     private File dir;
-    private DynamicArrayStore arrayStore;
+    private NeoPropertyArrayStore arrayStore;
     
     @Before
     public void before() throws Exception
@@ -58,11 +63,10 @@ public class TestArrayStore
         DefaultIdGeneratorFactory idGeneratorFactory = new DefaultIdGeneratorFactory();
         DefaultFileSystemAbstraction fs = new DefaultFileSystemAbstraction();
         StoreFactory factory = new StoreFactory( config,
-                idGeneratorFactory, new DefaultWindowPoolFactory(), fs, StringLogger.DEV_NULL, new DefaultTxHook() );
-        File fileName = new File( dir, "arraystore" );
-        factory.createDynamicArrayStore( fileName, 120 );
-        arrayStore = new DynamicArrayStore( fileName, config, IdType.ARRAY_BLOCK, idGeneratorFactory,
-                new DefaultWindowPoolFactory(), fs, StringLogger.DEV_NULL );
+                idGeneratorFactory, fs, StringLogger.DEV_NULL, new DefaultTxHook() );
+        factory.createDynamicArrayStore( dir.getPath(), NeoPropertyStore.DEFAULT_DATA_BLOCK_SIZE );
+        StoreParameter sp = new StoreParameter( dir.getPath(), config, idGeneratorFactory, fs, StringLogger.DEV_NULL );
+        arrayStore = new NeoPropertyArrayStore( sp  );
     }
 
     @After
@@ -102,7 +106,8 @@ public class TestArrayStore
     public void stringArrayGetsStoredAsUtf8() throws Exception
     {
         String[] array = new String[] { "first", "second" };
-        Collection<DynamicRecord> records = arrayStore.allocateRecords( array );
+        Collection<DynamicRecord> records = NeoPropertyArrayStore.allocateFromString( array, Collections.<DynamicRecord>emptyList(), 
+                new NewDynamicRecordAllocator( arrayStore, DynamicRecord.Type.ARRAY ) );
         Pair<byte[], byte[]> loaded = loadArray( records );
         assertStringHeader( loaded.first(), array.length );
         ByteBuffer buffer = ByteBuffer.wrap( loaded.other() );
@@ -142,14 +147,15 @@ public class TestArrayStore
 
     private Collection<DynamicRecord> storeArray( Object array )
     {
-        Collection<DynamicRecord> records = arrayStore.allocateRecords( array );
-        for ( DynamicRecord record : records )
-            arrayStore.writeToByteArray( record );
+        Collection<DynamicRecord> records = NeoPropertyArrayStore.allocateFromNumbers( array, Collections.<DynamicRecord>emptyList(), 
+                new NewDynamicRecordAllocator( arrayStore, DynamicRecord.Type.ARRAY ) );
+//        for ( DynamicRecord record : records )
+//            NeoArrayStore.writeToByteArray( record );
         return records;
     }
     
     private Pair<byte[], byte[]> loadArray( Collection<DynamicRecord> records )
     {
-        return arrayStore.readFullByteArray( records, PropertyType.ARRAY );
+        return NeoPropertyArrayStore.readFullByteArrayAsPair( NeoDynamicStore.readFullByteArray( records ) );
     }
 }

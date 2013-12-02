@@ -21,23 +21,34 @@ package org.neo4j.kernel.impl.nioneo.store;
 
 public class DynamicRecord extends Abstract64BitRecord
 {
+    // Fix this: should use record type should be tied to store
+    // either have StringRecord and ArrayRecords or change and only have one dynamic store
+    public enum Type
+    {
+        STRING,
+        ARRAY,
+        UNKNOWN, // used for recovery but we need to fix this
+    }
+    
     private static final int MAX_BYTES_IN_TO_STRING = 8, MAX_CHARS_IN_TO_STRING = 16;
     private byte[] data = null;
     private int length;
     private long nextBlock = Record.NO_NEXT_BLOCK.intValue();
     private boolean startRecord = true;
+    
+    private final Type type;
 
-    public static DynamicRecord dynamicRecord( long id, boolean inUse )
+    public static DynamicRecord dynamicRecord( long id, boolean inUse, Type type )
     {
-        DynamicRecord record = new DynamicRecord( id );
+        DynamicRecord record = new DynamicRecord( id, type );
         record.setInUse( inUse );
         return record;
     }
 
-    public static DynamicRecord dynamicRecord( long id, boolean inUse, boolean isStartRecord, long nextBlock, int type,
-                                               byte [] data )
+    public static DynamicRecord dynamicRecord( long id, boolean inUse, boolean isStartRecord, long nextBlock, /*int type,*/
+                                               byte [] data, Type type )
     {
-        DynamicRecord record = new DynamicRecord( id );
+        DynamicRecord record = new DynamicRecord( id, type );
         record.setInUse( inUse );
         record.setStartRecord( isStartRecord );
         record.setNextBlock( nextBlock );
@@ -46,9 +57,10 @@ public class DynamicRecord extends Abstract64BitRecord
         return record;
     }
 
-    public DynamicRecord( long id )
+    public DynamicRecord( long id, Type type )
     {
         super( id );
+        this.type = type;
     }
     
     public void setStartRecord( boolean startRecord )
@@ -154,10 +166,15 @@ public class DynamicRecord extends Abstract64BitRecord
         return buf.toString();
     }
     
+    public Type getType()
+    {
+        return type;
+    }
+    
     @Override
     public DynamicRecord clone()
     {
-        DynamicRecord result = new DynamicRecord( getLongId() );
+        DynamicRecord result = new DynamicRecord( getLongId(), getType() );
         if ( data != null )
             result.data = data.clone();
         result.setInUse( inUse() );

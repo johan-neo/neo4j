@@ -24,12 +24,13 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.helpers.Exceptions;
 import org.neo4j.kernel.IdGeneratorFactory;
 import org.neo4j.kernel.configuration.Config;
-import org.neo4j.kernel.impl.nioneo.store.DefaultWindowPoolFactory;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
 import org.neo4j.kernel.impl.nioneo.store.FileSystemAbstraction;
-import org.neo4j.kernel.impl.nioneo.store.NeoStore;
 import org.neo4j.kernel.impl.nioneo.store.StoreFactory;
 import org.neo4j.kernel.impl.storemigration.legacystore.LegacyStore;
 import org.neo4j.kernel.impl.util.StringLogger;
@@ -66,16 +67,16 @@ public class StoreUpgrader
         this.databaseFiles = databaseFiles;
     }
 
-    public void attemptUpgrade( File storageFileName )
+    public void attemptUpgrade( String path )
     {
         upgradeConfiguration.checkConfigurationAllowsAutomaticUpgrade();
-        upgradableDatabase.checkUpgradeable( storageFileName );
+        upgradableDatabase.checkUpgradeable( path );
 
-        File workingDirectory = storageFileName.getParentFile();
+        File workingDirectory = new File( path ); // storageFileName.getParentFile();
         File upgradeDirectory = new File( workingDirectory, "upgrade" );
         File backupDirectory = new File( workingDirectory, "upgrade_backup" );
 
-        migrateToIsolatedDirectory( storageFileName, upgradeDirectory );
+        migrateToIsolatedDirectory( workingDirectory, upgradeDirectory );
 
         databaseFiles.moveToBackupDirectory( workingDirectory, backupDirectory );
         backupMessagesLogLeavingInPlaceForNewDatabaseMessages( workingDirectory, backupDirectory );
@@ -98,7 +99,7 @@ public class StoreUpgrader
         }
     }
 
-    private void migrateToIsolatedDirectory( File storageFileName, File upgradeDirectory )
+    private void migrateToIsolatedDirectory( File workingDirectory, File upgradeDirectory )
     {
         if (upgradeDirectory.exists()) {
             try
@@ -112,18 +113,17 @@ public class StoreUpgrader
         }
         fileSystem.mkdir( upgradeDirectory );
 
-        File upgradeFileName = new File( upgradeDirectory, NeoStore.DEFAULT_NAME );
         Map<String, String> upgradeConfig = new HashMap<String, String>( originalConfig.getParams() );
-        upgradeConfig.put( "neo_store", upgradeFileName.getPath() );
+        upgradeConfig.put( GraphDatabaseSettings.store_dir.name(), upgradeDirectory.getPath() );
 
         Config upgradeConfiguration = new Config( upgradeConfig );
         
-        NeoStore neoStore = new StoreFactory( upgradeConfiguration, idGeneratorFactory, new DefaultWindowPoolFactory(),
-                fileSystem, StringLogger.DEV_NULL, null ).createNeoStore( upgradeFileName );
+        FlatNeoStores neoStores = new StoreFactory( upgradeConfiguration, idGeneratorFactory, 
+                fileSystem, StringLogger.DEV_NULL, null ).createNeoStore( upgradeDirectory.getPath() );
         try
         {
-            storeMigrator.migrate( new LegacyStore( fileSystem, storageFileName ),
-                    neoStore );
+            storeMigrator.migrate( new LegacyStore( fileSystem, workingDirectory ),
+                    neoStores );
         }
         catch ( IOException e )
         {
@@ -135,7 +135,7 @@ public class StoreUpgrader
         }
         finally
         {
-            neoStore.close();
+            neoStores.close();
         }
     }
 

@@ -17,60 +17,47 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.neo4j.kernel.impl.nioneo.store;
+package org.neo4j.kernel.impl.nioneo.alt;
+
+import static java.lang.System.arraycopy;
 
 import java.io.File;
 import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 
 import org.neo4j.helpers.Pair;
-import org.neo4j.kernel.IdGeneratorFactory;
 import org.neo4j.kernel.IdType;
-import org.neo4j.kernel.configuration.Config;
-import org.neo4j.kernel.impl.nioneo.store.windowpool.WindowPoolFactory;
+import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
+import org.neo4j.kernel.impl.nioneo.store.DynamicRecordAllocator;
+import org.neo4j.kernel.impl.nioneo.store.PropertyType;
+import org.neo4j.kernel.impl.nioneo.store.ShortArray;
+import org.neo4j.kernel.impl.nioneo.store.StoreFactory;
 import org.neo4j.kernel.impl.util.Bits;
-import org.neo4j.kernel.impl.util.StringLogger;
-
-import static java.lang.System.arraycopy;
 
 /**
  * Dynamic store that stores strings.
  */
-public class DynamicArrayStore extends AbstractDynamicStore
+public class NeoPropertyArrayStore extends Store
 {
     static final int NUMBER_HEADER_SIZE = 3;
     static final int STRING_HEADER_SIZE = 5;
     
     // store version, each store ends with this string (byte encoded)
     public static final String TYPE_DESCRIPTOR = "ArrayPropertyStore";
-    public static final String VERSION = buildTypeDescriptorAndVersion( TYPE_DESCRIPTOR );
+    public static final String VERSION = NeoNeoStore.buildTypeDescriptorAndVersion( TYPE_DESCRIPTOR );
 
-    public DynamicArrayStore(File fileName, Config configuration, IdType idType,
-                             IdGeneratorFactory idGeneratorFactory, WindowPoolFactory windowPoolFactory,
-                             FileSystemAbstraction fileSystemAbstraction, StringLogger stringLogger)
+    public static final IdType ID_TYPE = IdType.STRING_BLOCK;
+    
+    public NeoPropertyArrayStore( StoreParameter po )
     {
-        super( fileName, configuration, idType, idGeneratorFactory, windowPoolFactory,
-                fileSystemAbstraction, stringLogger);
+        super( new File( po.path, StoreFactory.PROPERTY_ARRAYS_STORE_NAME ), po.config, ID_TYPE, po.idGeneratorFactory, 
+                po.fileSystemAbstraction, po.stringLogger, TYPE_DESCRIPTOR, true, NeoPropertyStore.DEFAULT_DATA_BLOCK_SIZE );
     }
     
-    @Override
-    public <FAILURE extends Exception> void accept( OldRecordStore.Processor<FAILURE> processor, DynamicRecord record ) throws FAILURE
-    {
-        processor.processArray( this, record );
-    }
-
-    @Override
-    public String getTypeDescriptor()
-    {
-        return TYPE_DESCRIPTOR;
-    }
-
-    public static Collection<DynamicRecord> allocateFromNumbers( Object array, Iterator<DynamicRecord> recordsToUseFirst,
+    public static Collection<DynamicRecord> allocateFromNumbers( Object array, Collection<DynamicRecord> recordsToUseFirst,
                                                                  DynamicRecordAllocator recordAllocator )
     {
         Class<?> componentType = array.getClass().getComponentType();
@@ -109,17 +96,17 @@ public class DynamicArrayStore extends AbstractDynamicStore
             type.writeAll(array, arrayLength,requiredBits,bits);
             bytes = bits.asBytes();
         }
-        return allocateRecordsFromBytes( bytes, recordsToUseFirst, recordAllocator );
+        return NeoDynamicStore.allocateRecordsFromBytes( bytes, recordsToUseFirst.iterator(), recordAllocator );
     }
 
-    private static Collection<DynamicRecord> allocateFromString( String[] array, Iterator<DynamicRecord> recordsToUseFirst,
+    public static Collection<DynamicRecord> allocateFromString( String[] array, Collection<DynamicRecord> recordsToUseFirst,
                                                                  DynamicRecordAllocator recordAllocator )
     {
         List<byte[]> stringsAsBytes = new ArrayList<>();
         int totalBytesRequired = STRING_HEADER_SIZE; // 1b type + 4b array length
         for ( String string : array )
         {
-            byte[] bytes = PropertyStore.encodeString( string );
+            byte[] bytes = NeoPropertyStringStore.encodeString( string );
             stringsAsBytes.add( bytes );
             totalBytesRequired += 4/*byte[].length*/ + bytes.length;
         }
@@ -132,77 +119,56 @@ public class DynamicArrayStore extends AbstractDynamicStore
             buf.putInt( stringAsBytes.length );
             buf.put( stringAsBytes );
         }
-        return allocateRecordsFromBytes( buf.array(), recordsToUseFirst, recordAllocator );
+        return NeoDynamicStore.allocateRecordsFromBytes( buf.array(), recordsToUseFirst.iterator(), recordAllocator );
     }
 
-    public Collection<DynamicRecord> allocateRecords( Object array )
+    public static Object getRightArray( byte[] data )
     {
-        return allocateRecords( array, Collections.<DynamicRecord>emptyList().iterator() );
-    }
-    
-    public Collection<DynamicRecord> allocateRecords( Object array, Iterator<DynamicRecord> recordsToUseFirst )
-    {
-        if ( !array.getClass().isArray() )
-        {
-            throw new IllegalArgumentException( array + " not an array" );
-        }
-
-        Class<?> type = array.getClass().getComponentType();
-        if ( type.equals( String.class ) )
-        {
-            return allocateFromString( (String[]) array, recordsToUseFirst, recordAllocator );
-        }
-        else
-        {
-            return allocateFromNumbers( array, recordsToUseFirst, recordAllocator );
-        }
-    }
-
-    public static Object getRightArray( Pair<byte[],byte[]> data )
-    {
-        byte[] header = data.first();
-        byte[] bArray = data.other();
-        byte typeId = header[0];
+        ByteBuffer buffer = ByteBuffer.wrap( data );
+        byte typeId = buffer.get();
         if ( typeId == PropertyType.STRING.intValue() )
         {
-            ByteBuffer headerBuffer = ByteBuffer.wrap( header, 1/*skip the type*/, header.length-1 );
-            int arrayLength = headerBuffer.getInt();
+            int arrayLength = buffer.getInt();
             String[] result = new String[arrayLength];
             
-            ByteBuffer dataBuffer = ByteBuffer.wrap( bArray );
             for ( int i = 0; i < arrayLength; i++ )
             {
-                int byteLength = dataBuffer.getInt();
+                int byteLength = buffer.getInt();
                 byte[] stringByteArray = new byte[byteLength];
-                dataBuffer.get( stringByteArray );
-                result[i] = PropertyStore.decodeString( stringByteArray );
+                buffer.get( stringByteArray );
+                result[i] = NeoPropertyStringStore.decodeString( stringByteArray );
             }
             return result;
         }
         else
         {
             ShortArray type = ShortArray.typeOf( typeId );
-            int bitsUsedInLastByte = header[1];
-            int requiredBits = header[2];
+            int bitsUsedInLastByte = buffer.get(); 
+            int requiredBits = buffer.get(); 
             if ( requiredBits == 0 )
                 return type.createEmptyArray();
-            Object result;
             if ( type == ShortArray.BYTE && requiredBits == Byte.SIZE )
             {   // Optimization for byte arrays (probably large ones)
-                result = bArray;
+                byte[] result = new byte[data.length - 3];
+                buffer.get( result );
+                return result;
             }
             else
             {   // Fallback to the generic approach, which is a slower
-                Bits bits = Bits.bitsFromBytes( bArray );
-                int length = (bArray.length*8-(8-bitsUsedInLastByte))/requiredBits;
-                result = type.createArray(length, bits, requiredBits);
+                int dataLength = data.length - 3;
+                Bits bits = Bits.bitsFromBytes( data, 3 );
+                int length = (dataLength*8-(8-bitsUsedInLastByte))/requiredBits;
+                return type.createArray(length, bits, requiredBits);
             }
-            return result;
         }
     }
 
-    public Object getArrayFor( Iterable<DynamicRecord> records )
+    public static Pair<byte[], byte[]> readFullByteArrayAsPair( byte[] data )
     {
-        return getRightArray( readFullByteArray( records, PropertyType.ARRAY ) );
+        byte[] header = new byte[3];
+        byte[] result = new byte[data.length - header.length];
+        System.arraycopy( data, 0, header, 0, header.length );
+        System.arraycopy( data, 3, result, 0, result.length );
+        return Pair.of( header, data );
     }
 }

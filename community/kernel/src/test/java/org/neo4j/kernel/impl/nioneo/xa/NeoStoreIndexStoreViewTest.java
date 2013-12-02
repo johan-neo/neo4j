@@ -48,7 +48,7 @@ import org.neo4j.kernel.impl.api.index.StoreScan;
 import org.neo4j.kernel.impl.core.ThreadToStatementContextBridge;
 import org.neo4j.kernel.impl.locking.Lock;
 import org.neo4j.kernel.impl.locking.LockService;
-import org.neo4j.kernel.impl.nioneo.store.NeoStore;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
 import org.neo4j.kernel.impl.nioneo.store.StoreAccess;
 import org.neo4j.test.TargetDirectory;
 
@@ -56,7 +56,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
-
 import static org.neo4j.helpers.collection.IteratorUtil.asSet;
 import static org.neo4j.helpers.collection.IteratorUtil.emptySetOf;
 
@@ -154,7 +153,7 @@ public class NeoStoreIndexStoreViewTest
         createAlistairAndStefanNodes();
         getOrCreateIds();
 
-        NeoStore neoStore = new StoreAccess( graphDb ).getRawNeoStore();
+        FlatNeoStores neoStores = new StoreAccess( graphDb ).getRawFlatNeoStores();
         locks = mock( LockService.class, new Answer()
         {
             @Override
@@ -169,7 +168,7 @@ public class NeoStoreIndexStoreViewTest
                 return lock;
             }
         } );
-        storeView = new NeoStoreIndexStoreView( locks, neoStore );
+        storeView = new NeoStoreIndexStoreView( locks, neoStores );
     }
 
     @After

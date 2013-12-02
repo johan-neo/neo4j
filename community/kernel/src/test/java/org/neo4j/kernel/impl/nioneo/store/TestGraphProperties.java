@@ -19,6 +19,19 @@
  */
 package org.neo4j.kernel.impl.nioneo.store;
 
+import static org.hamcrest.Matchers.not;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
+import static org.neo4j.graphdb.Neo4jMatchers.containsOnly;
+import static org.neo4j.graphdb.Neo4jMatchers.getPropertyKeys;
+import static org.neo4j.graphdb.Neo4jMatchers.hasProperty;
+import static org.neo4j.graphdb.Neo4jMatchers.inTx;
+import static org.neo4j.graphdb.Neo4jMatchers.isEmpty;
+import static org.neo4j.test.TargetDirectory.forTest;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -27,6 +40,7 @@ import java.util.Collections;
 import java.util.concurrent.Future;
 
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 
@@ -40,25 +54,14 @@ import org.neo4j.kernel.GraphDatabaseAPI;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.core.GraphProperties;
 import org.neo4j.kernel.impl.core.NodeManager;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
+import org.neo4j.kernel.impl.nioneo.alt.RecordStore;
 import org.neo4j.kernel.impl.util.StringLogger;
 import org.neo4j.test.EphemeralFileSystemRule;
 import org.neo4j.test.OtherThreadExecutor;
 import org.neo4j.test.TestGraphDatabaseFactory;
 import org.neo4j.test.impl.EphemeralFileSystemAbstraction;
-
-import static org.hamcrest.Matchers.not;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
-
-import static org.neo4j.graphdb.Neo4jMatchers.containsOnly;
-import static org.neo4j.graphdb.Neo4jMatchers.getPropertyKeys;
-import static org.neo4j.graphdb.Neo4jMatchers.hasProperty;
-import static org.neo4j.graphdb.Neo4jMatchers.inTx;
-import static org.neo4j.graphdb.Neo4jMatchers.isEmpty;
-import static org.neo4j.test.TargetDirectory.forTest;
 
 public class TestGraphProperties
 {
@@ -108,6 +111,11 @@ public class TestGraphProperties
     @Test
     public void setManyGraphProperties() throws Exception
     {
+//        EphemeralFileSystemAbstraction fileSystem = new EphemeralFileSystemAbstraction();
+//        TestGraphDatabaseFactory factory = new TestGraphDatabaseFactory().setFileSystem( fileSystem );
+//        String storeDir = new File( "test" ).getAbsolutePath();
+//        GraphDatabaseAPI db = (GraphDatabaseAPI) factory.newImpermanentDatabase( storeDir );
+
         GraphDatabaseAPI db = (GraphDatabaseAPI) factory.newImpermanentDatabase();
         
         Transaction tx = db.beginTx();
@@ -184,11 +192,13 @@ public class TestGraphProperties
         tx.finish();
         db.shutdown();
 
-        NeoStore neoStore = new StoreFactory( new Config( Collections.<String, String>emptyMap(),
+        FlatNeoStores neoStores = new StoreFactory( new Config( Collections.<String, String>emptyMap(),
                 GraphDatabaseSettings.class ),
-                new DefaultIdGeneratorFactory(), new DefaultWindowPoolFactory(), fs.get(), StringLogger.DEV_NULL,
-                null ).newNeoStore( new File( storeDir, NeoStore.DEFAULT_NAME ) );
-        long prop = neoStore.getGraphNextProp();
+                new DefaultIdGeneratorFactory(), fs.get(), StringLogger.DEV_NULL,
+                null ).openNeoStore( storeDir ); // new File( storeDir, NeoStore.DEFAULT_NAME ) );
+        RecordStore neoStore = neoStores.getNeoStore().getRecordStore();
+        
+        long prop = NeoNeoStore.getLong( neoStore, NeoNeoStore.NEXT_GRAPH_PROP_POSITION );
         assertTrue( prop != 0 );
         neoStore.close();
     }
@@ -275,9 +285,9 @@ public class TestGraphProperties
     private void truncateNeoStoreTo5Records( FileSystemAbstraction fileSystem, String storeDir ) throws IOException
     {
         // Remove the last record, next startup will look like as if we're upgrading an old store
-        File neoStoreFile = new File( storeDir, NeoStore.DEFAULT_NAME );
+        File neoStoreFile = new File( storeDir, StoreFactory.NEO_STORE_NAME );
         FileChannel channel = fileSystem.open( neoStoreFile, "rw" );
-        channel.position( NeoStore.RECORD_SIZE * 7/*position of "next prop"*/ );
+        channel.position( NeoNeoStore.RECORD_SIZE * 7/*position of "next prop"*/ );
         int trail = (int) (channel.size() - channel.position());
         ByteBuffer trailBuffer = null;
         if ( trail > 0 )
@@ -286,7 +296,7 @@ public class TestGraphProperties
             channel.read( trailBuffer );
             trailBuffer.flip();
         }
-        channel.position( NeoStore.RECORD_SIZE * 5 );
+        channel.position( NeoNeoStore.RECORD_SIZE * 5 );
         if ( trail > 0 )
         {
             channel.write( trailBuffer );

@@ -29,7 +29,7 @@ import org.neo4j.test.TestGraphDatabaseFactory;
 
 import static java.lang.String.format;
 import static org.junit.Assert.assertTrue;
-import static org.neo4j.kernel.impl.nioneo.store.DefaultWindowPoolFactory.memoryMappingSetting;
+import static org.neo4j.kernel.impl.nioneo.store.StoreFactory.memoryMappingSetting;
 
 public class AutoconfTest
 {

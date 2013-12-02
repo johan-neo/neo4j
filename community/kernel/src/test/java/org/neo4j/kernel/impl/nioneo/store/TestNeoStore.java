@@ -19,6 +19,13 @@
  */
 package org.neo4j.kernel.impl.nioneo.store;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.neo4j.kernel.impl.util.StringLogger.DEV_NULL;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -39,7 +46,6 @@ import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
-
 import org.neo4j.graphdb.DependencyResolver;
 import org.neo4j.graphdb.DependencyResolver.Adapter;
 import org.neo4j.graphdb.Node;
@@ -69,6 +75,12 @@ import org.neo4j.kernel.impl.core.NodeManager;
 import org.neo4j.kernel.impl.core.PropertyKeyTokenHolder;
 import org.neo4j.kernel.impl.core.RelationshipTypeTokenHolder;
 import org.neo4j.kernel.impl.core.Token;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
+import org.neo4j.kernel.impl.nioneo.alt.NeoDynamicStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoTokenStore;
+import org.neo4j.kernel.impl.nioneo.alt.RecordStore;
 import org.neo4j.kernel.impl.nioneo.xa.NeoStoreXaConnection;
 import org.neo4j.kernel.impl.nioneo.xa.NeoStoreXaDataSource;
 import org.neo4j.kernel.impl.persistence.NeoStoreTransaction.PropertyReceiver;
@@ -93,32 +105,20 @@ import org.neo4j.kernel.logging.DevNullLoggingService;
 import org.neo4j.kernel.logging.SingleLoggingService;
 import org.neo4j.test.EphemeralFileSystemRule;
 import org.neo4j.test.TargetDirectory;
-import org.neo4j.test.TestGraphDatabaseFactory;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
-import static org.neo4j.kernel.impl.util.StringLogger.DEV_NULL;
 
 public class TestNeoStore
 {
-    private PropertyStore pStore;
-    private RelationshipTypeTokenStore rtStore;
+    private RecordStore pStore;
+    //private RelationshipTypeTokenStore rtStore;
     private NeoStoreXaDataSource ds;
     private NeoStoreXaConnection xaCon;
     private TargetDirectory targetDirectory;
     private File path;
+    
+    private FlatNeoStores neoStores;
 
     @Rule public EphemeralFileSystemRule fs = new EphemeralFileSystemRule();
     @Rule public TargetDirectory.TestDirectory testDir = TargetDirectory.cleanTestDirForTest( getClass() );
-
-    private File file( String name )
-    {
-        return new File( path, name);
-    }
 
     @Before
     public void setUpNeoStore() throws Exception
@@ -126,9 +126,9 @@ public class TestNeoStore
         targetDirectory = TargetDirectory.forTest( fs.get(), getClass() );
         path = targetDirectory.directory( "dir", true );
         Config config = new Config( new HashMap<String, String>(), GraphDatabaseSettings.class );
-        StoreFactory sf = new StoreFactory( config, new DefaultIdGeneratorFactory(), new DefaultWindowPoolFactory(),
+        StoreFactory sf = new StoreFactory( config, new DefaultIdGeneratorFactory(),
                 fs.get(), StringLogger.DEV_NULL, null );
-        sf.createNeoStore( file( NeoStore.DEFAULT_NAME ) ).close();
+        sf.createNeoStore( path.getPath() ).close();
     }
 
     private static class MyPropertyKeyToken extends Token
@@ -174,12 +174,9 @@ public class TestNeoStore
         LockManager lockManager = new LockManagerImpl( new RagManager() );
 
         final Config config = new Config( MapUtil.stringMap(
-                InternalAbstractGraphDatabase.Configuration.store_dir.name(), path.getPath(),
-                InternalAbstractGraphDatabase.Configuration.neo_store.name(), "neo",
-                InternalAbstractGraphDatabase.Configuration.logical_log.name(), file( "nioneo_logical.log" ).getPath() ),
+                InternalAbstractGraphDatabase.Configuration.store_dir.name(), path.getPath() ),
                 GraphDatabaseSettings.class );
-        StoreFactory sf = new StoreFactory( config, new DefaultIdGeneratorFactory(), new DefaultWindowPoolFactory(),
-                fs.get(), StringLogger.DEV_NULL, null );
+        StoreFactory sf = new StoreFactory( config, new DefaultIdGeneratorFactory(),fs.get(), StringLogger.DEV_NULL, null );
 
         NodeManager nodeManager = mock(NodeManager.class);
         @SuppressWarnings( "rawtypes" )
@@ -204,8 +201,9 @@ public class TestNeoStore
         ds.start();
 
         xaCon = ds.getXaConnection();
-        pStore = xaCon.getPropertyStore();
-        rtStore = xaCon.getRelationshipTypeStore();
+        neoStores = ds.getNeoStores();
+        pStore = neoStores.getPropertyStore().getRecordStore();
+        // rtStore = xaCon.getRelationshipTypeStore();
     }
 
     private DependencyResolver dependencyResolverForNoIndexProvider( final NodeManager nodeManager )
@@ -269,32 +267,18 @@ public class TestNeoStore
     @After
     public void tearDownNeoStore()
     {
-        for ( String file : new String[] {
-                "neo",
-                "neo.nodestore.db",
-                "neo.nodestore.db.labels",
-                "neo.propertystore.db",
-                "neo.propertystore.db.index",
-                "neo.propertystore.db.index.keys",
-                "neo.propertystore.db.strings",
-                "neo.propertystore.db.arrays",
-                "neo.relationshipstore.db",
-                "neo.relationshiptypestore.db",
-                "neo.relationshiptypestore.db.names",
-                "neo.schemastore.db",
-        } )
+        deleteAllFiles( path );
+    }
+    
+    private void deleteAllFiles( File directory )
+    {
+        for ( File file : fs.get().listFiles( directory ) )
         {
-            fs.get().deleteFile( file( file ) );
-            fs.get().deleteFile( file( file + ".id" ) );
-        }
-
-        File file = new File( "." );
-        for ( File nioFile : fs.get().listFiles( file ) )
-        {
-            if ( nioFile.getName().startsWith( "nioneo_logical.log" ) )
+            if ( file.isDirectory() )
             {
-                fs.get().deleteFile( nioFile );
+                deleteAllFiles( file );
             }
+            fs.get().deleteFile( file );
         }
     }
 
@@ -431,7 +415,7 @@ public class TestNeoStore
     private Iterable<RelationshipRecord> getMore( NeoStoreXaConnection xaCon, long node, AtomicLong pos )
     {
         Pair<Map<DirectionWrapper, Iterable<RelationshipRecord>>, Long> rels =
-                xaCon.getWriteTransaction().getMoreRelationships( node, pos.get() );
+                xaCon.getWriteTransaction().getMoreRelationships( node, pos.get(), 25 );
         pos.set( rels.other() );
         List<Iterable<RelationshipRecord>> list = new ArrayList<>();
         for ( Map.Entry<DirectionWrapper, Iterable<RelationshipRecord>> entry : rels.first().entrySet() )
@@ -454,9 +438,9 @@ public class TestNeoStore
         for ( int keyId : props.keySet() )
         {
             long id = props.get( keyId ).other();
-            PropertyRecord record = pStore.getRecord( id );
+            PropertyRecord record = NeoPropertyStore.getRecord( id, pStore.getRecord( id ) );
             PropertyBlock block = record.getPropertyBlock( props.get( keyId ).first().propertyKeyId() );
-            DefinedProperty data = block.newPropertyData( pStore );
+            DefinedProperty data = block.newPropertyData( neoStores );
             if ( data.propertyKeyId() == prop1.propertyKeyId() )
             {
                 assertEquals( "prop1", MyPropertyKeyToken.getIndexFor(
@@ -540,9 +524,9 @@ public class TestNeoStore
         for ( int keyId : props.keySet() )
         {
             long id = props.get( keyId ).other();
-            PropertyRecord record = pStore.getRecord( id );
+            PropertyRecord record = NeoPropertyStore.getRecord( id, pStore.getRecord( id ) );
             PropertyBlock block = record.getPropertyBlock( props.get( keyId ).first().propertyKeyId() );
-            DefinedProperty data = block.newPropertyData( pStore );
+            DefinedProperty data = block.newPropertyData( neoStores );
             if ( data.propertyKeyId() == prop1.propertyKeyId() )
             {
                 assertEquals( "prop1", MyPropertyKeyToken.getIndexFor(
@@ -613,9 +597,9 @@ public class TestNeoStore
         for ( int keyId : props.keySet() )
         {
             long id = props.get( keyId ).other();
-            PropertyRecord record = pStore.getRecord( id );
+            PropertyRecord record = NeoPropertyStore.getRecord( id, pStore.getRecord( id ) );
             PropertyBlock block = record.getPropertyBlock( props.get( keyId ).first().propertyKeyId() );
-            DefinedProperty data = block.newPropertyData( pStore );
+            DefinedProperty data = block.newPropertyData( neoStores );
             if ( data.propertyKeyId() == prop1.propertyKeyId() )
             {
                 assertEquals( "prop1", MyPropertyKeyToken.getIndexFor(
@@ -660,9 +644,9 @@ public class TestNeoStore
         for ( int keyId : props.keySet() )
         {
             long id = props.get( keyId ).other();
-            PropertyRecord record = pStore.getRecord( id );
+            PropertyRecord record = NeoPropertyStore.getRecord( id, pStore.getRecord( id ) );
             PropertyBlock block = record.getPropertyBlock( props.get( keyId ).first().propertyKeyId() );
-            DefinedProperty data = block.newPropertyData( pStore );
+            DefinedProperty data = block.newPropertyData( neoStores );
             if ( data.propertyKeyId() == prop1.propertyKeyId() )
             {
                 assertEquals( "prop1", MyPropertyKeyToken.getIndexFor(
@@ -700,13 +684,16 @@ public class TestNeoStore
     private void validateRelTypes( int relType1, int relType2 )
             throws IOException
     {
-        Token data = rtStore.getToken( relType1 );
+        Token data = NeoTokenStore.getToken( neoStores.getRelationshipTypeTokenStore().getRecordStore(), 
+                neoStores.getRelationshipTypeTokenNameStore().getRecordStore(), relType1, false );
         assertEquals( relType1, data.id() );
         assertEquals( "relationshiptype1", data.name() );
-        data = rtStore.getToken( relType2 );
+        data = NeoTokenStore.getToken( neoStores.getRelationshipTypeTokenStore().getRecordStore(), 
+                neoStores.getRelationshipTypeTokenNameStore().getRecordStore(), relType2, false );
         assertEquals( relType2, data.id() );
         assertEquals( "relationshiptype2", data.name() );
-        Token allData[] = rtStore.getTokens( Integer.MAX_VALUE );
+        Token allData[] = NeoTokenStore.getTokens( neoStores.getRelationshipTypeTokenStore().getRecordStore(), 
+                neoStores.getRelationshipTypeTokenNameStore().getRecordStore(), (int) neoStores.getRelationshipTypeTokenStore().getIdGenerator().getHighId() );
         assertEquals( 2, allData.length );
         for ( int i = 0; i < 2; i++ )
         {
@@ -736,9 +723,9 @@ public class TestNeoStore
         for ( int keyId : props.keySet() )
         {
             long id = props.get( keyId ).other();
-            PropertyRecord record = pStore.getRecord( id );
+            PropertyRecord record = NeoPropertyStore.getRecord( id, pStore.getRecord( id ) );
             PropertyBlock block = record.getPropertyBlock( props.get( keyId ).first().propertyKeyId() );
-            DefinedProperty data = block.newPropertyData( pStore );
+            DefinedProperty data = block.newPropertyData( neoStores );
             if ( data.propertyKeyId() == prop1.propertyKeyId() )
             {
                 assertEquals( "prop1", MyPropertyKeyToken.getIndexFor(
@@ -803,9 +790,9 @@ public class TestNeoStore
         for ( int keyId : props.keySet() )
         {
             long id = props.get( keyId ).other();
-            PropertyRecord record = pStore.getRecord( id );
+            PropertyRecord record = NeoPropertyStore.getRecord( id, pStore.getRecord( id ) );
             PropertyBlock block = record.getPropertyBlock( props.get( keyId ).first().propertyKeyId() );
-            DefinedProperty data = block.newPropertyData( pStore );
+            DefinedProperty data = block.newPropertyData( neoStores );
             if ( data.propertyKeyId() == prop1.propertyKeyId() )
             {
                 assertEquals( "prop1", MyPropertyKeyToken.getIndexFor(
@@ -858,9 +845,9 @@ public class TestNeoStore
         for ( int keyId : props.keySet() )
         {
             long id = props.get( keyId ).other();
-            PropertyRecord record = pStore.getRecord( id );
+            PropertyRecord record = NeoPropertyStore.getRecord( id, pStore.getRecord( id ) );
             PropertyBlock block = record.getPropertyBlock( props.get( keyId ).first().propertyKeyId() );
-            DefinedProperty data = block.newPropertyData( pStore );
+            DefinedProperty data = block.newPropertyData( neoStores );
             if ( data.propertyKeyId() == prop1.propertyKeyId() )
             {
                 assertEquals( "prop1", MyPropertyKeyToken.getIndexFor(
@@ -906,9 +893,9 @@ public class TestNeoStore
         for ( int keyId : props.keySet() )
         {
             long id = props.get( keyId ).other();
-            PropertyRecord record = pStore.getRecord( id );
+            PropertyRecord record = NeoPropertyStore.getRecord( id, pStore.getRecord( id ) );
             PropertyBlock block = record.getPropertyBlock( props.get( keyId ).first().propertyKeyId() );
-            DefinedProperty data = block.newPropertyData( pStore );
+            DefinedProperty data = block.newPropertyData( neoStores );
             if ( data.propertyKeyId() == prop1.propertyKeyId() )
             {
                 assertEquals( "prop1", MyPropertyKeyToken.getIndexFor(
@@ -1078,7 +1065,7 @@ public class TestNeoStore
         startTx();
         long nodeId = ds.nextId( Node.class );
         xaCon.getWriteTransaction().nodeCreate( nodeId );
-        pStore.nextId();
+        neoStores.getPropertyStore().getIdGenerator().nextId();
         DefinedProperty prop = xaCon.getWriteTransaction().nodeAddProperty(
                 nodeId, index( "nisse" ),
                 new Integer( 10 ) );
@@ -1100,15 +1087,15 @@ public class TestNeoStore
 
         Config config = new Config( MapUtil.stringMap( "string_block_size", "62", "array_block_size", "302" ),
                 GraphDatabaseSettings.class );
-        StoreFactory sf = new StoreFactory( config, new DefaultIdGeneratorFactory(), new DefaultWindowPoolFactory(),
+        StoreFactory sf = new StoreFactory( config, new DefaultIdGeneratorFactory(),
                 fs.get(), StringLogger.DEV_NULL, null );
-        sf.createNeoStore( file( "neo" ) ).close();
+        sf.createNeoStore( path.getPath() ).close();
 
         initializeStores();
-        assertEquals( 62 + AbstractDynamicStore.BLOCK_HEADER_SIZE,
-                pStore.getStringBlockSize() );
-        assertEquals( 302 + AbstractDynamicStore.BLOCK_HEADER_SIZE,
-                pStore.getArrayBlockSize() );
+        assertEquals( 62 + NeoDynamicStore.BLOCK_HEADER_SIZE,
+                neoStores.getStringStore().getRecordStore().getRecordSize() );
+        assertEquals( 302 + NeoDynamicStore.BLOCK_HEADER_SIZE,
+                neoStores.getArrayStore().getRecordStore().getRecordSize() );
         ds.stop();
     }
 
@@ -1116,16 +1103,30 @@ public class TestNeoStore
     public void setVersion() throws Exception
     {
         String storeDir = "target/test-data/set-version";
-        new TestGraphDatabaseFactory().setFileSystem( fs.get() ).newImpermanentDatabase( storeDir ).shutdown();
-        assertEquals( 1, NeoStore.setVersion( fs.get(), new File( storeDir ), 10 ) );
-        assertEquals( 10, NeoStore.setVersion( fs.get(), new File( storeDir ), 12 ) );
-
+        deleteAllFiles( new File( storeDir ) );
+        // new GraphDatabaseFactory().newEmbeddedDatabase( storeDir ).shutdown();
         StoreFactory sf = new StoreFactory( new Config( new HashMap<String, String>(), GraphDatabaseSettings.class ),
-                new DefaultIdGeneratorFactory(), new DefaultWindowPoolFactory(), fs.get(), StringLogger.DEV_NULL, null );
+                new DefaultIdGeneratorFactory(), fs.get(),
+                StringLogger.DEV_NULL, null );
 
-        NeoStore neoStore = sf.newNeoStore( new File( storeDir, NeoStore.DEFAULT_NAME ) );
-        assertEquals( 12, neoStore.getVersion() );
-        neoStore.close();
+        FlatNeoStores neoStores = sf.openNeoStore( storeDir );
+  
+        assertEquals( 0, setVersion( neoStores.getNeoStore().getRecordStore(), 10 ) );
+        assertEquals( 10, setVersion( neoStores.getNeoStore().getRecordStore(), 12 ) );
+        
+        neoStores.close();
+
+        neoStores = sf.openNeoStore( storeDir );
+        assertEquals( 12, NeoNeoStore.getLong( neoStores.getNeoStore().getRecordStore(), NeoNeoStore.LOG_VERSION_POSITION ) );
+        neoStores.close();
+    }
+    
+    private long setVersion( RecordStore neoStore, long newVersion )
+    {
+        long currentVersion = NeoNeoStore.getLong( 
+                neoStore, NeoNeoStore.LOG_VERSION_POSITION );
+        NeoNeoStore.writeLong( neoStore, NeoNeoStore.LOG_VERSION_POSITION, newVersion );
+        return currentVersion;
     }
 
     @Test
@@ -1134,30 +1135,30 @@ public class TestNeoStore
         // given
         new GraphDatabaseFactory().newEmbeddedDatabase( testDir.absolutePath() ).shutdown();
         StoreFactory sf = new StoreFactory( new Config( new HashMap<String, String>(), GraphDatabaseSettings.class ),
-                new DefaultIdGeneratorFactory(), new DefaultWindowPoolFactory(), new DefaultFileSystemAbstraction(),
+                new DefaultIdGeneratorFactory(), new DefaultFileSystemAbstraction(),
                 StringLogger.DEV_NULL, null );
 
         // when
-        NeoStore neoStore = sf.newNeoStore( new File( testDir.absolutePath(), NeoStore.DEFAULT_NAME ) );
+        FlatNeoStores neoStores = sf.openNeoStore( testDir.absolutePath() );
 
         // then the default is 0
-        assertEquals( 0l, neoStore.getLatestConstraintIntroducingTx() );
+        assertEquals( 0l, NeoNeoStore.getLong( neoStores.getNeoStore().getRecordStore(), NeoNeoStore.LATEST_CONSTRAINT_TX_POSITION ) );
 
 
         // when
-        neoStore.setLatestConstraintIntroducingTx( 10l );
+        NeoNeoStore.writeLong( neoStores.getNeoStore().getRecordStore(), NeoNeoStore.LATEST_CONSTRAINT_TX_POSITION, 10l );
 
         // then
-        assertEquals( 10l, neoStore.getLatestConstraintIntroducingTx() );
+        assertEquals( 10l, NeoNeoStore.getLong( neoStores.getNeoStore().getRecordStore(), NeoNeoStore.LATEST_CONSTRAINT_TX_POSITION ) );
 
 
         // when
-        neoStore.flushAll();
-        neoStore.close();
-        neoStore = sf.newNeoStore( new File( testDir.absolutePath(), NeoStore.DEFAULT_NAME ) );
+        neoStores.flushAll();
+        neoStores.close();
+        neoStores = sf.openNeoStore( testDir.absolutePath() );
 
         // then the value should have been stored
-        assertEquals( 10l, neoStore.getLatestConstraintIntroducingTx() );
-        neoStore.close();
+        assertEquals( 10l, NeoNeoStore.getLong( neoStores.getNeoStore().getRecordStore(), NeoNeoStore.LATEST_CONSTRAINT_TX_POSITION ) );
+        neoStores.close();
     }
 }

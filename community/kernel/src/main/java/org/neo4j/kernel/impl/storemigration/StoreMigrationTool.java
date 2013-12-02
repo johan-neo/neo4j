@@ -30,9 +30,9 @@ import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.kernel.DefaultFileSystemAbstraction;
 import org.neo4j.kernel.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.configuration.Config;
-import org.neo4j.kernel.impl.nioneo.store.DefaultWindowPoolFactory;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
 import org.neo4j.kernel.impl.nioneo.store.FileSystemAbstraction;
-import org.neo4j.kernel.impl.nioneo.store.NeoStore;
 import org.neo4j.kernel.impl.nioneo.store.StoreFactory;
 import org.neo4j.kernel.impl.storemigration.legacystore.LegacyStore;
 import org.neo4j.kernel.impl.storemigration.monitoring.VisibleMigrationProgressMonitor;
@@ -56,7 +56,7 @@ public class StoreMigrationTool
     private void run( String legacyStoreDirectory, String targetStoreDirectory, StringLogger log ) throws IOException
     {
         LegacyStore legacyStore = new LegacyStore( new DefaultFileSystemAbstraction(),
-                new File( new File( legacyStoreDirectory ), NeoStore.DEFAULT_NAME ) );
+                new File( new File( legacyStoreDirectory ), StoreFactory.NEO_STORE_NAME ) );
 
         Map<String, String> config = new HashMap<String, String>();
 
@@ -72,22 +72,20 @@ public class StoreMigrationTool
             throw new IllegalStateException( "Failed to create directory" );
         }
 
-        File targetStoreFile = new File( targetStoreDirectory, NeoStore.DEFAULT_NAME );
-        config.put( "neo_store", targetStoreFile.getPath() );
+        config.put( GraphDatabaseSettings.store_dir.name(), targetStoreDirectory );
         FileSystemAbstraction fileSystem = new DefaultFileSystemAbstraction();
 
-        NeoStore neoStore = new StoreFactory( new Config( config, GraphDatabaseSettings.class ),
-                new DefaultIdGeneratorFactory(),
-                new DefaultWindowPoolFactory(), fileSystem, log, null ).createNeoStore( targetStoreFile );
+        FlatNeoStores neoStores = new StoreFactory( new Config( config, GraphDatabaseSettings.class ),
+                new DefaultIdGeneratorFactory(), fileSystem, log, null ).createNeoStore( targetStoreDirectory );
 
         long startTime = System.currentTimeMillis();
 
-        new StoreMigrator( new VisibleMigrationProgressMonitor( log, System.out ) ).migrate( legacyStore, neoStore );
+        new StoreMigrator( new VisibleMigrationProgressMonitor( log, System.out ) ).migrate( legacyStore, neoStores );
 
         long duration = System.currentTimeMillis() - startTime;
         System.out.printf( "Migration completed in %d s%n", duration / 1000 );
 
-        neoStore.close();
+        neoStores.close();
 
         GraphDatabaseService database =
                 new GraphDatabaseFactory().newEmbeddedDatabase( targetStoreDirectoryFile.getPath() );

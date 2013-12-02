@@ -63,7 +63,8 @@ public class TransactionWriterTest
         TransactionWriter writer = new TransactionWriter( buffer, 1, -1 );
 
         NodeRecord node = new NodeRecord( 0, -1, -1 );
-        node.setLabelField( 0, Collections.<DynamicRecord>emptyList() );
+        node.setLabelField( 0 );
+        // node.addLabelDynamicRecords( Collections.<DynamicRecord>emptyList() );
         RelationshipRecord relationship = new RelationshipRecord( 0, 1, 1, 6 );
 
         // when

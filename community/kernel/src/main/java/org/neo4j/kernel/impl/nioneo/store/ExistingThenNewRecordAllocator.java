@@ -21,15 +21,19 @@ package org.neo4j.kernel.impl.nioneo.store;
 
 import java.util.Iterator;
 
+import org.neo4j.kernel.impl.nioneo.alt.NeoDynamicStore;
+
 class ExistingThenNewRecordAllocator implements DynamicRecordAllocator
 {
     private final DynamicBlockSize blockSize;
     private final IdSequence idSequence;
+    private final DynamicRecord.Type type;
 
-    ExistingThenNewRecordAllocator( DynamicBlockSize blockSize, IdSequence idSequence )
+    ExistingThenNewRecordAllocator( DynamicBlockSize blockSize, IdSequence idSequence, DynamicRecord.Type type )
     {
         this.blockSize = blockSize;
         this.idSequence = idSequence;
+        this.type = type;
     }
 
     public DynamicRecord nextUsedRecordOrNew( Iterator<DynamicRecord> recordsToUseFirst )
@@ -45,7 +49,7 @@ class ExistingThenNewRecordAllocator implements DynamicRecordAllocator
         }
         else
         {
-            record = new DynamicRecord( idSequence.nextId() );
+            record = new DynamicRecord( idSequence.nextId(), type );
             record.setCreated();
         }
         record.setInUse( true );
@@ -55,6 +59,6 @@ class ExistingThenNewRecordAllocator implements DynamicRecordAllocator
     @Override
     public int dataSize()
     {
-        return blockSize.getBlockSize() - AbstractDynamicStore.BLOCK_HEADER_SIZE;
+        return blockSize.getBlockSize() - NeoDynamicStore.BLOCK_HEADER_SIZE;
     }
 }

@@ -9,7 +9,7 @@ import org.neo4j.kernel.impl.nioneo.store.FileSystemAbstraction;
 import org.neo4j.kernel.impl.nioneo.store.IdGenerator;
 import org.neo4j.kernel.impl.util.StringLogger;
 
-public class Store
+class Store
 {
     private final StoreLoader storeLoader;
     private final IdGenerator idGenerator;
@@ -42,6 +42,7 @@ public class Store
     public void close()
     {
         recordStore.close();
+        storeLoader.writeTypeAndVersion();
         idGenerator.close();
         storeLoader.releaseFileLockAndCloseFileChannel();
     }
@@ -54,5 +55,35 @@ public class Store
     public IdGenerator getIdGenerator()
     {
         return idGenerator;
+    }
+    
+    public static class NeoStore extends Store
+    {
+        public NeoStore( File fileName, Config config, IdType idType, IdGeneratorFactory idGeneratorFactory,
+                FileSystemAbstraction fileSystemAbstraction, StringLogger stringLogger, String storeTypeDescriptor,
+                boolean isDynamic, int recordSize)
+        {
+            super( fileName, config, idType, idGeneratorFactory, fileSystemAbstraction, stringLogger, storeTypeDescriptor, isDynamic, recordSize );
+        }
+    }
+
+    public static class NodeStore extends Store
+    {
+        public NodeStore( File fileName, Config config, IdType idType, IdGeneratorFactory idGeneratorFactory,
+                FileSystemAbstraction fileSystemAbstraction, StringLogger stringLogger, String storeTypeDescriptor,
+                boolean isDynamic, int recordSize)
+        {
+            super( fileName, config, idType, idGeneratorFactory, fileSystemAbstraction, stringLogger, storeTypeDescriptor, isDynamic, recordSize );
+        }
+    }
+
+    public static class RelationshipStore extends Store
+    {
+        public RelationshipStore( File fileName, Config config, IdType idType, IdGeneratorFactory idGeneratorFactory,
+                FileSystemAbstraction fileSystemAbstraction, StringLogger stringLogger, String storeTypeDescriptor,
+                boolean isDynamic, int recordSize)
+        {
+            super( fileName, config, idType, idGeneratorFactory, fileSystemAbstraction, stringLogger, storeTypeDescriptor, isDynamic, recordSize );
+        }
     }
 }

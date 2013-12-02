@@ -19,21 +19,21 @@
  */
 package org.neo4j.kernel.impl.nioneo.xa;
 
+import static junit.framework.Assert.fail;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
+import static org.mockito.Mockito.doThrow;
+import static org.neo4j.kernel.impl.nioneo.store.UniquenessConstraintRule.uniquenessConstraintRule;
+import static org.powermock.api.mockito.PowerMockito.mock;
+
 import javax.transaction.xa.XAException;
 
 import org.junit.Test;
 import org.neo4j.kernel.api.exceptions.schema.ConstraintVerificationFailedKernelException;
 import org.neo4j.kernel.impl.api.index.IndexingService;
-import org.neo4j.kernel.impl.nioneo.store.NeoStore;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.UniquenessConstraintRule;
-
-import static junit.framework.Assert.fail;
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.equalTo;
-import static org.mockito.Mockito.*;
-import static org.neo4j.kernel.impl.nioneo.store.UniquenessConstraintRule.uniquenessConstraintRule;
-import static org.powermock.api.mockito.PowerMockito.mock;
 
 public class IntegrityValidatorTest
 {
@@ -42,7 +42,7 @@ public class IntegrityValidatorTest
     public void shouldValidateUniquenessIndexes() throws Exception
     {
         // Given
-        NeoStore store = mock( NeoStore.class );
+        FlatNeoStores store = mock( FlatNeoStores.class );
         IndexingService indexes = mock(IndexingService.class);
         IntegrityValidator validator = new IntegrityValidator(store, indexes);
 
@@ -67,9 +67,9 @@ public class IntegrityValidatorTest
     public void deletingNodeWithRelationshipsIsNotAllowed() throws Exception
     {
         // Given
-        NeoStore store = mock( NeoStore.class );
+        FlatNeoStores stores = mock( FlatNeoStores.class );
         IndexingService indexes = mock(IndexingService.class);
-        IntegrityValidator validator = new IntegrityValidator(store, indexes );
+        IntegrityValidator validator = new IntegrityValidator(stores, indexes );
 
         NodeRecord record = new NodeRecord( 1l, 1l, -1l );
         record.setInUse( false );
@@ -90,10 +90,10 @@ public class IntegrityValidatorTest
     public void transactionsStartedBeforeAConstraintWasCreatedAreDisallowed() throws Exception
     {
         // Given
-        NeoStore store = mock( NeoStore.class );
+        FlatNeoStores stores = mock( FlatNeoStores.class );
         IndexingService indexes = mock(IndexingService.class);
-        when(store.getLatestConstraintIntroducingTx()).thenReturn( 10l );
-        IntegrityValidator validator = new IntegrityValidator( store, indexes );
+        // when(stores.getLatestConstraintIntroducingTx()).thenReturn( 10l );
+        IntegrityValidator validator = new IntegrityValidator( stores, indexes );
 
         // When
         try

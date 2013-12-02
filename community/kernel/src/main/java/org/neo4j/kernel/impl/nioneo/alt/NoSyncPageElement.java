@@ -53,4 +53,10 @@ class NoSyncPageElement implements PageElement
         }
         isDirty = false;
     }
+
+    @Override
+    public boolean isAllocated()
+    {
+        return page != null;
+    }
 }

@@ -22,7 +22,6 @@ package org.neo4j.kernel.impl.storemigration;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.neo4j.kernel.impl.nioneo.store.CommonAbstractStore.ALL_STORES_VERSION;
 import static org.neo4j.kernel.impl.storemigration.MigrationTestUtils.allStoreFilesHaveVersion;
 import static org.neo4j.kernel.impl.storemigration.MigrationTestUtils.alwaysAllowed;
 import static org.neo4j.kernel.impl.storemigration.MigrationTestUtils.changeVersionNumber;
@@ -41,8 +40,8 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.neo4j.kernel.DefaultIdGeneratorFactory;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
 import org.neo4j.kernel.impl.nioneo.store.FileSystemAbstraction;
-import org.neo4j.kernel.impl.nioneo.store.NeoStore;
 import org.neo4j.kernel.impl.storemigration.legacystore.LegacyStore;
 import org.neo4j.kernel.impl.storemigration.monitoring.SilentMigrationProgressMonitor;
 import org.neo4j.kernel.impl.util.StringLogger;
@@ -57,9 +56,9 @@ public class StoreUpgraderTestIT
         assertTrue( allStoreFilesHaveVersion( fileSystem, dbDirectory, LegacyStore.LEGACY_VERSION ) );
 
         newUpgrader( alwaysAllowed(), new StoreMigrator( new SilentMigrationProgressMonitor() ),
-                new DatabaseFiles( fileSystem ) ).attemptUpgrade( new File( dbDirectory, NeoStore.DEFAULT_NAME ) );
+                new DatabaseFiles( fileSystem ) ).attemptUpgrade( dbPath );
 
-        assertTrue( allStoreFilesHaveVersion( fileSystem, dbDirectory, ALL_STORES_VERSION ) );
+        assertTrue( allStoreFilesHaveVersion( fileSystem, dbDirectory, NeoNeoStore.ALL_STORES_VERSION ) );
 
         assertFalse( containsAnyLogicalLogs( fileSystem, dbDirectory ) );
         
@@ -70,7 +69,7 @@ public class StoreUpgraderTestIT
     public void shouldLeaveACopyOfOriginalStoreFilesInBackupDirectory() throws IOException
     {
         newUpgrader( alwaysAllowed(), new StoreMigrator( new SilentMigrationProgressMonitor() ), new DatabaseFiles( fileSystem ) )
-                .attemptUpgrade( new File( dbDirectory, NeoStore.DEFAULT_NAME ) );
+                .attemptUpgrade( dbPath );
 
         File backupDirectory = new File( dbDirectory, "upgrade_backup" );
 
@@ -87,7 +86,7 @@ public class StoreUpgraderTestIT
 
         // when
         newUpgrader( alwaysAllowed(), new StoreMigrator( new SilentMigrationProgressMonitor() ), new DatabaseFiles( fileSystem ) )
-                .attemptUpgrade( new File( dbDirectory, NeoStore.DEFAULT_NAME ) );
+                .attemptUpgrade( dbPath );
 
         // then
         File backupDirectory = new File( dbDirectory, "upgrade_backup" );
@@ -110,7 +109,7 @@ public class StoreUpgraderTestIT
         try
         {
             newUpgrader( vetoingUpgradeConfiguration, new StoreMigrator( new SilentMigrationProgressMonitor() ),
-                    new DatabaseFiles( fileSystem ) ).attemptUpgrade( new File( dbDirectory, NeoStore.DEFAULT_NAME ) );
+                    new DatabaseFiles( fileSystem ) ).attemptUpgrade( dbPath );
             fail( "Should throw exception" );
         }
         catch ( UpgradeNotAllowedByConfigurationException e )
@@ -132,7 +131,7 @@ public class StoreUpgraderTestIT
         try
         {
             newUpgrader( alwaysAllowed(), new StoreMigrator( new SilentMigrationProgressMonitor() ),
-                    new DatabaseFiles( fileSystem ) ).attemptUpgrade( new File( dbDirectory, NeoStore.DEFAULT_NAME ) );
+                    new DatabaseFiles( fileSystem ) ).attemptUpgrade( dbPath );
             fail( "Should throw exception" );
         }
         catch ( StoreUpgrader.UnexpectedUpgradingStoreVersionException e )
@@ -156,7 +155,7 @@ public class StoreUpgraderTestIT
         try
         {
             newUpgrader( alwaysAllowed(), new StoreMigrator( new SilentMigrationProgressMonitor() ),
-                    new DatabaseFiles( fileSystem ) ).attemptUpgrade( new File( dbDirectory, NeoStore.DEFAULT_NAME ) );
+                    new DatabaseFiles( fileSystem ) ).attemptUpgrade( dbPath );
             fail( "Should throw exception" );
         }
         catch ( StoreUpgrader.UpgradingStoreVersionNotFoundException e )
@@ -180,7 +179,7 @@ public class StoreUpgraderTestIT
         try
         {
             newUpgrader( alwaysAllowed(), new StoreMigrator( new SilentMigrationProgressMonitor() ),
-                    new DatabaseFiles( fileSystem ) ).attemptUpgrade( new File( dbDirectory, NeoStore.DEFAULT_NAME ) );
+                    new DatabaseFiles( fileSystem ) ).attemptUpgrade( dbPath );
             fail( "Should throw exception" );
         }
         catch ( StoreUpgrader.UpgradingStoreVersionNotFoundException e )
@@ -200,7 +199,8 @@ public class StoreUpgraderTestIT
     }
 
     @Rule public EphemeralFileSystemRule fs = new EphemeralFileSystemRule();
-    private final File dbDirectory = new File( "dir" );
+    private final String dbPath = "dir";
+    private final File dbDirectory = new File( dbPath );
     private EphemeralFileSystemAbstraction fileSystem;
 
     private StoreUpgrader newUpgrader( UpgradeConfiguration config, StoreMigrator migrator, DatabaseFiles files )

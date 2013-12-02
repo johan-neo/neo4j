@@ -19,6 +19,34 @@
  */
 package org.neo4j.kernel.impl.nioneo.xa;
 
+import static org.hamcrest.Matchers.equalTo;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.neo4j.helpers.collection.Iterables.count;
+import static org.neo4j.helpers.collection.IteratorUtil.asCollection;
+import static org.neo4j.helpers.collection.IteratorUtil.asSet;
+import static org.neo4j.helpers.collection.IteratorUtil.emptyIterator;
+import static org.neo4j.helpers.collection.IteratorUtil.first;
+import static org.neo4j.helpers.collection.MapUtil.stringMap;
+import static org.neo4j.kernel.api.index.NodePropertyUpdate.add;
+import static org.neo4j.kernel.api.index.NodePropertyUpdate.change;
+import static org.neo4j.kernel.api.index.NodePropertyUpdate.remove;
+import static org.neo4j.kernel.api.index.SchemaIndexProvider.NO_INDEX_PROVIDER;
+import static org.neo4j.kernel.impl.api.index.TestSchemaIndexProviderDescriptor.PROVIDER_DESCRIPTOR;
+import static org.neo4j.kernel.impl.nioneo.store.IndexRule.indexRule;
+import static org.neo4j.kernel.impl.nioneo.store.UniquenessConstraintRule.uniquenessConstraintRule;
+import static org.neo4j.kernel.impl.transaction.xaframework.InjectedTransactionValidator.ALLOW_ALL;
+import static org.neo4j.kernel.impl.util.StringLogger.DEV_NULL;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -36,7 +64,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
-
 import org.neo4j.graphdb.ResourceIterator;
 import org.neo4j.helpers.collection.Visitor;
 import org.neo4j.kernel.DefaultIdGeneratorFactory;
@@ -56,17 +83,18 @@ import org.neo4j.kernel.impl.core.CacheAccessBackDoor;
 import org.neo4j.kernel.impl.core.TransactionState;
 import org.neo4j.kernel.impl.locking.Lock;
 import org.neo4j.kernel.impl.locking.LockService;
-import org.neo4j.kernel.impl.nioneo.store.DefaultWindowPoolFactory;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.FileSystemAbstraction;
 import org.neo4j.kernel.impl.nioneo.store.IndexRule;
-import org.neo4j.kernel.impl.nioneo.store.NeoStore;
-import org.neo4j.kernel.impl.nioneo.store.NodeStore;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
+import org.neo4j.kernel.impl.nioneo.alt.NeoDynamicStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoSchemaStore;
+import org.neo4j.kernel.impl.nioneo.alt.NewDynamicRecordAllocator;
 import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
 import org.neo4j.kernel.impl.nioneo.store.Record;
 import org.neo4j.kernel.impl.nioneo.store.SchemaRule;
-import org.neo4j.kernel.impl.nioneo.store.SchemaStore;
 import org.neo4j.kernel.impl.nioneo.store.StoreFactory;
 import org.neo4j.kernel.impl.nioneo.xa.Command.PropertyCommand;
 import org.neo4j.kernel.impl.nioneo.xa.Command.SchemaRuleCommand;
@@ -76,26 +104,6 @@ import org.neo4j.kernel.impl.transaction.xaframework.XaCommand;
 import org.neo4j.kernel.impl.transaction.xaframework.XaLogicalLog;
 import org.neo4j.kernel.logging.SingleLoggingService;
 import org.neo4j.test.EphemeralFileSystemRule;
-
-import static org.hamcrest.Matchers.equalTo;
-import static org.junit.Assert.*;
-import static org.mockito.Matchers.any;
-import static org.mockito.Mockito.*;
-import static org.neo4j.helpers.collection.Iterables.count;
-import static org.neo4j.helpers.collection.IteratorUtil.asCollection;
-import static org.neo4j.helpers.collection.IteratorUtil.asSet;
-import static org.neo4j.helpers.collection.IteratorUtil.emptyIterator;
-import static org.neo4j.helpers.collection.IteratorUtil.first;
-import static org.neo4j.helpers.collection.MapUtil.stringMap;
-import static org.neo4j.kernel.api.index.NodePropertyUpdate.add;
-import static org.neo4j.kernel.api.index.NodePropertyUpdate.change;
-import static org.neo4j.kernel.api.index.NodePropertyUpdate.remove;
-import static org.neo4j.kernel.api.index.SchemaIndexProvider.NO_INDEX_PROVIDER;
-import static org.neo4j.kernel.impl.api.index.TestSchemaIndexProviderDescriptor.PROVIDER_DESCRIPTOR;
-import static org.neo4j.kernel.impl.nioneo.store.IndexRule.indexRule;
-import static org.neo4j.kernel.impl.nioneo.store.UniquenessConstraintRule.uniquenessConstraintRule;
-import static org.neo4j.kernel.impl.transaction.xaframework.InjectedTransactionValidator.ALLOW_ALL;
-import static org.neo4j.kernel.impl.util.StringLogger.DEV_NULL;
 
 public class WriteTransactionTest
 {
@@ -107,8 +115,8 @@ public class WriteTransactionTest
         // GIVEN
         WriteTransaction writeTransaction = newWriteTransaction( mockIndexing );
 
-        final long indexId = neoStore.getSchemaStore().nextId();
-        final long constraintId = neoStore.getSchemaStore().nextId();
+        final long indexId = neoStores.getSchemaStore().getIdGenerator().nextId();
+        final long constraintId = neoStores.getSchemaStore().getIdGenerator().nextId();
 
         writeTransaction.createSchemaRule( uniquenessConstraintRule( constraintId, 1, 1, indexId ) );
 
@@ -126,7 +134,7 @@ public class WriteTransactionTest
         WriteTransaction writeTransaction = newWriteTransaction( mockIndexing );
 
         // WHEN
-        final long ruleId = neoStore.getSchemaStore().nextId();
+        final long ruleId = neoStores.getSchemaStore().getIdGenerator().nextId();
         IndexRule schemaRule = indexRule( ruleId, 10, 8, PROVIDER_DESCRIPTOR );
         writeTransaction.createSchemaRule( schemaRule );
         writeTransaction.prepare();
@@ -140,13 +148,14 @@ public class WriteTransactionTest
     public void shouldRemoveSchemaRuleFromCacheWhenApplyingTransactionThatDeletesOne() throws Exception
     {
         // GIVEN
-        SchemaStore schemaStore = neoStore.getSchemaStore();
+        NeoSchemaStore schemaStore = neoStores.getSchemaStore();
         int labelId = 10, propertyKey = 10;
-        IndexRule rule = indexRule( schemaStore.nextId(), labelId, propertyKey, PROVIDER_DESCRIPTOR );
-        Collection<DynamicRecord> records = schemaStore.allocateFrom( rule );
+        IndexRule rule = indexRule( schemaStore.getIdGenerator().nextId(), labelId, propertyKey, PROVIDER_DESCRIPTOR );
+        Collection<DynamicRecord> records = NeoSchemaStore.allocateFrom( rule, 
+                schemaStore.getRecordStore(), new NewDynamicRecordAllocator( schemaStore, DynamicRecord.Type.UNKNOWN ) );
         for ( DynamicRecord record : records )
         {
-            schemaStore.writeToByteArray( record );
+            NeoDynamicStore.writeToByteArray( record ); //??? schemaStore.writeToByteArray( record );
         }
         long ruleId = first( records ).getId();
         WriteTransaction writeTransaction = newWriteTransaction( mockIndexing );
@@ -164,7 +173,7 @@ public class WriteTransactionTest
     public void shouldMarkDynamicLabelRecordsAsNotInUseWhenLabelsAreReInlined() throws Exception
     {
         // GIVEN
-        final long nodeId = neoStore.getNodeStore().nextId();
+        final long nodeId = neoStores.getNeoStore().getIdGenerator().nextId();
 
         // A transaction that creates labels that just barely fit to be inlined
         WriteTransaction writeTransaction = newWriteTransaction( mockIndexing );
@@ -217,7 +226,7 @@ public class WriteTransactionTest
     public void shouldReUseOriginalDynamicRecordWhenInlinedAndThenExpandedLabelsInSameTx() throws Exception
     {
         // GIVEN
-        final long nodeId = neoStore.getNodeStore().nextId();
+        final long nodeId = neoStores.getNodeStore().getIdGenerator().nextId();
 
         // A transaction that creates labels that just barely fit to be inlined
         WriteTransaction writeTransaction = newWriteTransaction( mockIndexing );
@@ -281,7 +290,7 @@ public class WriteTransactionTest
         WriteTransaction writeTransaction = newWriteTransaction( mockIndexing );
 
         // WHEN
-        final long ruleId = neoStore.getSchemaStore().nextId();
+        final long ruleId = neoStores.getSchemaStore().getIdGenerator().nextId();
         writeTransaction.createSchemaRule( indexRule( ruleId, 10, 7, PROVIDER_DESCRIPTOR ) );
         writeTransaction.prepare();
         writeTransaction.rollback();
@@ -580,17 +589,17 @@ public class WriteTransactionTest
         prepareAndCommitRecovered( tx );
 
         // THEN
-        assertEquals( "NodeStore", nodeId+1, neoStore.getNodeStore().getHighId() );
-        assertEquals( "DynamicNodeLabelStore", 2, neoStore.getNodeStore().getDynamicLabelStore().getHighId() );
-        assertEquals( "RelationshipStore", relId+1, neoStore.getRelationshipStore().getHighId() );
-        assertEquals( "RelationshipTypeStore", relationshipType+1, neoStore.getRelationshipTypeStore().getHighId() );
-        assertEquals( "RelationshipType NameStore", 2, neoStore.getRelationshipTypeStore().getNameStore().getHighId() );
-        assertEquals( "PropertyStore", 2, neoStore.getPropertyStore().getHighId() );
-        assertEquals( "PropertyStore DynamicStringStore", 2, neoStore.getPropertyStore().getStringStore().getHighId() );
-        assertEquals( "PropertyStore DynamicArrayStore", 2, neoStore.getPropertyStore().getArrayStore().getHighId() );
-        assertEquals( "PropertyIndexStore", propertyKeyId+1, neoStore.getPropertyStore().getPropertyKeyTokenStore().getHighId() );
-        assertEquals( "PropertyKeyToken NameStore", 2, neoStore.getPropertyStore().getPropertyKeyTokenStore().getNameStore().getHighId() );
-        assertEquals( "SchemaStore", ruleId+1, neoStore.getSchemaStore().getHighId() );
+        assertEquals( "NodeStore", nodeId+1, neoStores.getNodeStore().getIdGenerator().getHighId() );
+        assertEquals( "DynamicNodeLabelStore", 2, neoStores.getLabelStore().getIdGenerator().getHighId() );
+        assertEquals( "RelationshipStore", relId+1, neoStores.getRelationshipStore().getIdGenerator().getHighId() );
+        assertEquals( "RelationshipTypeStore", relationshipType+1, neoStores.getRelationshipTypeTokenStore().getIdGenerator().getHighId() );
+        assertEquals( "RelationshipType NameStore", 2, neoStores.getRelationshipTypeTokenNameStore().getIdGenerator().getHighId() );
+        assertEquals( "PropertyStore", 2, neoStores.getPropertyStore().getIdGenerator().getHighId() );
+        assertEquals( "PropertyStore DynamicStringStore", 2, neoStores.getStringStore().getIdGenerator().getHighId() );
+        assertEquals( "PropertyStore DynamicArrayStore", 2, neoStores.getArrayStore().getIdGenerator().getHighId() );
+        assertEquals( "PropertyIndexStore", propertyKeyId+1, neoStores.getPropertyKeyTokenStore().getIdGenerator().getHighId() );
+        assertEquals( "PropertyKeyToken NameStore", 2, neoStores.getPropertyKeyTokenNameStore().getIdGenerator().getHighId() );
+        assertEquals( "SchemaStore", ruleId+1, neoStores.getSchemaStore().getIdGenerator().getHighId() );
     }
 
     @Test
@@ -790,9 +799,8 @@ public class WriteTransactionTest
     private final Config config = new Config( stringMap() );
     @SuppressWarnings("deprecation")
     private final DefaultIdGeneratorFactory idGeneratorFactory = new DefaultIdGeneratorFactory();
-    private final DefaultWindowPoolFactory windowPoolFactory = new DefaultWindowPoolFactory();
-    private NeoStore neoStore;
     private LockService locks;
+    private FlatNeoStores neoStores;
     private CacheAccessBackDoor cacheAccessBackDoor;
     private final List<Lock> lockMocks = new ArrayList<>();
 
@@ -801,9 +809,9 @@ public class WriteTransactionTest
     {
         transactionState = TransactionState.NO_STATE;
         @SuppressWarnings("deprecation")
-        StoreFactory storeFactory = new StoreFactory( config, idGeneratorFactory, windowPoolFactory,
+        StoreFactory storeFactory = new StoreFactory( config, idGeneratorFactory,
                 fs.get(), DEV_NULL, new DefaultTxHook() );
-        neoStore = storeFactory.createNeoStore( new File( "neostore" ) );
+        neoStores = storeFactory.openNeoStore( "" );
         locks = mock( LockService.class, new Answer()
         {
             @Override
@@ -886,11 +894,17 @@ public class WriteTransactionTest
             RuntimeException> verifier )
     {
         VerifyingXaLogicalLog log = new VerifyingXaLogicalLog( fs.get(), verifier );
-        WriteTransaction result = new WriteTransaction( 0, 0l, log, transactionState, neoStore,
-                cacheAccessBackDoor, indexing, NO_LABEL_SCAN_STORE, new IntegrityValidator(neoStore, indexing ),
+
+        WriteTransaction result = new WriteTransaction( 0, 0l, log, transactionState, neoStores,
+                cacheAccessBackDoor, indexing, NO_LABEL_SCAN_STORE, new IntegrityValidator(neoStores, indexing ),
                 kernelTransaction, locks );
-        result.setCommitTxId( neoStore.getLastCommittedTx()+1 );
+        result.setCommitTxId( getLastCommittedTx()+1 );
         return result;
+    }
+    
+    private long getLastCommittedTx()
+    {
+        return NeoNeoStore.getLong( neoStores.getNeoStore().getRecordStore(), NeoNeoStore.LATEST_COMMITTED_TX_POSITION );
     }
 
     private class CapturingIndexingService extends IndexingService
@@ -901,7 +915,7 @@ public class WriteTransactionTest
         {
             super(  null,
                     new DefaultSchemaIndexProviderMap( NO_INDEX_PROVIDER ),
-                    new NeoStoreIndexStoreView( locks, neoStore ),
+                    new NeoStoreIndexStoreView( locks, neoStores ),
                     null,
                     new KernelSchemaStateStore(),
                     new SingleLoggingService( DEV_NULL )

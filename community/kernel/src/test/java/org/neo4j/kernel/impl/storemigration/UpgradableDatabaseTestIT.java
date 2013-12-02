@@ -54,14 +54,15 @@ public class UpgradableDatabaseTestIT
     {
         URL legacyStoreResource = getClass().getResource( "legacystore/exampledb/neostore" );
         File resourceDirectory = new File( legacyStoreResource.getFile() ).getParentFile();
-        File workingDirectory = new File( "target/" + UpgradableDatabaseTestIT.class.getSimpleName() );
+        String workingPath = "target/" + UpgradableDatabaseTestIT.class.getSimpleName();
+        File workingDirectory = new File( workingPath );
 
         FileUtils.deleteRecursively( workingDirectory );
         assertTrue( workingDirectory.mkdirs() );
 
         copyRecursively( resourceDirectory, workingDirectory );
 
-        assertTrue( new UpgradableDatabase(fileSystem).storeFilesUpgradeable( new File( workingDirectory, "neostore" ) ) );
+        assertTrue( new UpgradableDatabase(fileSystem).storeFilesUpgradeable( workingPath ) );
     }
 
     @Test
@@ -69,7 +70,8 @@ public class UpgradableDatabaseTestIT
     {
         URL legacyStoreResource = getClass().getResource( "legacystore/exampledb/neostore" );
         File resourceDirectory = new File( legacyStoreResource.getFile() ).getParentFile();
-        File workingDirectory = new File( "target/" + UpgradableDatabaseTestIT.class.getSimpleName() );
+        String workingPath = "target/" + UpgradableDatabaseTestIT.class.getSimpleName();
+        File workingDirectory = new File( workingPath );
 
         FileUtils.deleteRecursively( workingDirectory );
         assertTrue( workingDirectory.mkdirs() );
@@ -78,7 +80,7 @@ public class UpgradableDatabaseTestIT
 
         changeVersionNumber( fileSystem, new File( workingDirectory, "neostore.nodestore.db" ), "v0.9.5" );
 
-        assertFalse( new UpgradableDatabase(fileSystem).storeFilesUpgradeable( new File( workingDirectory, "neostore" ) ) );
+        assertFalse( new UpgradableDatabase(fileSystem).storeFilesUpgradeable( workingPath ) );
     }
 
     @Test
@@ -86,7 +88,8 @@ public class UpgradableDatabaseTestIT
     {
         URL legacyStoreResource = getClass().getResource( "legacystore/exampledb/neostore" );
         File resourceDirectory = new File( legacyStoreResource.getFile() ).getParentFile();
-        File workingDirectory = new File( "target/" + UpgradableDatabaseTestIT.class.getSimpleName() );
+        String workingPath = "target/" + UpgradableDatabaseTestIT.class.getSimpleName();
+        File workingDirectory = new File( workingPath );
 
         FileUtils.deleteRecursively( workingDirectory );
         assertTrue( workingDirectory.mkdirs() );
@@ -95,7 +98,7 @@ public class UpgradableDatabaseTestIT
 
         truncateFile( fileSystem, new File( workingDirectory, "neostore.nodestore.db" ), "StringPropertyStore " + LEGACY_VERSION );
 
-        assertFalse( new UpgradableDatabase(fileSystem).storeFilesUpgradeable( new File( workingDirectory, "neostore" ) ) );
+        assertFalse( new UpgradableDatabase(fileSystem).storeFilesUpgradeable( workingPath ) );
     }
 
     @Test
@@ -103,7 +106,8 @@ public class UpgradableDatabaseTestIT
     {
         URL legacyStoreResource = getClass().getResource( "legacystore/exampledb/neostore" );
         File resourceDirectory = new File( legacyStoreResource.getFile() ).getParentFile();
-        File workingDirectory = new File( "target/" + UpgradableDatabaseTestIT.class.getSimpleName() );
+        String workingPath = "target/" + UpgradableDatabaseTestIT.class.getSimpleName();
+        File workingDirectory = new File( workingPath );
 
         FileUtils.deleteRecursively( workingDirectory );
         assertTrue( workingDirectory.mkdirs() );
@@ -114,7 +118,7 @@ public class UpgradableDatabaseTestIT
         assertTrue( shortFileLength < UTF8.encode( "StringPropertyStore " + LEGACY_VERSION ).length );
         truncateToFixedLength( fileSystem, new File( workingDirectory, "neostore.relationshiptypestore.db" ), shortFileLength );
 
-        assertFalse( new UpgradableDatabase(fileSystem).storeFilesUpgradeable( new File( workingDirectory, "neostore" ) ) );
+        assertFalse( new UpgradableDatabase(fileSystem).storeFilesUpgradeable( workingPath ) );
     }
 
     private final FileSystemAbstraction fileSystem = new DefaultFileSystemAbstraction();
@@ -124,7 +128,8 @@ public class UpgradableDatabaseTestIT
     {
         URL legacyStoreResource = getClass().getResource( "legacystore/exampledb/neostore" );
         File resourceDirectory = new File( legacyStoreResource.getFile() ).getParentFile();
-        File workingDirectory = new File( "target/" + UpgradableDatabaseTestIT.class.getSimpleName() );
+        String workingPath = "target/" + UpgradableDatabaseTestIT.class.getSimpleName();
+        File workingDirectory = new File( workingPath );
 
         FileUtils.deleteRecursively( workingDirectory );
         assertTrue( workingDirectory.mkdirs() );
@@ -135,7 +140,7 @@ public class UpgradableDatabaseTestIT
 
         try
         {
-            new UpgradableDatabase( fileSystem ).checkUpgradeable( new File( workingDirectory, "neostore" ) );
+            new UpgradableDatabase( fileSystem ).checkUpgradeable( workingPath );
             fail( "should not have been able to upgrade" );
         }
         catch (StoreUpgrader.UnexpectedUpgradingStoreVersionException e)

@@ -13,6 +13,8 @@ public class PagedFileWithRecords implements RecordStore
     private final PageSynchronization pageReferenceSync;
     private volatile PageElement[] pages;
     private boolean closed = false;
+    
+    private long memoryToUse = 0;
 
     public PagedFileWithRecords( FileWithRecords fwr, int targetPageSize, PageType type, PageSynchronization refSync,
             long initialMemory )
@@ -29,7 +31,8 @@ public class PagedFileWithRecords implements RecordStore
         this.pageType = type;
         this.pageReferenceSync = refSync;
         this.pages = new PageElement[nrOfPages];
-        setupPages( initialMemory );
+        this.memoryToUse = initialMemory;
+        setupPages();
     }
 
     private PageElement getPageElement( long record )
@@ -37,9 +40,10 @@ public class PagedFileWithRecords implements RecordStore
         int element = (int) (record / pageSizeRecords);
         if ( element >= pages.length )
         {
-            expand( (int) (element * 1.1f) );
+            // if element == 1 pages array length has to be size 2
+            expand( (int) ((element+1) * 1.1f) );
         }
-        return pages[(int) (record / pageSizeRecords)];
+        return pages[element];
     }
 
     @Override
@@ -64,14 +68,14 @@ public class PagedFileWithRecords implements RecordStore
         }
     }
 
-    private void setupPages( long initalMemory )
+    private void setupPages()
     {
         long memoryUsed = 0;
         for ( int i = 0; i < pages.length; i++ )
         {
             long startRecord = i * pageSizeRecords;
             Page page = null;
-            if ( memoryUsed + pageSizeBytes <= initalMemory )
+            if ( memoryUsed + pageSizeBytes <= memoryToUse )
             {
                 try
                 {
@@ -80,7 +84,7 @@ public class PagedFileWithRecords implements RecordStore
                 catch ( UnableToMapPageException e )
                 {
                     // make sure we do not try to allocate more memory
-                    memoryUsed = initalMemory;
+                    memoryUsed = memoryToUse;
                     // log this somehow
                     // TODO:
                     System.out.println( fwr.getName() + " " + e.getMessage() );
@@ -139,10 +143,7 @@ public class PagedFileWithRecords implements RecordStore
     @Override
     public synchronized void close()
     {
-        if ( closed )
-        {
-            throw new UnderlyingStorageException( "Closed store " + fwr.getName() );
-        }
+        checkClosed();
         closed = true;
         nullPages();
         fwr.force();
@@ -151,18 +152,60 @@ public class PagedFileWithRecords implements RecordStore
     @Override
     public synchronized void force()
     {
-        if ( closed )
-        {
-            throw new UnderlyingStorageException( "Closed store " + fwr.getName() );
-        }
+        checkClosed();
         writeOutDirtyPages();
         fwr.force();
-        throw new UnsupportedOperationException( "Not implemented yet" );
     }
 
     private synchronized void expand( int nrOfPages )
     {
-        throw new UnsupportedOperationException( "Not implemented yet" );
+        if ( nrOfPages < 1 || nrOfPages < pages.length )
+        {
+            throw new IllegalStateException( "Unable to expand, to many pages? current page count=" + pages.length + " new page count=" + nrOfPages );
+        }
+        PageElement[] newPages = new PageElement[nrOfPages];
+        long memoryUsed = 0;
+        for ( int i = 0; i < pages.length; i++ )
+        {
+            if ( pages[i].isAllocated() )
+            {
+                memoryUsed += pageSizeBytes;
+            }
+            newPages[i] = pages[i];
+        }
+        for ( int i = pages.length; i < nrOfPages; i++ )
+        {
+            long startRecord = i * pageSizeRecords;
+            Page page = null;
+            if ( memoryUsed + pageSizeBytes <= memoryToUse )
+            {
+                try
+                {
+                    page = createPage( startRecord );
+                }
+                catch ( UnableToMapPageException e )
+                {
+                    // make sure we do not try to allocate more memory
+                    memoryUsed = memoryToUse;
+                    // log this somehow
+                    // TODO:
+                    System.out.println( fwr.getName() + " " + e.getMessage() );
+                }
+                memoryUsed += pageSizeBytes;
+            }
+            switch ( pageReferenceSync )
+            {
+            case ATOMIC:
+                newPages[i] = new AtomicPageElement( page );
+                break;
+            case NONE:
+                newPages[i] = new NoSyncPageElement( page );
+                break;
+            default:
+                throw new IllegalArgumentException( "Invalid page synchronization " + pageReferenceSync );
+            }
+        }
+        this.pages = newPages;
     }
 
     public long getNrOfRecords()
@@ -173,31 +216,27 @@ public class PagedFileWithRecords implements RecordStore
     @Override
     public synchronized void allocatePages( long amountBytes )
     {
-        if ( closed )
-        {
-            throw new UnderlyingStorageException( "Closed store " + fwr.getName() );
-        }
+        checkClosed();
+        memoryToUse += amountBytes;
         throw new UnsupportedOperationException( "Not implemented yet" );
     }
 
     @Override
     public synchronized void freePages( long amountBytes )
     {
-        if ( closed )
-        {
-            throw new UnderlyingStorageException( "Closed store " + fwr.getName() );
-        }
+        checkClosed();
         throw new UnsupportedOperationException( "Not implemented yet" );
+        // memoryToUse -= amountBytes;
     }
 
     @Override
     public synchronized void writeOutDirtyPages()
     {
-        if ( closed )
+        checkClosed();
+        for ( PageElement page : pages )
         {
-            throw new UnderlyingStorageException( "Closed store " + fwr.getName() );
+            page.force();
         }
-        throw new UnsupportedOperationException( "Not implemented yet" );
     }
 
     @Override
@@ -213,4 +252,13 @@ public class PagedFileWithRecords implements RecordStore
     {
         return fwr.getRecordSize();
     }
+
+    private void checkClosed()
+    {
+        if ( closed )
+        {
+            throw new UnderlyingStorageException( "Closed store " + fwr.getName() );
+        }
+    }
+
 }

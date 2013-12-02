@@ -67,7 +67,7 @@ public class PropertyBlock implements Cloneable
     {
         valueBlocks = new long[1];
         valueBlocks[0] = value;
-        valueRecords.clear();
+        // valueRecords.clear();
     }
 
     public void addValueRecord( DynamicRecord record )
@@ -124,7 +124,7 @@ public class PropertyBlock implements Cloneable
         assert ( blocks == null || blocks.length <= expectedPayloadSize) : (
                 "I was given an array of size " + blocks.length +", but I wanted it to be " + expectedPayloadSize );
         this.valueBlocks = blocks;
-        valueRecords.clear();
+        // valueRecords.clear();
     }
 
     /**

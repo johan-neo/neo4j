@@ -19,8 +19,6 @@
  */
 package org.neo4j.kernel.impl.storemigration;
 
-import static org.neo4j.kernel.impl.nioneo.store.CommonAbstractStore.buildTypeDescriptorAndVersion;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -30,14 +28,14 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.neo4j.helpers.UTF8;
-import org.neo4j.kernel.impl.nioneo.store.DynamicArrayStore;
-import org.neo4j.kernel.impl.nioneo.store.DynamicStringStore;
-import org.neo4j.kernel.impl.nioneo.store.NeoStore;
-import org.neo4j.kernel.impl.nioneo.store.NodeStore;
-import org.neo4j.kernel.impl.nioneo.store.PropertyKeyTokenStore;
-import org.neo4j.kernel.impl.nioneo.store.PropertyStore;
-import org.neo4j.kernel.impl.nioneo.store.RelationshipStore;
-import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeTokenStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyArrayStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNodeStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoRelationshipStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStringStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoTokenStore;
+import org.neo4j.kernel.impl.nioneo.store.StoreFactory;
 
 public class CurrentDatabase
 {
@@ -45,23 +43,23 @@ public class CurrentDatabase
 
     public CurrentDatabase()
     {
-        fileNamesToTypeDescriptors.put( NeoStore.DEFAULT_NAME, NeoStore.TYPE_DESCRIPTOR );
-        fileNamesToTypeDescriptors.put( "neostore.nodestore.db", NodeStore.TYPE_DESCRIPTOR );
-        fileNamesToTypeDescriptors.put( "neostore.propertystore.db", PropertyStore.TYPE_DESCRIPTOR );
-        fileNamesToTypeDescriptors.put( "neostore.propertystore.db.arrays", DynamicArrayStore.TYPE_DESCRIPTOR );
-        fileNamesToTypeDescriptors.put( "neostore.propertystore.db.index", PropertyKeyTokenStore.TYPE_DESCRIPTOR );
-        fileNamesToTypeDescriptors.put( "neostore.propertystore.db.index.keys", DynamicStringStore.TYPE_DESCRIPTOR );
-        fileNamesToTypeDescriptors.put( "neostore.propertystore.db.strings", DynamicStringStore.TYPE_DESCRIPTOR );
-        fileNamesToTypeDescriptors.put( "neostore.relationshipstore.db", RelationshipStore.TYPE_DESCRIPTOR );
-        fileNamesToTypeDescriptors.put( "neostore.relationshiptypestore.db", RelationshipTypeTokenStore.TYPE_DESCRIPTOR );
-        fileNamesToTypeDescriptors.put( "neostore.relationshiptypestore.db.names", DynamicStringStore.TYPE_DESCRIPTOR );
+        fileNamesToTypeDescriptors.put( StoreFactory.NEO_STORE_NAME, NeoNeoStore.TYPE_DESCRIPTOR );
+        fileNamesToTypeDescriptors.put( StoreFactory.NODE_STORE_NAME, NeoNodeStore.TYPE_DESCRIPTOR );
+        fileNamesToTypeDescriptors.put( StoreFactory.PROPERTY_STORE_NAME, NeoPropertyStore.TYPE_DESCRIPTOR );
+        fileNamesToTypeDescriptors.put( StoreFactory.PROPERTY_ARRAYS_STORE_NAME, NeoPropertyArrayStore.TYPE_DESCRIPTOR );
+        fileNamesToTypeDescriptors.put( StoreFactory.PROPERTY_KEY_TOKEN_STORE_NAME, NeoTokenStore.PROPERTY_KEY_TOKEN_TYPE_DESCRIPTOR );
+        fileNamesToTypeDescriptors.put( StoreFactory.PROPERTY_KEY_TOKEN_NAMES_STORE_NAME, NeoPropertyStringStore.TYPE_DESCRIPTOR );
+        fileNamesToTypeDescriptors.put( StoreFactory.PROPERTY_STRINGS_STORE_NAME, NeoPropertyStringStore.TYPE_DESCRIPTOR );
+        fileNamesToTypeDescriptors.put( StoreFactory.RELATIONSHIP_STORE_NAME, NeoRelationshipStore.TYPE_DESCRIPTOR );
+        fileNamesToTypeDescriptors.put( StoreFactory.RELATIONSHIP_TYPE_TOKEN_STORE_NAME, NeoTokenStore.RELATIONSHIP_TYPE_TOKEN_TYPE_DESCRIPTOR );
+        fileNamesToTypeDescriptors.put( StoreFactory.RELATIONSHIP_TYPE_TOKEN_NAMES_STORE_NAME, NeoPropertyStringStore.TYPE_DESCRIPTOR );
     }
 
     public boolean storeFilesAtCurrentVersion( File storeDirectory )
     {
         for ( String fileName : fileNamesToTypeDescriptors.keySet() )
         {
-            String expectedVersion = buildTypeDescriptorAndVersion( fileNamesToTypeDescriptors.get( fileName ) );
+            String expectedVersion = NeoNeoStore.buildTypeDescriptorAndVersion( fileNamesToTypeDescriptors.get( fileName ) );
             FileChannel fileChannel = null;
             byte[] expectedVersionBytes = UTF8.encode( expectedVersion );
             try

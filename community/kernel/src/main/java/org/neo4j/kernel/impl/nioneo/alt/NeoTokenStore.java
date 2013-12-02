@@ -19,19 +19,22 @@
  */
 package org.neo4j.kernel.impl.nioneo.alt;
 
+import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.LinkedList;
 
+import org.neo4j.kernel.IdType;
 import org.neo4j.kernel.impl.core.Token;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.InvalidRecordException;
 import org.neo4j.kernel.impl.nioneo.store.Record;
+import org.neo4j.kernel.impl.nioneo.store.StoreFactory;
 import org.neo4j.kernel.impl.nioneo.store.TokenRecord;
 
 /**
  * Implementation of the property store.
  */
-public class NeoTokenStore
+public class NeoTokenStore extends Store
 {
     // Historical type descriptor, should be called PropertyKeyTokenStore
     public static final String PROPERTY_KEY_TOKEN_TYPE_DESCRIPTOR = "PropertyIndexStore";
@@ -43,15 +46,21 @@ public class NeoTokenStore
     public static final String RELATIONSHIP_TYPE_TOKEN_TYPE_DESCRIPTOR = "RelationshipTypeStore";
     public static final int RELATIONSHIP_TYPE_TOKEN_RECORD_SIZE = 1/*inUse*/ + 4/*nameId*/;
     
+    public static final int NAME_STORE_BLOCK_SIZE = 30;
     
+    public NeoTokenStore( StoreParameter po, String fileName, IdType idType, String typeDescriptor, int recordSize )
+    {
+        super( new File( po.path, fileName ), po.config, idType, po.idGeneratorFactory, 
+                po.fileSystemAbstraction, po.stringLogger, typeDescriptor, false, recordSize );
+    }
+   
     public static Token[] getTokens( RecordStore tokenStore, RecordStore tokenStringStore, int maxCount )
     {
         LinkedList<Token> recordList = new LinkedList<>();
-        long maxIdInUse = tokenStore.getHighestPossibleIdInUse();
-        int found = 0;
-        for ( int i = 0; i <= maxIdInUse && found < maxCount; i++ )
+        for ( int i = 0; i < maxCount; i++ )
         {
-            byte[] data = tokenStore.getRecord( i );
+            byte[] data;
+            data = tokenStore.getRecord( i );
             ByteBuffer buffer = ByteBuffer.wrap( data );
             boolean inUse = buffer.get() == Record.IN_USE.byteValue();
             if ( !inUse )
@@ -65,7 +74,7 @@ public class NeoTokenStore
                 buffer.getInt();
             }
             long stringNameId = buffer.getInt();
-            String name = NeoStringStore.decodeString( NeoDynamicStore.readByteArray( tokenStringStore, stringNameId ) );
+            String name = NeoPropertyStringStore.decodeString( NeoDynamicStore.readByteArray( tokenStringStore, stringNameId, DynamicRecord.Type.STRING ) );
             recordList.add( new Token( name, i ) );
         }
         return recordList.toArray( new Token[recordList.size()] );
@@ -88,7 +97,7 @@ public class NeoTokenStore
             buffer.getInt();
         }
         long stringNameId = buffer.getInt();
-        String name = NeoStringStore.decodeString( NeoDynamicStore.readByteArray( tokenStringStore, stringNameId ) );
+        String name = NeoPropertyStringStore.decodeString( NeoDynamicStore.readByteArray( tokenStringStore, stringNameId, DynamicRecord.Type.STRING ) );
         return new Token( name, id );
     }
 

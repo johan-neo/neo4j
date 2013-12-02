@@ -25,10 +25,10 @@ import java.util.concurrent.Callable;
 import org.neo4j.kernel.api.properties.DefinedProperty;
 import org.neo4j.kernel.api.properties.Property;
 import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
-import org.neo4j.kernel.impl.nioneo.alt.NeoArrayStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyArrayStore;
 import org.neo4j.kernel.impl.nioneo.alt.NeoDynamicStore;
 import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStore;
-import org.neo4j.kernel.impl.nioneo.alt.NeoStringStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStringStore;
 import org.neo4j.kernel.impl.nioneo.alt.RecordStore;
 
 /**
@@ -213,8 +213,8 @@ public enum PropertyType
             {
                 return null;
             }
-            byte[] byteArray = NeoDynamicStore.readByteArray( stringStore, block.getSingleValueLong() );
-            return NeoStringStore.decodeString( byteArray ); 
+            byte[] byteArray = NeoDynamicStore.readByteArray( stringStore, block.getSingleValueLong(), DynamicRecord.Type.STRING );
+            return NeoPropertyStringStore.decodeString( byteArray ); 
         }
     },
     ARRAY( 10 )
@@ -239,8 +239,8 @@ public enum PropertyType
             {
                 return null;
             }
-            byte[] byteArray = NeoDynamicStore.readByteArray( arrayStore, block.getSingleValueLong() );
-            return NeoArrayStore.getRightArray( byteArray ); 
+            byte[] byteArray = NeoDynamicStore.readByteArray( arrayStore, block.getSingleValueLong(), DynamicRecord.Type.ARRAY );
+            return NeoPropertyArrayStore.getRightArray( byteArray ); 
         }
     },
     SHORT_STRING( 11 )
@@ -288,7 +288,7 @@ public enum PropertyType
     private final int type;
 
     // TODO In wait of a better place
-    private static int payloadSize = PropertyStore.DEFAULT_PAYLOAD_SIZE;
+    private static int payloadSize = NeoPropertyStore.DEFAULT_PAYLOAD_SIZE;
 
     PropertyType( int type )
     {

@@ -23,7 +23,7 @@ class AtomicPageElement implements PageElement
         do
         {
             pageReadFrom = page.get();
-            if ( page != null )
+            if ( pageReadFrom != null )
             {
                 data = pageReadFrom.readRecord( record );
             }
@@ -90,5 +90,11 @@ class AtomicPageElement implements PageElement
         {
             oldPage.force();
         }
+    }
+
+    @Override
+    public boolean isAllocated()
+    {
+        return page.get() != null;
     }
 }

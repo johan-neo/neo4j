@@ -26,6 +26,7 @@ import org.neo4j.kernel.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.DefaultTxHook;
 import org.neo4j.kernel.GraphDatabaseAPI;
 import org.neo4j.kernel.configuration.Config;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
 import org.neo4j.kernel.impl.transaction.XaDataSourceManager;
 import org.neo4j.kernel.impl.util.StringLogger;
 
@@ -41,58 +42,26 @@ import static org.neo4j.helpers.Settings.osIsWindows;
  */
 public class StoreAccess
 {
-    // Top level stores
-    private final OldRecordStore<DynamicRecord> schemaStore;
-    private final OldRecordStore<NodeRecord> nodeStore;
-    private final OldRecordStore<RelationshipRecord> relStore;
-    private final OldRecordStore<RelationshipTypeTokenRecord> relationshipTypeTokenStore;
-    private final OldRecordStore<LabelTokenRecord> labelTokenStore;
-    private final OldRecordStore<DynamicRecord> nodeDynamicLabelStore;
-    private final OldRecordStore<PropertyRecord> propStore;
-    // Transitive stores
-    private final OldRecordStore<DynamicRecord> stringStore, arrayStore;
-    private final OldRecordStore<PropertyKeyTokenRecord> propertyKeyTokenStore;
-    private final OldRecordStore<DynamicRecord> relationshipTypeNameStore;
-    private final OldRecordStore<DynamicRecord> labelNameStore;
-    private final OldRecordStore<DynamicRecord> propertyKeyNameStore;
     // internal state
     private boolean closeable;
-    private NeoStore neoStore;
+    // private NeoStore neoStore;
+    
+    private FlatNeoStores neoStores;
 
     public StoreAccess( GraphDatabaseAPI graphdb )
     {
-        this( getNeoStoreFrom( graphdb ) );
+        this( getFlatNeoStoreFrom( graphdb ) );
     }
 
     @SuppressWarnings( "deprecation" )
-    private static NeoStore getNeoStoreFrom( GraphDatabaseAPI graphdb )
+    private static FlatNeoStores getFlatNeoStoreFrom( GraphDatabaseAPI graphdb )
     {
-        return graphdb.getDependencyResolver().resolveDependency( XaDataSourceManager.class ).getNeoStoreDataSource().getNeoStore();
+        return graphdb.getDependencyResolver().resolveDependency( XaDataSourceManager.class ).getNeoStoreDataSource().getNeoStores();
     }
 
-    public StoreAccess( NeoStore store )
+    public StoreAccess( FlatNeoStores stores )
     {
-        this( store.getSchemaStore(), store.getNodeStore(), store.getRelationshipStore(), store.getPropertyStore(),
-                store.getRelationshipTypeStore(), store.getLabelTokenStore() );
-        this.neoStore = store;
-    }
-
-    public StoreAccess( SchemaStore schemaStore, NodeStore nodeStore, RelationshipStore relStore, PropertyStore propStore,
-                        RelationshipTypeTokenStore typeStore, LabelTokenStore labelTokenStore )
-    {
-        this.schemaStore = wrapStore( schemaStore );
-        this.nodeStore = wrapStore( nodeStore );
-        this.relStore = wrapStore( relStore );
-        this.propStore = wrapStore( propStore );
-        this.stringStore = wrapStore( propStore.getStringStore() );
-        this.arrayStore = wrapStore( propStore.getArrayStore() );
-        this.relationshipTypeTokenStore = wrapStore( typeStore );
-        this.labelTokenStore = wrapStore( labelTokenStore );
-        this.nodeDynamicLabelStore = wrapStore( wrapNodeDynamicLabelStore( nodeStore.getDynamicLabelStore() ) );
-        this.propertyKeyTokenStore = wrapStore( propStore.getPropertyKeyTokenStore() );
-        this.relationshipTypeNameStore = wrapStore( typeStore.getNameStore() );
-        this.labelNameStore = wrapStore( labelTokenStore.getNameStore() );
-        this.propertyKeyNameStore = wrapStore( propStore.getPropertyKeyTokenStore().getNameStore() );
+        this.neoStores = stores;
     }
 
     public StoreAccess( String path )
@@ -114,9 +83,8 @@ public class StoreAccess
     {
         this( new StoreFactory( new Config( requiredParams( params, path ) ),
                                 new DefaultIdGeneratorFactory(),
-                                new DefaultWindowPoolFactory(),
                                 fileSystem, StringLogger.DEV_NULL,
-                                new DefaultTxHook() ).attemptNewNeoStore( new File( path, "neostore" ) ) );
+                                new DefaultTxHook() ).attemptNewFlatNeoStores( path ) );
         this.closeable = true;
     }
 
@@ -127,12 +95,12 @@ public class StoreAccess
         return params;
     }
 
-    public NeoStore getRawNeoStore()
+    public FlatNeoStores getRawFlatNeoStores()
     {
-        return neoStore;
+        return neoStores;
     }
-
-    public OldRecordStore<DynamicRecord> getSchemaStore()
+    
+/*    public OldRecordStore<DynamicRecord> getSchemaStore()
     {
         return schemaStore;
     }
@@ -239,14 +207,14 @@ public class StoreAccess
     protected <R extends AbstractBaseRecord> OldRecordStore<R> wrapStore( OldRecordStore<R> store )
     {
         return store;
-    }
+    } 
 
     @SuppressWarnings("unchecked")
     protected <FAILURE extends Exception> void apply( OldRecordStore.Processor<FAILURE> processor, OldRecordStore<?> store )
             throws FAILURE
     {
         processor.applyFiltered( store, OldRecordStore.IN_USE );
-    }
+    } */
 
     private static Map<String, String> defaultParams()
     {
@@ -265,14 +233,14 @@ public class StoreAccess
         }
         params.put( GraphDatabaseSettings.rebuild_idgenerators_fast.name(), Settings.TRUE );
         return params;
-    }
+    } 
 
     public synchronized void close()
     {
         if ( closeable )
         {
             closeable = false;
-            neoStore.close();
+            neoStores.close();
         }
     }
 }

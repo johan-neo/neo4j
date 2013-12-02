@@ -43,11 +43,11 @@ public class UpgradableDatabase
         this.fs = fs;
     }
 
-    public boolean storeFilesUpgradeable( File neoStoreFile )
+    public boolean storeFilesUpgradeable( String path )
     {
         try
 		{
-            checkUpgradeable( neoStoreFile );
+            checkUpgradeable( path );
             return true;
         }
 		catch ( StoreUpgrader.UnableToUpgradeException e )
@@ -56,9 +56,9 @@ public class UpgradableDatabase
         }
     }
 
-    public void checkUpgradeable( File neoStoreFile )
+    public void checkUpgradeable( String path )
     {
-        File storeDirectory = neoStoreFile.getParentFile();
+        File storeDirectory = new File( path ); // neoStoreFile.getParentFile();
         for ( StoreFile store : StoreFile.legacyStoreFiles() )
         {
             String expectedVersion = store.legacyVersion();

@@ -40,10 +40,10 @@ import org.neo4j.kernel.DefaultIdGeneratorFactory;
 import org.neo4j.kernel.DefaultTxHook;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.core.Token;
-import org.neo4j.kernel.impl.nioneo.store.DefaultWindowPoolFactory;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoTokenStore;
 import org.neo4j.kernel.impl.nioneo.store.FileSystemAbstraction;
-import org.neo4j.kernel.impl.nioneo.store.NeoStore;
-import org.neo4j.kernel.impl.nioneo.store.PropertyKeyTokenStore;
 import org.neo4j.kernel.impl.nioneo.store.PropertyType;
 import org.neo4j.kernel.impl.nioneo.store.StoreFactory;
 import org.neo4j.kernel.impl.storemigration.legacystore.LegacyStore;
@@ -67,16 +67,16 @@ public class StoreMigratorIT
         // GIVEN
         LegacyStore legacyStore = new LegacyStore( fs,
                 new File( getClass().getResource( "legacystore/exampledb/neostore" ).getFile() ) );
-        NeoStore neoStore = storeFactory.createNeoStore( storeFileName );
+        FlatNeoStores neoStores = storeFactory.openNeoStore( storeDir );
 
         // WHEN
-        new StoreMigrator( monitor ).migrate( legacyStore, neoStore );
+        new StoreMigrator( monitor ).migrate( legacyStore, neoStores );
         legacyStore.close();
         
         // THEN
-        neoStore = storeFactory.newNeoStore( storeFileName );
-        verifyNeoStore( neoStore );
-        neoStore.close();
+        neoStores = storeFactory.openNeoStore( storeDir );
+        verifyNeoStore( neoStores );
+        neoStores.close();
 
         assertEquals( 100, monitor.events.size() );
         assertTrue( monitor.started );
@@ -102,11 +102,12 @@ public class StoreMigratorIT
         // that should be merged in the store migration
         LegacyStore legacyStore = new LegacyStore( fs,
                 new File( getClass().getResource( "legacystore/propkeydupdb/neostore" ).getFile() ) );
-        NeoStore neoStore = storeFactory.createNeoStore( storeFileName );
+        FlatNeoStores neoStores = storeFactory.openNeoStore( storeDir );
 
         // WHEN
-        new StoreMigrator( monitor ).migrate( legacyStore, neoStore );
+        new StoreMigrator( monitor ).migrate( legacyStore, neoStores );
         legacyStore.close();
+        neoStores.close();
 
         // THEN
         // verify that the "name" property for both the involved nodes
@@ -125,10 +126,9 @@ public class StoreMigratorIT
         
         // THEN
         // verify that there are no duplicate keys in the store
-        PropertyKeyTokenStore tokenStore =
-                storeFactory.newPropertyKeyTokenStore( new File( storeFileName + PROPERTY_KEY_TOKEN_STORE_NAME ) );
-        Token[] tokens = tokenStore.getTokens( MAX_VALUE );
-        tokenStore.close();
+        neoStores = storeFactory.openNeoStore( storeDir );
+        Token[] tokens = NeoTokenStore.getTokens( neoStores.getPropertyKeyTokenStore().getRecordStore(), 
+                neoStores.getPropertyKeyTokenNameStore().getRecordStore(), MAX_VALUE ); 
         assertNuDuplicates( tokens );
     }
     
@@ -166,25 +166,25 @@ public class StoreMigratorIT
     private final String storeDir = TargetDirectory.forTest( getClass() ).graphDbDir( true ).getAbsolutePath();
     private final ListAccumulatorMigrationProgressMonitor monitor = new ListAccumulatorMigrationProgressMonitor();
     private StoreFactory storeFactory;
-    private File storeFileName;
+    // private File storeFileName;
     
     @Before
     public void setUp()
     {
         Config config = MigrationTestUtils.defaultConfig();
-        File outputDir = new File( storeDir );
-        storeFileName = new File( outputDir, NeoStore.DEFAULT_NAME );
+        // File outputDir = new File( storeDir );
+        // storeFileName = new File( outputDir, NeoStore.DEFAULT_NAME );
         storeFactory = new StoreFactory( config, new DefaultIdGeneratorFactory(),
-                new DefaultWindowPoolFactory(), fs, StringLogger.DEV_NULL, new DefaultTxHook() );
+                fs, StringLogger.DEV_NULL, new DefaultTxHook() );
     }
 
-    private void verifyNeoStore( NeoStore neoStore )
+    private void verifyNeoStore( FlatNeoStores neoStores )
     {
-        assertEquals( 1317392957120l, neoStore.getCreationTime() );
-        assertEquals( -472309512128245482l, neoStore.getRandomNumber() );
-        assertEquals( 1l, neoStore.getVersion() );
-        assertEquals( NeoStore.ALL_STORES_VERSION, NeoStore.versionLongToString( neoStore.getStoreVersion() ) );
-        assertEquals( 1004l, neoStore.getLastCommittedTx() );
+        assertEquals( 1317392957120l, NeoNeoStore.getLong( neoStores.getNeoStore().getRecordStore(), NeoNeoStore.TIME_POSITION ) );
+        assertEquals( -472309512128245482l, NeoNeoStore.getLong( neoStores.getNeoStore().getRecordStore(), NeoNeoStore.RANDOM_POSITION )  );
+        assertEquals( 1l, NeoNeoStore.getLong( neoStores.getNeoStore().getRecordStore(), NeoNeoStore.LOG_VERSION_POSITION ) );
+        assertEquals( NeoNeoStore.ALL_STORES_VERSION, NeoNeoStore.versionLongToString( NeoNeoStore.getLong( neoStores.getNeoStore().getRecordStore(), NeoNeoStore.STORE_VERSION_POSITION ) ) );
+        assertEquals( 1004l, NeoNeoStore.getLong( neoStores.getNeoStore().getRecordStore(), NeoNeoStore.LATEST_COMMITTED_TX_POSITION ) );
     }
 
     private static class DatabaseContentVerifier

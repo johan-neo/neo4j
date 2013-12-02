@@ -58,17 +58,19 @@ public class XaFactory
         this.pruneStrategy = pruneStrategy;
     }
 
-    public XaContainer newXaContainer( XaDataSource xaDataSource, File logicalLog, XaCommandFactory cf,
+    public XaContainer newXaContainer( XaDataSource xaDataSource, String path, XaCommandFactory cf,
                                        InjectedTransactionValidator injectedTxValidator, XaTransactionFactory tf,
                                        TransactionStateFactory stateFactory, TransactionInterceptorProviders providers,
                                        boolean readOnly )
     {
-        if ( logicalLog == null || cf == null || tf == null )
+        if ( path == null || cf == null || tf == null )
         {
             throw new IllegalArgumentException( "Null parameter, "
-                    + "LogicalLog[" + logicalLog + "] CommandFactory[" + cf
+                    + "Path[" + path + "] CommandFactory[" + cf
                     + "TransactionFactory[" + tf + "]" );
         }
+
+        File logicalLog = new File( path, XaLogicalLog.DEFAULT_FILE_PREFIX );
 
         // TODO The dependencies between XaRM, LogicalLog and XaTF should be resolved to avoid the setter
         XaResourceManager rm = new XaResourceManager( xaDataSource, tf, txIdGenerator, txManager, recoveryVerifier, logicalLog.getName() );
