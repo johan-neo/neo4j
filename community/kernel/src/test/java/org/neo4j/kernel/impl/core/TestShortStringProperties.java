@@ -29,6 +29,7 @@ import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.Relationship;
 import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
 import org.neo4j.kernel.impl.nioneo.store.TestShortString;
+import org.neo4j.kernel.impl.nioneo.xa.NeoStoreXaDataSource;
 import org.neo4j.kernel.impl.transaction.XaDataSourceManager;
 import org.neo4j.test.DatabaseRule;
 import org.neo4j.test.GraphTransactionRule;
@@ -212,27 +213,14 @@ public class TestShortStringProperties extends TestShortString
     private long propertyRecordsInUse()
     {
         FlatNeoStores neoStores = 
-                graphdb.getGraphDatabaseAPI().getXaDataSourceManager().getNeoStoreDataSource().getNeoStores();
+                graphdb.getGraphDatabaseAPI().getDependencyResolver().resolveDependency( NeoStoreXaDataSource.class ).getNeoStores();
         return neoStores.getPropertyStore().getIdGenerator().getNumberOfIdsInUse();
     }
 
     private long dynamicRecordsInUse()
     {
-        try
-        {
-            return ( (AbstractDynamicStore) storeField.get( propertyStore() ) ).getNumberOfIdsInUse();
-        }
-        catch ( Exception e )
-        {
-            throw new RuntimeException( e );
-        }
-    }
-
-    private PropertyStore propertyStore()
-    {
-        XaDataSourceManager dsMgr = graphdb.getGraphDatabaseAPI().getDependencyResolver()
-                .resolveDependency( XaDataSourceManager.class );
-        FlatNeoStores neoStores = dsMgr.getNeoStoreDataSource().getNeoStores();
+        FlatNeoStores neoStores = 
+                graphdb.getGraphDatabaseAPI().getDependencyResolver().resolveDependency( NeoStoreXaDataSource.class ).getNeoStores();
         return neoStores.getStringStore().getIdGenerator().getNumberOfIdsInUse();
     }
 }

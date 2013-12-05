@@ -75,14 +75,14 @@ public class NeoStoreIndexStoreView implements IndexStoreView
     public <FAILURE extends Exception> StoreScan<FAILURE> visitNodesWithPropertyAndLabel(
             IndexDescriptor descriptor, final Visitor<NodePropertyUpdate, FAILURE> visitor )
     {
-<       final int soughtLabelId = descriptor.getLabelId();
+        final int soughtLabelId = descriptor.getLabelId();
         final int soughtPropertyKeyId = descriptor.getPropertyKeyId();
         return new NodeStoreScan<NodePropertyUpdate, FAILURE>()
         {
             @Override
             protected NodePropertyUpdate read( NodeRecord node )
             {
-                long[] labels = parseLabelsField( node ).get( nodeStore );
+                long[] labels = parseLabelsField( node ).get( neoStores.getLabelStore() );
                 if ( !containsLabel( soughtLabelId, labels ) )
                 {
                     return null;
@@ -127,7 +127,7 @@ public class NeoStoreIndexStoreView implements IndexStoreView
             @Override
             protected Update read( NodeRecord node )
             {
-                long[] labels = parseLabelsField( node ).get( nodeStore );
+                long[] labels = parseLabelsField( node ).get( neoStores.getLabelStore() );
                 Update update = new Update( node.getId(), labels );
                 if ( !containsAnyLabel( labelIds, labels ) )
                 {
@@ -218,11 +218,25 @@ public class NeoStoreIndexStoreView implements IndexStoreView
         return updates;
     }
 
-    private Object valueOf( PropertyBlock property )
+    private Object valueOf( PropertyBlock block )
     {
-        // Make sure the value is loaded, even if it's of a "heavy" kind.
-        propertyStore.ensureHeavy( property );
-        return property.getType().getValue( property, propertyStore );
+        // propertyStore.ensureHeavy( property );
+        if ( block == null )
+        {
+            return null;
+        }
+        if ( block.getType() == PropertyType.STRING )
+        {
+            return block.getType().getValue( block, neoStores.getStringStore().getRecordStore() );
+        }
+        else if ( block.getType() == PropertyType.ARRAY )
+        {
+            return block.getType().getValue( block, neoStores.getArrayStore().getRecordStore() );
+        }
+        else
+        {
+            return block.getType().getValue( block, null );           
+        }
     }
 
     private Iterable<PropertyBlock> properties( final NodeRecord node )
@@ -297,7 +311,7 @@ public class NeoStoreIndexStoreView implements IndexStoreView
             }
             else
             {
-                records = propertyStore.getPropertyRecordChain( firstPropertyId ).iterator();
+                records = NeoPropertyStore.getPropertyRecordChain( neoStores.getPropertyStore().getRecordStore(), firstPropertyId ).iterator();
             }
         }
 
@@ -330,7 +344,7 @@ public class NeoStoreIndexStoreView implements IndexStoreView
         @Override
         public void run() throws FAILURE
         {
-            PrimitiveLongIterator nodeIds = new StoreIdIterator( nodeStore );
+            PrimitiveLongIterator nodeIds = new StoreIdIterator( neoStores.getNodeStore().getRecordStore() );
             continueScanning = true;
             while ( continueScanning && nodeIds.hasNext() )
             {
@@ -338,7 +352,8 @@ public class NeoStoreIndexStoreView implements IndexStoreView
                 RESULT result = null;
                 try ( Lock ignored = locks.acquireNodeLock( id, LockService.LockType.READ_LOCK ) )
                 {
-                    NodeRecord record = nodeStore.forceGetRecord( id );
+                    byte[] data = neoStores.getNodeStore().getRecordStore().getRecord( id );
+                    NodeRecord record = NeoNodeStore.getRecord( id, data, RecordLoad.FORCE );
                     if ( record.inUse() )
                     {
                         result = read( record );

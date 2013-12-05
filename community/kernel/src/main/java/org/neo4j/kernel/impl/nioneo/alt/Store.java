@@ -9,7 +9,7 @@ import org.neo4j.kernel.impl.nioneo.store.FileSystemAbstraction;
 import org.neo4j.kernel.impl.nioneo.store.IdGenerator;
 import org.neo4j.kernel.impl.util.StringLogger;
 
-class Store
+public class Store
 {
     private final StoreLoader storeLoader;
     private final IdGenerator idGenerator;

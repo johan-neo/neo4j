@@ -1072,14 +1072,11 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
     private final void execute( boolean removeFromCache, Collection<PropertyCommand> propCommands, Collection<RelationshipCommand> relCommands, 
             Collection<NodeCommand> nodeCommands, Mode mode )
     {
-        if ( command.getMode() == CREATE )
-        {
-            lockEntity( lockGroup, command );
-        }
         for ( PropertyCommand propCommand : propCommands )
         {
             if ( propCommand.getMode() == mode )
             {
+                // lockEntity( lockGroup, propCommand );
                 propCommand.execute( neoStores.getPropertyStore(), neoStores.getStringStore(), neoStores.getArrayStore() );
                 if ( !isRecovered() )
                 {
@@ -1132,10 +1129,6 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
         {
             if ( relCommand.getMode() == mode )
             {
-                if ( command.getMode() == UPDATE )
-                {
-                    lockEntity( lockGroup, command );
-                }
                 relCommand.execute( neoStores.getRelationshipStore() );
                 if ( mode == Mode.DELETE && !isRecovered() )
                 {
@@ -1151,16 +1144,7 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
         {
             if ( nodeCommand.getMode() == mode )
             {
-                if ( command.getMode() == DELETE )
-                {
-                /*
-                 * We always update the disk image and then always invalidate the cache. In the case of relationships
-                 * this is expected to also patch the relChainPosition in the start and end NodeImpls (if they actually
-                 * are in cache).
-                 */
-                    lockEntity( lockGroup, command );
-                    command.removeFromCache( cacheAccess );
-                }
+                // lockEntity( lockGroup, nodeCommand );
                 nodeCommand.execute( neoStores.getNodeStore(), neoStores.getLabelStore() );
                 if ( mode == Mode.DELETE && !isRecovered() )
                 {

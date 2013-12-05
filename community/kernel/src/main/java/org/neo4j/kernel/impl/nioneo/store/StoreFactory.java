@@ -276,6 +276,11 @@ public class StoreFactory
         createEmptyDynamicStore(path, PROPERTY_STRINGS_STORE_NAME, blockSize, NeoPropertyStringStore.VERSION, idType);
     }
 
+    public void createDynamicArrayStore( String path, String name, int blockSize)
+    {
+        createEmptyDynamicStore( path, name, blockSize, NeoPropertyArrayStore.VERSION, IdType.ARRAY_BLOCK);
+    }
+    
     public void createDynamicArrayStore( String path, int blockSize)
     {
         createEmptyDynamicStore( path, PROPERTY_ARRAYS_STORE_NAME, blockSize, NeoPropertyArrayStore.VERSION, IdType.ARRAY_BLOCK);
@@ -308,6 +313,11 @@ public class StoreFactory
     public void createEmptyDynamicStore( String path, String name, int baseBlockSize,
                                             String typeAndVersionDescriptor, IdType idType)
     {
+        if ( path == null || name == null )
+        {
+            throw new IllegalArgumentException( "path=" + path + " name=" + name );
+        }
+            
         File fileName = new File( path, name );
         int blockSize = baseBlockSize;
         if ( fileSystemAbstraction.fileExists( fileName ) )
@@ -356,6 +366,10 @@ public class StoreFactory
 
     public void createEmptyStore( String path, String name, String typeAndVersionDescriptor)
     {
+        if ( path == null || name == null )
+        {
+            throw new IllegalArgumentException( "path=" + path + " file=" + name );
+        }
         File fileName = new File( path, name );
         // sanity checks
         if ( fileSystemAbstraction.fileExists( fileName ) )

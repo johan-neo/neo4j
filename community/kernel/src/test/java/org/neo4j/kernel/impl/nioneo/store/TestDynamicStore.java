@@ -122,8 +122,14 @@ public class TestDynamicStore
 
     private void createEmptyStore( File fileName, int blockSize )
     {
+        String parent = null, name = null;
+        if ( fileName != null )
+        {
+            parent = fileName.getParent();
+            name = fileName.getName();
+        }
         new StoreFactory( config(), ID_GENERATOR_FACTORY, fs.get(),
-                StringLogger.DEV_NULL, null ).createDynamicArrayStore( fileName, blockSize );
+                StringLogger.DEV_NULL, null ).createDynamicArrayStore( parent, name, blockSize );
     }
 
     private Store newStore()

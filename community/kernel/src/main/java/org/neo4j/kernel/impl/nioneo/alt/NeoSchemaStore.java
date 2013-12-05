@@ -122,7 +122,7 @@ public class NeoSchemaStore extends Store
         return readSchemaRule( id, records, new byte[ BLOCK_SIZE * 4 ] );
     }
 
-    private static SchemaRule readSchemaRule( long id, Collection<DynamicRecord> records, byte[] buffer )
+    public static SchemaRule readSchemaRule( long id, Collection<DynamicRecord> records, byte[] buffer )
             throws MalformedSchemaRuleException
     {
         ByteBuffer scratchBuffer = NeoDynamicStore.concatData( records, buffer );

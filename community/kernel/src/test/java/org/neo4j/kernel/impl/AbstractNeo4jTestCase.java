@@ -39,6 +39,7 @@ import org.neo4j.graphdb.Transaction;
 import org.neo4j.kernel.GraphDatabaseAPI;
 import org.neo4j.kernel.impl.core.NodeManager;
 import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
+import org.neo4j.kernel.impl.nioneo.xa.NeoStoreXaDataSource;
 import org.neo4j.kernel.impl.util.FileUtils;
 import org.neo4j.test.TestGraphDatabaseFactory;
 
@@ -247,6 +248,6 @@ public abstract class AbstractNeo4jTestCase
     
     public FlatNeoStores getFlatNeoStore()
     {
-       return graphDb.getXaDataSourceManager().getNeoStoreDataSource().getNeoStores();
+       return getGraphDbAPI().getDependencyResolver().resolveDependency( NeoStoreXaDataSource.class ).getNeoStores();
     }
 }

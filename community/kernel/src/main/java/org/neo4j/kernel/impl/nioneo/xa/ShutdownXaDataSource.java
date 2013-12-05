@@ -27,7 +27,6 @@ import org.neo4j.graphdb.DatabaseShutdownException;
 import org.neo4j.graphdb.ResourceIterator;
 import org.neo4j.helpers.Pair;
 import org.neo4j.kernel.configuration.Config;
-import org.neo4j.kernel.impl.api.SchemaCache;
 import org.neo4j.kernel.impl.api.index.IndexingService;
 import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
 import org.neo4j.kernel.impl.nioneo.store.StoreId;

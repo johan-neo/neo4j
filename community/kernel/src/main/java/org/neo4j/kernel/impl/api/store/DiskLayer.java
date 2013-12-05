@@ -19,6 +19,12 @@
  */
 package org.neo4j.kernel.impl.api.store;
 
+import static org.neo4j.helpers.collection.Iterables.filter;
+import static org.neo4j.helpers.collection.Iterables.map;
+import static org.neo4j.helpers.collection.IteratorUtil.emptyPrimitiveIntIterator;
+import static org.neo4j.kernel.impl.nioneo.store.labels.NodeLabelsField.parseLabelsField;
+import static org.neo4j.kernel.impl.util.IoPrimitiveUtils.safeCastLongToInt;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
@@ -31,7 +37,6 @@ import org.neo4j.helpers.Predicate;
 import org.neo4j.helpers.Predicates;
 import org.neo4j.helpers.collection.IteratorUtil;
 import org.neo4j.kernel.api.EntityType;
-import org.neo4j.kernel.impl.api.KernelStatement;
 import org.neo4j.kernel.api.StatementConstants;
 import org.neo4j.kernel.api.constraints.UniquenessConstraint;
 import org.neo4j.kernel.api.exceptions.EntityNotFoundException;
@@ -41,37 +46,36 @@ import org.neo4j.kernel.api.exceptions.RelationshipTypeIdNotFoundKernelException
 import org.neo4j.kernel.api.exceptions.index.IndexNotFoundKernelException;
 import org.neo4j.kernel.api.exceptions.schema.SchemaRuleNotFoundException;
 import org.neo4j.kernel.api.exceptions.schema.TooManyLabelsException;
+import org.neo4j.kernel.api.index.IndexDescriptor;
 import org.neo4j.kernel.api.index.IndexReader;
 import org.neo4j.kernel.api.index.InternalIndexState;
 import org.neo4j.kernel.api.properties.DefinedProperty;
-import org.neo4j.kernel.api.index.IndexDescriptor;
+import org.neo4j.kernel.impl.api.KernelStatement;
 import org.neo4j.kernel.impl.api.index.IndexingService;
 import org.neo4j.kernel.impl.core.LabelTokenHolder;
 import org.neo4j.kernel.impl.core.PropertyKeyTokenHolder;
 import org.neo4j.kernel.impl.core.RelationshipTypeTokenHolder;
 import org.neo4j.kernel.impl.core.Token;
 import org.neo4j.kernel.impl.core.TokenNotFoundException;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNodeStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoRelationshipStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoSchemaStore;
 import org.neo4j.kernel.impl.nioneo.store.IndexRule;
 import org.neo4j.kernel.impl.nioneo.store.InvalidRecordException;
-import org.neo4j.kernel.impl.nioneo.store.NeoStore;
-import org.neo4j.kernel.impl.nioneo.store.NodeStore;
+import org.neo4j.kernel.impl.nioneo.store.NeoStoreRecord;
+import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PrimitiveRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
-import org.neo4j.kernel.impl.nioneo.store.PropertyStore;
-import org.neo4j.kernel.impl.nioneo.store.RelationshipStore;
 import org.neo4j.kernel.impl.nioneo.store.SchemaRule;
 import org.neo4j.kernel.impl.nioneo.store.SchemaStorage;
 import org.neo4j.kernel.impl.nioneo.store.UnderlyingStorageException;
 import org.neo4j.kernel.impl.nioneo.store.UniquenessConstraintRule;
 import org.neo4j.kernel.impl.util.PrimitiveIntIterator;
 import org.neo4j.kernel.impl.util.PrimitiveLongIterator;
-
-import static org.neo4j.helpers.collection.Iterables.filter;
-import static org.neo4j.helpers.collection.Iterables.map;
-import static org.neo4j.helpers.collection.IteratorUtil.emptyPrimitiveIntIterator;
-import static org.neo4j.kernel.impl.nioneo.store.labels.NodeLabelsField.parseLabelsField;
-import static org.neo4j.kernel.impl.util.IoPrimitiveUtils.safeCastLongToInt;
 
 public class DiskLayer
 {
@@ -94,28 +98,22 @@ public class DiskLayer
     private final LabelTokenHolder labelTokenHolder;
     private final RelationshipTypeTokenHolder relationshipTokenHolder;
 
-    private final NeoStore neoStore;
+    private final FlatNeoStores neoStores;
     private final IndexingService indexService;
-    private final NodeStore nodeStore;
-    private final RelationshipStore relationshipStore;
-    private final PropertyStore propertyStore;
     private final SchemaStorage schemaStorage;
 
     public DiskLayer( PropertyKeyTokenHolder propertyKeyTokenHolder, LabelTokenHolder labelTokenHolder,
                       RelationshipTypeTokenHolder relationshipTokenHolder, SchemaStorage schemaStorage,
-                      NeoStore neoStore, IndexingService indexService )
+                      FlatNeoStores neoStores, IndexingService indexService )
     {
         this.relationshipTokenHolder = relationshipTokenHolder;
         this.schemaStorage = schemaStorage;
-        assert neoStore != null : "No neoStore provided";
+        assert neoStores != null : "No neoStore provided";
 
         this.indexService = indexService;
         this.propertyKeyTokenHolder = propertyKeyTokenHolder;
         this.labelTokenHolder = labelTokenHolder;
-        this.neoStore = neoStore;
-        this.nodeStore = neoStore.getNodeStore();
-        this.relationshipStore = neoStore.getRelationshipStore();
-        this.propertyStore = neoStore.getPropertyStore();
+        this.neoStores = neoStores;
     }
 
     public int labelGetOrCreateForName( String label ) throws TooManyLabelsException
@@ -166,7 +164,9 @@ public class DiskLayer
     {
         try
         {
-            final long[] labels = parseLabelsField( nodeStore.getRecord( nodeId ) ).get( nodeStore );
+            byte[] data = neoStores.getNodeStore().getRecordStore().getRecord( nodeId );
+            NodeRecord nodeRecord = NeoNodeStore.getRecord( nodeId, data );
+            final long[] labels = parseLabelsField( nodeRecord ).get( neoStores.getLabelStore() );
             return new PrimitiveIntIterator()
             {
                 private int cursor;
@@ -298,7 +298,7 @@ public class DiskLayer
 
     private Iterator<IndexDescriptor> getIndexDescriptorsFor( Predicate<SchemaRule> filter )
     {
-        Iterator<SchemaRule> filtered = filter( filter, neoStore.getSchemaStore().loadAllSchemaRules() );
+        Iterator<SchemaRule> filtered = filter( filter, NeoSchemaStore.loadAllSchemaRules( neoStores.getSchemaStore() ) );
 
         return map( new Function<SchemaRule, IndexDescriptor>()
         {
@@ -408,7 +408,8 @@ public class DiskLayer
     {
         try
         {
-            return loadAllPropertiesOf( nodeStore.getRecord( nodeId ) );
+            byte[] data = neoStores.getNodeStore().getRecordStore().getRecord( nodeId );
+            return loadAllPropertiesOf( NeoNodeStore.getRecord( nodeId, data ) );
         }
         catch ( InvalidRecordException e )
         {
@@ -422,7 +423,8 @@ public class DiskLayer
     {
         try
         {
-            return loadAllPropertiesOf( relationshipStore.getRecord( relationshipId ) );
+            byte[] data = neoStores.getRelationshipStore().getRecordStore().getRecord( relationshipId );
+            return loadAllPropertiesOf( NeoRelationshipStore.getRecord( relationshipId, data ) );
         }
         catch ( InvalidRecordException e )
         {
@@ -433,7 +435,10 @@ public class DiskLayer
     
     public Iterator<DefinedProperty> graphGetAllProperties()
     {
-        return loadAllPropertiesOf( neoStore.asRecord() );
+        NeoStoreRecord record = new NeoStoreRecord();
+        long nextProp = NeoNeoStore.getLong( neoStores.getNeoStore().getRecordStore(), NeoNeoStore.NEXT_GRAPH_PROP_POSITION );
+        record.setNextProp( nextProp );
+        return loadAllPropertiesOf( record );
     }
 
     
@@ -455,7 +460,8 @@ public class DiskLayer
 
     private Iterator<DefinedProperty> loadAllPropertiesOf( PrimitiveRecord primitiveRecord )
     {
-        Collection<PropertyRecord> records = propertyStore.getPropertyRecordChain( primitiveRecord.getNextProp() );
+        Collection<PropertyRecord> records = NeoPropertyStore.getPropertyRecordChain( 
+                neoStores.getPropertyStore().getRecordStore(), primitiveRecord.getNextProp() );
         if ( null == records )
         {
             return IteratorUtil.emptyIterator();
@@ -465,7 +471,7 @@ public class DiskLayer
         {
             for ( PropertyBlock block : record.getPropertyBlocks() )
             {
-                properties.add( block.getType().readProperty( block.getKeyIndexId(), block, propertyStore ) );
+                properties.add( block.getType().readProperty( block.getKeyIndexId(), block, neoStores ) );
             }
         }
         return properties.iterator();

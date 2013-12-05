@@ -46,27 +46,27 @@ public class TestStore
     public static FileSystemAbstraction FILE_SYSTEM =
             new DefaultFileSystemAbstraction();
 
-    private File path()
+    private String path()
     {
         String path = AbstractNeo4jTestCase.getStorePath( "teststore" );
         File file = new File( path );
         file.mkdirs();
-        return file;
+        return file.getPath();
     }
 
-    private File file( String name )
+//    private File file( String name )
+//    {
+//        return new File( path() , name);
+//    }
+
+    private String storeFile()
     {
-        return new File( path() , name);
+        return "testStore.db";
     }
 
-    private File storeFile()
+    private String storeIdFile()
     {
-        return file( "testStore.db" );
-    }
-
-    private File storeIdFile()
-    {
-        return file( "testStore.db.id" );
+        return "testStore.db.id";
     }
 
     @Test
@@ -76,16 +76,16 @@ public class TestStore
         {
             try
             {
-                StoreHolder.createStore( null );
+                StoreHolder.createStore( null, null );
                 fail( "Null fileName should throw exception" );
             }
             catch ( IllegalArgumentException e )
             { // good
             }
-            StoreHolder store = StoreHolder.createStore( storeFile() );
+            StoreHolder store = StoreHolder.createStore( path(), storeFile() );
             try
             {
-                StoreHolder.createStore( storeFile() );
+                StoreHolder.createStore( path(), storeFile() );
                 fail( "Creating existing store should throw exception" );
             }
             catch ( IllegalStateException e )
@@ -101,12 +101,12 @@ public class TestStore
 
     private void deleteBothFiles()
     {
-        File file = storeFile();
+        File file = new File( path(), storeFile() );
         if ( file.exists() )
         {
             assertTrue( file.delete() );
         }
-        file = storeIdFile();
+        file = new File( path(), storeIdFile() );
         if ( file.exists() )
         {
             assertTrue( file.delete() );
@@ -118,13 +118,18 @@ public class TestStore
     {
         try
         {
-            StoreHolder.createStore( storeFile() ).close();
-            java.nio.channels.FileChannel fileChannel = new java.io.RandomAccessFile(
-                    storeFile(), "rw" ).getChannel();
+            StoreHolder.createStore( path(), storeFile() ).close();
+            java.nio.channels.FileChannel fileChannel = new java.io.RandomAccessFile( 
+                    new File( path(), storeFile() ), "rw" ).getChannel();
             fileChannel.truncate( fileChannel.size() - 2 );
             fileChannel.close();
-            StoreHolder store = new StoreHolder( storeFile() );
+            StoreHolder store = new StoreHolder( new File( path(), storeFile() ) );
             store.close();
+            fail( "Should throw exception" );
+        }
+        catch ( NotCurrentStoreVersionException e )
+        {
+            // good
         }
         finally
         {
@@ -137,7 +142,7 @@ public class TestStore
     {
         try
         {
-            StoreHolder store = StoreHolder.createStore( storeFile() );
+            StoreHolder store = StoreHolder.createStore( path(), storeFile() );
             store.close();
         }
         finally
@@ -171,13 +176,13 @@ public class TestStore
             return TYPE_DESCRIPTOR;
         }
 
-        public static StoreHolder createStore( File fileName ) throws IOException
+        public static StoreHolder createStore( String path, String name ) throws IOException
         {
             new StoreFactory( new Config( Collections.<String, String>emptyMap(), GraphDatabaseSettings.class ),
                     ID_GENERATOR_FACTORY,
                     FILE_SYSTEM, StringLogger.DEV_NULL, null ).
-                    createEmptyStore( fileName, NeoNeoStore.buildTypeDescriptorAndVersion( TYPE_DESCRIPTOR ) );
-            return new StoreHolder( fileName );
+                    createEmptyStore( path, name, NeoNeoStore.buildTypeDescriptorAndVersion( TYPE_DESCRIPTOR ) );
+            return new StoreHolder( new File( path, name ) );
         }
 
         public void close()

@@ -91,6 +91,7 @@ import org.neo4j.kernel.impl.nioneo.alt.NeoDynamicStore;
 import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
 import org.neo4j.kernel.impl.nioneo.alt.NeoSchemaStore;
 import org.neo4j.kernel.impl.nioneo.alt.NewDynamicRecordAllocator;
+import org.neo4j.kernel.impl.nioneo.store.IdGenerator;
 import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
 import org.neo4j.kernel.impl.nioneo.store.Record;
@@ -727,15 +728,15 @@ public class WriteTransactionTest
     public void shouldLockUpdatedNodes() throws Exception
     {
         // given
-        NodeStore nodeStore = neoStore.getNodeStore();
+        IdGenerator nodeStoreIdGenerator = neoStores.getNodeStore().getIdGenerator();
         long[] nodes = { // allocate ids
-                nodeStore.nextId(),
-                nodeStore.nextId(),
-                nodeStore.nextId(),
-                nodeStore.nextId(),
-                nodeStore.nextId(),
-                nodeStore.nextId(),
-                nodeStore.nextId(),
+                nodeStoreIdGenerator.nextId(),
+                nodeStoreIdGenerator.nextId(),
+                nodeStoreIdGenerator.nextId(),
+                nodeStoreIdGenerator.nextId(),
+                nodeStoreIdGenerator.nextId(),
+                nodeStoreIdGenerator.nextId(),
+                nodeStoreIdGenerator.nextId(),
         };
         // create the node records that we will modify in our main tx.
         {

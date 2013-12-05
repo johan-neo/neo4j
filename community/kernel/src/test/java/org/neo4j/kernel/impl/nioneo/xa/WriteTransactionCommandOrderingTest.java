@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.Test;
-
 import org.neo4j.kernel.impl.api.KernelTransactionImplementation;
 import org.neo4j.kernel.impl.api.index.IndexingService;
 import org.neo4j.kernel.impl.core.CacheAccessBackDoor;
@@ -33,6 +32,7 @@ import org.neo4j.kernel.impl.core.TransactionState;
 import org.neo4j.kernel.impl.locking.LockService;
 import org.neo4j.kernel.impl.nioneo.xa.WriteTransaction;
 import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
 import org.neo4j.kernel.impl.nioneo.store.AbstractBaseRecord;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
@@ -164,7 +164,9 @@ public class WriteTransactionCommandOrderingTest
                 store, mock( CacheAccessBackDoor.class ), mock( IndexingService.class ),
                 WriteTransactionTest.NO_LABEL_SCAN_STORE, mock( IntegrityValidator.class ),
                 mock( KernelTransactionImplementation.class ), mock( LockService.class, RETURNS_MOCKS ) );
-        tx.setCommitTxId( store.getLastCommittedTx() + 1 );
+        byte[] data = store.getNeoStore().getRecordStore().getRecord( NeoNeoStore.LATEST_COMMITTED_TX_POSITION );
+        long txId = NeoNeoStore.getLong( data );
+        tx.setCommitTxId( txId + 1 );
         return tx;
     }
 

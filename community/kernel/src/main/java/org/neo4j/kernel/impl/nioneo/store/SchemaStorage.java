@@ -204,8 +204,8 @@ public class SchemaStorage implements SchemaRuleAccess
                 while ( currentId <= highestId )
                 {
                     long id = currentId++;
-                    byte[] data = new byte[schemaStore.getRecordStore().getRecordSize()];
-                    DynamicRecord record = NeoDynamicStore.getRecord( id, schemaStore.getRecordStore().getRecord( id ), RecordLoad.FORCE, DynamicRecord.Type.UNKNOWN );
+                    byte[] data = schemaStore.getRecordStore().getRecord( id );
+                    DynamicRecord record = NeoDynamicStore.getRecord( id, data, RecordLoad.FORCE, DynamicRecord.Type.UNKNOWN );
                     if ( record.inUse() && record.isStartRecord() )
                     {
                         try
@@ -246,7 +246,7 @@ public class SchemaStorage implements SchemaRuleAccess
         {
             throw new MalformedSchemaRuleException( e.getMessage(), e );
         }
-        return SchemaStore.readSchemaRule( id, records, buffer );
+        return NeoSchemaStore.readSchemaRule( id, records, buffer );
     }
 
     public long newRuleId()

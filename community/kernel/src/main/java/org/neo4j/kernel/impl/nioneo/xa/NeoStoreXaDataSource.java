@@ -79,6 +79,7 @@ import org.neo4j.kernel.impl.nioneo.store.IndexRule;
 import org.neo4j.kernel.impl.nioneo.store.PropertyKeyTokenRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
 import org.neo4j.kernel.impl.nioneo.store.SchemaRule;
+import org.neo4j.kernel.impl.nioneo.store.SchemaStorage;
 import org.neo4j.kernel.impl.nioneo.store.StoreFactory;
 import org.neo4j.kernel.impl.nioneo.store.StoreId;
 import org.neo4j.kernel.impl.persistence.IdGenerationFailedException;
@@ -691,7 +692,7 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
 
     private Iterator<IndexRule> loadIndexRules()
     {
-        return new SchemaStorage( neoStore.getSchemaStore() ).allIndexRules();
+        return new SchemaStorage( neoStores.getSchemaStore() ).allIndexRules();
     }
 
     @Override

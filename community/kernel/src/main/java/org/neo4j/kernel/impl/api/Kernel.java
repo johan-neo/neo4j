@@ -242,7 +242,7 @@ public class Kernel extends LifecycleAdapter implements KernelAPI
     {
         // Bottom layer: Read-access to committed data
         StoreReadLayer storeLayer = new CacheLayer( new DiskLayer( propertyKeyTokenHolder, labelTokenHolder,
-                relationshipTypeTokenHolder, new SchemaStorage( neoStore.getSchemaStore() ), neoStore,
+                relationshipTypeTokenHolder, new SchemaStorage( neoStores.getSchemaStore() ), neoStores,
                 indexService ), persistenceCache, indexService, schemaCache );;
 
         // + Transaction state handling

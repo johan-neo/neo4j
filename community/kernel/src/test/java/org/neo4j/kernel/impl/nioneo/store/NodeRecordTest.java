@@ -62,11 +62,12 @@ public class NodeRecordTest
         // Given
         NodeRecord node = new NodeRecord( 1, -1, -1 );
         long inlinedLabels = 12l;
-        DynamicRecord dynamic1 = dynamicRecord( 1l, true );
-        DynamicRecord dynamic2 = dynamicRecord( 2l, true );
-        DynamicRecord dynamic3 = dynamicRecord( 3l, true );
+        DynamicRecord dynamic1 = dynamicRecord( 1l, true, DynamicRecord.Type.UNKNOWN );
+        DynamicRecord dynamic2 = dynamicRecord( 2l, true, DynamicRecord.Type.UNKNOWN );
+        DynamicRecord dynamic3 = dynamicRecord( 3l, true, DynamicRecord.Type.UNKNOWN );
 
-        node.setLabelField( inlinedLabels, asList( dynamic1, dynamic2, dynamic3 ) );
+        node.setLabelField( inlinedLabels );
+        node.addLabelDynamicRecords( asList( dynamic1, dynamic2, dynamic3 ) );
 
         dynamic3.setInUse( false );
 
