@@ -347,8 +347,8 @@ public class TestXa
     private NeoStoreXaDataSource newNeoStore() throws IOException
     {
         final Config config = new Config( MapUtil.stringMap(
-                        InternalAbstractGraphDatabase.Configuration.store_dir.name(), path().getPath(),
-                        file( LOGICAL_LOG_DEFAULT_NAME ).getPath() ), GraphDatabaseSettings.class );
+                        InternalAbstractGraphDatabase.Configuration.store_dir.name(), path().getPath() /*,
+                        file( LOGICAL_LOG_DEFAULT_NAME ).getPath()*/ ), GraphDatabaseSettings.class );
 
         StoreFactory sf = new StoreFactory( config, new DefaultIdGeneratorFactory(), 
                 fileSystem, StringLogger.DEV_NULL, null );
@@ -588,8 +588,8 @@ public class TestXa
         xaRes.end( xid, XAResource.TMSUCCESS );
         xaRes.prepare( xid );
         xaCon.clearAllTransactions();
-        ds.stop();
-        deleteLogicalLogIfExist();
+        // ds.stop();
+        // deleteLogicalLogIfExist();
     }
 
     private Object loadNodeProperty( WriteTransaction writeTransaction, long node, final long propertyKeyId )

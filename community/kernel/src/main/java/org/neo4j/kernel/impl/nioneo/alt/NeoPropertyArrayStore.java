@@ -26,6 +26,7 @@ import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 
 import org.neo4j.helpers.Pair;
@@ -57,7 +58,8 @@ public class NeoPropertyArrayStore extends Store
                 po.fileSystemAbstraction, po.stringLogger, TYPE_DESCRIPTOR, true, NeoPropertyStore.DEFAULT_DATA_BLOCK_SIZE );
     }
     
-    public static Collection<DynamicRecord> allocateFromNumbers( Object array, Collection<DynamicRecord> recordsToUseFirst,
+    
+     public static Collection<DynamicRecord> allocateFromNumbers( Object array, Collection<DynamicRecord> recordsToUseFirst,
                                                                  DynamicRecordAllocator recordAllocator )
     {
         Class<?> componentType = array.getClass().getComponentType();

@@ -291,14 +291,21 @@ public class NeoPropertyStore extends Store
             {
                 return;
             }
+            NewDynamicRecordAllocator allocator = new NewDynamicRecordAllocator( neoStores.getArrayStore(), DynamicRecord.Type.ARRAY );
+            Collection<DynamicRecord> arrayRecords = null;
+            Class<?> type = value.getClass().getComponentType();
+            if ( type.equals( String.class ) )
+            {
+                arrayRecords = NeoPropertyArrayStore.allocateFromString( (String[]) value, Collections.<DynamicRecord>emptyList(), allocator );
+            }
+            else
+            {
+                arrayRecords = NeoPropertyArrayStore.allocateFromNumbers( value, Collections.<DynamicRecord>emptyList(), allocator );
+            }
 
-            // Fall back to dynamic array store
-            Collection<DynamicRecord> arrayRecords = NeoPropertyArrayStore.allocateFromNumbers( value, Collections.<DynamicRecord>emptyList(), 
-                    new NewDynamicRecordAllocator( neoStores.getArrayStore(), DynamicRecord.Type.ARRAY ) );
             setSingleBlockValue( block, keyId, PropertyType.ARRAY, first( arrayRecords ).getId() );
             for ( DynamicRecord valueRecord : arrayRecords )
             {
-//                valueRecord.setType( PropertyType.ARRAY.intValue() );
                 block.addValueRecord( valueRecord );
             }
         }

@@ -26,12 +26,12 @@ import java.util.Set;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.mockito.InOrder;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
-
 import org.neo4j.graphdb.DynamicLabel;
 import org.neo4j.graphdb.Label;
 import org.neo4j.graphdb.Node;
@@ -116,6 +116,7 @@ public class NeoStoreIndexStoreViewTest
         assertEquals( emptySetOf( NodePropertyUpdate.class ), visitor.getUpdates() );
     }
 
+    @Ignore
     @Test
     public void shouldLockNodesWhileReadingThem() throws Exception
     {

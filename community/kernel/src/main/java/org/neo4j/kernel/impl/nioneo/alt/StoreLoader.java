@@ -397,7 +397,12 @@ public class StoreLoader
             LinkedList<Long> freeIdList = new LinkedList<Long>();
             if ( fullRebuild )
             {
-                for ( long i = 0; i * recordSize < fileSize && recordSize > 0; i++ )
+                long start = 0;
+                if ( isDynamic )
+                {
+                    start = 1;
+                }
+                for ( long i = start; i * recordSize < fileSize && recordSize > 0; i++ )
                 {
                     fileChannel.position( i * recordSize );
                     byteBuffer.clear();
@@ -443,8 +448,13 @@ public class StoreLoader
         int recordSize = getRecordSize();
         long fileSize = fileChannel.size();
         long highId = fileSize / recordSize;
+        long end = 0;
+        if ( isDynamic )
+        {
+            end = 1;
+        }
         ByteBuffer byteBuffer = ByteBuffer.allocate( getRecordSize() );
-        for ( long i = highId; i > 0; i-- )
+        for ( long i = highId; i > end; i-- )
         {
             fileChannel.position( i * recordSize );
             if ( fileChannel.read( byteBuffer ) > 0 )
@@ -473,7 +483,7 @@ public class StoreLoader
     
     public void writeTypeAndVersion()
     {
-        boolean success = false;
+        boolean success = isReadOnly();
         IOException storedIoe = null;
         // hack for WINBLOWS
         if ( !isReadOnly() || isBackupSlave() )

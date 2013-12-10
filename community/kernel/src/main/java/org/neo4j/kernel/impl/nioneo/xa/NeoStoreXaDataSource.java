@@ -673,7 +673,8 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
     @Override
     public boolean setRecovered( boolean recovered )
     {
-        throw new RuntimeException( "Not implemented yet" );
+        return false;
+//        throw new RuntimeException( "Not implemented yet" );
 //        boolean currentValue = neoStore.isInRecoveryMode();
 //        neoStore.setRecoveredStatus( true );
 //        return currentValue;
