@@ -19,6 +19,14 @@
  */
 package org.neo4j.unsafe.batchinsert;
 
+import static java.lang.Boolean.parseBoolean;
+import static org.neo4j.graphdb.DynamicLabel.label;
+import static org.neo4j.helpers.collection.Iterables.map;
+import static org.neo4j.helpers.collection.IteratorUtil.asPrimitiveIterator;
+import static org.neo4j.helpers.collection.IteratorUtil.iterator;
+import static org.neo4j.kernel.impl.nioneo.store.labels.NodeLabelsField.parseLabelsField;
+import static org.neo4j.kernel.impl.util.IoPrimitiveUtils.safeCastLongToInt;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -34,7 +42,6 @@ import java.util.Set;
 
 import org.neo4j.graphdb.DependencyResolver;
 import org.neo4j.graphdb.Label;
-import org.neo4j.graphdb.NotFoundException;
 import org.neo4j.graphdb.RelationshipType;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.graphdb.schema.ConstraintCreator;
@@ -61,7 +68,6 @@ import org.neo4j.kernel.api.index.NodePropertyUpdate;
 import org.neo4j.kernel.api.index.SchemaIndexProvider;
 import org.neo4j.kernel.api.labelscan.LabelScanStore;
 import org.neo4j.kernel.api.labelscan.NodeLabelUpdate;
-import org.neo4j.kernel.api.properties.DefinedProperty;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.extension.KernelExtensionFactory;
 import org.neo4j.kernel.extension.KernelExtensions;
@@ -80,31 +86,27 @@ import org.neo4j.kernel.impl.coreapi.schema.PropertyUniqueConstraintDefinition;
 import org.neo4j.kernel.impl.index.IndexStore;
 import org.neo4j.kernel.impl.locking.LockService;
 import org.neo4j.kernel.impl.locking.ReentrantLockService;
-import org.neo4j.kernel.impl.nioneo.store.DefaultWindowPoolFactory;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
+import org.neo4j.kernel.impl.nioneo.alt.NeoDynamicStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoNodeStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoRelationshipStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoSchemaStore;
+import org.neo4j.kernel.impl.nioneo.alt.NeoTokenStore;
+import org.neo4j.kernel.impl.nioneo.alt.NewDynamicRecordAllocator;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.FileSystemAbstraction;
 import org.neo4j.kernel.impl.nioneo.store.IdGeneratorImpl;
 import org.neo4j.kernel.impl.nioneo.store.IndexRule;
 import org.neo4j.kernel.impl.nioneo.store.InvalidRecordException;
-import org.neo4j.kernel.impl.nioneo.store.LabelTokenRecord;
-import org.neo4j.kernel.impl.nioneo.store.LabelTokenStore;
-import org.neo4j.kernel.impl.nioneo.store.NeoStore;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
-import org.neo4j.kernel.impl.nioneo.store.NodeStore;
 import org.neo4j.kernel.impl.nioneo.store.PrimitiveRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
-import org.neo4j.kernel.impl.nioneo.store.PropertyKeyTokenRecord;
-import org.neo4j.kernel.impl.nioneo.store.PropertyKeyTokenStore;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
-import org.neo4j.kernel.impl.nioneo.store.PropertyStore;
 import org.neo4j.kernel.impl.nioneo.store.PropertyType;
 import org.neo4j.kernel.impl.nioneo.store.Record;
 import org.neo4j.kernel.impl.nioneo.store.RelationshipRecord;
-import org.neo4j.kernel.impl.nioneo.store.RelationshipStore;
-import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeTokenRecord;
-import org.neo4j.kernel.impl.nioneo.store.RelationshipTypeTokenStore;
 import org.neo4j.kernel.impl.nioneo.store.SchemaRule;
-import org.neo4j.kernel.impl.nioneo.store.SchemaStore;
 import org.neo4j.kernel.impl.nioneo.store.StoreFactory;
 import org.neo4j.kernel.impl.nioneo.store.UnderlyingStorageException;
 import org.neo4j.kernel.impl.nioneo.store.UniquenessConstraintRule;
@@ -118,25 +120,14 @@ import org.neo4j.kernel.lifecycle.LifeSupport;
 import org.neo4j.kernel.logging.Logging;
 import org.neo4j.kernel.logging.SingleLoggingService;
 
-import static java.lang.Boolean.parseBoolean;
-
-import static org.neo4j.graphdb.DynamicLabel.label;
-import static org.neo4j.helpers.collection.Iterables.map;
-import static org.neo4j.helpers.collection.IteratorUtil.asPrimitiveIterator;
-import static org.neo4j.helpers.collection.IteratorUtil.first;
-import static org.neo4j.helpers.collection.IteratorUtil.iterator;
-import static org.neo4j.kernel.impl.nioneo.store.PropertyStore.encodeString;
-import static org.neo4j.kernel.impl.nioneo.store.labels.NodeLabelsField.parseLabelsField;
-import static org.neo4j.kernel.impl.util.IoPrimitiveUtils.safeCastLongToInt;
-
 public class BatchInserterImpl implements BatchInserter
 {
     private static final long MAX_NODE_ID = IdType.NODE.getMaxValue();
 
     private final LifeSupport life;
-    private final NeoStore neoStore;
+    private final FlatNeoStores neoStores;
     private final IndexStore indexStore;
-    private final File storeDir;
+    private final String storeDir;
     private final BatchTokenHolder propertyKeyTokens;
     private final BatchTokenHolder relationshipTypeTokens;
     private final BatchTokenHolder labelTokens;
@@ -183,10 +174,10 @@ public class BatchInserterImpl implements BatchInserter
     {
         life = new LifeSupport();
         this.fileSystem = fileSystem;
-        this.storeDir = new File( FileUtils.fixSeparatorsInPath( storeDir ) );
+        this.storeDir = FileUtils.fixSeparatorsInPath( storeDir );
 
         rejectAutoUpgrade( stringParams );
-        msgLog = StringLogger.loggerDirectory( fileSystem, this.storeDir );
+        msgLog = StringLogger.loggerDirectory( fileSystem, new File( this.storeDir ) );
         logging = new SingleLoggingService( msgLog );
         Map<String, String> params = getDefaultParams();
         params.put( GraphDatabaseSettings.use_memory_mapped_buffers.name(), Settings.FALSE );
@@ -194,35 +185,43 @@ public class BatchInserterImpl implements BatchInserter
         params.putAll( stringParams );
 
         storeLocker = new StoreLocker( fileSystem );
-        storeLocker.checkLock( this.storeDir );
+        storeLocker.checkLock( new File( this.storeDir ) );
 
         config = new Config( params, GraphDatabaseSettings.class );
         boolean dump = config.get( GraphDatabaseSettings.dump_configuration );
         this.idGeneratorFactory = new DefaultIdGeneratorFactory();
 
-        StoreFactory sf = new StoreFactory( config, idGeneratorFactory, new DefaultWindowPoolFactory(), fileSystem,
-                                            msgLog, null );
+        StoreFactory sf = new StoreFactory( config, idGeneratorFactory, fileSystem, msgLog, null );
 
-        File store = fixPath( this.storeDir, sf );
+        File store = fixPath( new File( this.storeDir ), sf );
 
         if ( dump )
         {
             dumpConfiguration( params );
         }
         msgLog.logMessage( Thread.currentThread() + " Starting BatchInserter(" + this + ")" );
-        neoStore = sf.openNeoStore( store );
-        if ( !neoStore.isStoreOk() )
+        neoStores = sf.openNeoStore( this.storeDir );
+        if ( true ) // !neoStore.isStoreOk() )
         {
-            throw new IllegalStateException( storeDir + " store is not cleanly shutdown." );
+            throw new RuntimeException( "Implement this" );
+//            throw new IllegalStateException( storeDir + " store is not cleanly shutdown." );
         }
-        neoStore.makeStoreOk();
-        Token[] indexes = getPropertyKeyTokenStore().getTokens( 10000 );
+//        neoStore.makeStoreOk();
+        Token[] indexes = NeoTokenStore.getTokens( neoStores.getPropertyKeyTokenStore().getRecordStore(), 
+                neoStores.getPropertyKeyTokenNameStore().getRecordStore(), Integer.MAX_VALUE ); // why 10000?
         propertyKeyTokens = new BatchTokenHolder( indexes );
-        labelTokens = new BatchTokenHolder( neoStore.getLabelTokenStore().getTokens( Integer.MAX_VALUE ) );
-        Token[] types = getRelationshipTypeStore().getTokens( Integer.MAX_VALUE );
+        labelTokens = new BatchTokenHolder( NeoTokenStore.getTokens( neoStores.getLabelTokenStore().getRecordStore(), 
+                neoStores.getLabelTokenNameStore().getRecordStore(), Integer.MAX_VALUE ) );
+        Token[] types = NeoTokenStore.getTokens( neoStores.getRelationshipTypeTokenStore().getRecordStore(), 
+                neoStores.getRelationshipTypeTokenNameStore().getRecordStore(), Integer.MAX_VALUE );
         relationshipTypeTokens = new BatchTokenHolder( types );
-        indexStore = life.add( new IndexStore( this.storeDir, fileSystem ) );
-        schemaCache = new SchemaCache( neoStore.getSchemaStore() );
+        indexStore = life.add( new IndexStore( new File( this.storeDir ), fileSystem ) );
+        schemaCache = new SchemaCache( Collections.<SchemaRule>emptyList() );
+        Iterator<SchemaRule> rules = NeoSchemaStore.loadAllSchemaRules( neoStores.getSchemaStore() );
+        while ( rules.hasNext() )
+        {
+            schemaCache.addSchemaRule( rules.next() );
+        }
 
         KernelExtensions extensions = life
                 .add( new KernelExtensions( kernelExtensions, config, new DependencyResolverImpl(),
@@ -272,8 +271,15 @@ public class BatchInserterImpl implements BatchInserter
         NodeRecord nodeRec = getNodeRecord( node );
         if ( setPrimitiveProperty( nodeRec, propertyName, newValue ) )
         {
-            getNodeStore().updateRecord( nodeRec );
+            updateRecord( nodeRec );
         }
+    }
+
+    private void updateRecord( NodeRecord nodeRec )
+    {
+        byte[] data = new byte[NeoNodeStore.RECORD_SIZE];
+        neoStores.getNodeStore().getRecordStore().writeRecord( nodeRec.getId(), NeoNodeStore.updateRecord( nodeRec, data, false ) );
+        throw new RuntimeException( "Implement labels???" );
     }
 
     @Override
@@ -283,8 +289,16 @@ public class BatchInserterImpl implements BatchInserter
         RelationshipRecord relRec = getRelationshipRecord( relationship );
         if ( setPrimitiveProperty( relRec, propertyName, propertyValue ) )
         {
-            getRelationshipStore().updateRecord( relRec );
+            updateRecord( relRec );
         }
+    }
+
+
+    private void updateRecord( RelationshipRecord relRec )
+    {
+        byte[] data = new byte[NeoRelationshipStore.RECORD_SIZE];
+        neoStores.getRelationshipStore().getRecordStore().writeRecord( relRec.getId(), 
+                NeoRelationshipStore.updateRecord( relRec, data, false ) );
     }
 
     @Override
@@ -293,7 +307,7 @@ public class BatchInserterImpl implements BatchInserter
         NodeRecord nodeRec = getNodeRecord( node );
         if ( removePrimitiveProperty( nodeRec, propertyName ) )
         {
-            getNodeStore().updateRecord( nodeRec );
+            updateRecord( nodeRec );
         }
     }
 
@@ -304,7 +318,7 @@ public class BatchInserterImpl implements BatchInserter
         RelationshipRecord relationshipRec = getRelationshipRecord( relationship );
         if ( removePrimitiveProperty( relationshipRec, propertyName ) )
         {
-            getRelationshipStore().updateRecord( relationshipRec );
+            updateRecord( relationshipRec );
         }
     }
 
@@ -318,14 +332,16 @@ public class BatchInserterImpl implements BatchInserter
     {
         // TODO: Do not create duplicate index
 
-        SchemaStore schemaStore = getSchemaStore();
-        IndexRule schemaRule = IndexRule.indexRule( schemaStore.nextId(), getOrCreateLabelId( label.name() ),
+        NeoSchemaStore schemaStore = neoStores.getSchemaStore();
+        IndexRule schemaRule = IndexRule.indexRule( schemaStore.getIdGenerator().nextId(), getOrCreateLabelId( label.name() ),
                                                     getOrCreatePropertyKeyId( propertyKey ),
                                                     this.schemaIndexProviders.getDefaultProvider()
                                                                              .getProviderDescriptor() );
-        for ( DynamicRecord record : schemaStore.allocateFrom( schemaRule ) )
+        for ( DynamicRecord record : NeoSchemaStore.allocateFrom( schemaRule, schemaStore.getRecordStore(), 
+                new NewDynamicRecordAllocator( schemaStore, DynamicRecord.Type.UNKNOWN ) ) )
         {
-            schemaStore.updateRecord( record );
+            schemaStore.getRecordStore().writeRecord( record.getId(), 
+                    NeoDynamicStore.writeToByteArray( record ) );
         }
         schemaCache.addSchemaRule( schemaRule );
     }
@@ -336,7 +352,7 @@ public class BatchInserterImpl implements BatchInserter
         final IndexPopulator[] populators = new IndexPopulator[rules.length];
         // the store is uncontended at this point, so creating a local LockService is safe.
         LockService locks = new ReentrantLockService();
-        IndexStoreView storeView = new NeoStoreIndexStoreView( locks, neoStore );
+        IndexStoreView storeView = new NeoStoreIndexStoreView( locks, neoStores );
 
         final int[] labelIds = new int[rules.length];
         final int[] propertyKeyIds = new int[rules.length];
@@ -449,28 +465,54 @@ public class BatchInserterImpl implements BatchInserter
     {
         // TODO: Do not create duplicate index
 
-        SchemaStore schemaStore = getSchemaStore();
+        NeoSchemaStore schemaStore = neoStores.getSchemaStore();
 
-        long indexRuleId = schemaStore.nextId();
-        long constraintRuleId = schemaStore.nextId();
+        long indexRuleId = schemaStore.getIdGenerator().nextId();
+        long constraintRuleId = schemaStore.getIdGenerator().nextId();
 
         IndexRule indexRule = IndexRule.constraintIndexRule(
                 indexRuleId, constraint.label(), constraint.propertyKeyId(),
                 this.schemaIndexProviders.getDefaultProvider().getProviderDescriptor(),
                 constraintRuleId );
         UniquenessConstraintRule constraintRule = UniquenessConstraintRule.uniquenessConstraintRule(
-                schemaStore.nextId(), constraint.label(), constraint.propertyKeyId(), indexRuleId );
+                schemaStore.getIdGenerator().nextId(), constraint.label(), constraint.propertyKeyId(), indexRuleId );
 
-        for ( DynamicRecord record : schemaStore.allocateFrom( constraintRule ) )
-        {
-            schemaStore.updateRecord( record );
-        }
+        allocateFromSchemaStore( constraintRule );
         schemaCache.addSchemaRule( constraintRule );
-        for ( DynamicRecord record : schemaStore.allocateFrom( indexRule ) )
-        {
-            schemaStore.updateRecord( record );
-        }
+        allocateFromSchemaStore( indexRule );
         schemaCache.addSchemaRule( indexRule );
+    }
+
+    private void allocateFromSchemaStore( SchemaRule rule )
+    {
+        NeoSchemaStore schemaStore = neoStores.getSchemaStore();
+        for ( DynamicRecord record : NeoSchemaStore.allocateFrom( rule, schemaStore.getRecordStore(), 
+                new NewDynamicRecordAllocator( schemaStore, DynamicRecord.Type.UNKNOWN ) ) )
+        {
+            schemaStore.getRecordStore().writeRecord( record.getId(), 
+                    NeoDynamicStore.writeToByteArray( record ) );
+        }
+    }
+
+    private void ensureHeavy( PropertyRecord record )
+    {
+        for ( PropertyBlock block : record.getPropertyBlocks() )
+        {
+            ensureHeavy( block );
+        }
+    }
+
+
+    private void ensureHeavy( PropertyBlock block )
+    {
+        if ( block.getType() == PropertyType.STRING )
+        {
+            NeoPropertyStore.ensureHeavy( block, neoStores.getStringStore().getRecordStore(), block.getSingleValueLong(), DynamicRecord.Type.STRING );  
+        }
+        else if ( block.getType() == PropertyType.ARRAY )
+        {
+            NeoPropertyStore.ensureHeavy( block, neoStores.getArrayStore().getRecordStore(), block.getSingleValueLong(), DynamicRecord.Type.ARRAY );
+        }
     }
 
     private boolean removePrimitiveProperty( PrimitiveRecord primitive,
@@ -487,14 +529,14 @@ public class BatchInserterImpl implements BatchInserter
         }
         while ( nextProp != Record.NO_NEXT_PROPERTY.intValue() )
         {
-            current = getPropertyStore().getRecord( nextProp );
+            current = getPropertyRecord( nextProp );
             if ( (target = current.removePropertyBlock( propIndex )) != null )
             {
-                getPropertyStore().ensureHeavy( target );
+                ensureHeavy( target );
                 for ( DynamicRecord dynRec : target.getValueRecords() )
                 {
                     dynRec.setInUse( false );
-                    current.addDeletedRecord( dynRec );
+                    // current.addDeletedRecord( dynRec );
                 }
                 break;
             }
@@ -503,7 +545,7 @@ public class BatchInserterImpl implements BatchInserter
         assert current != null : "the if statement above prevents it";
         if ( current.size() > 0 )
         {
-            getPropertyStore().updateRecord( current );
+            updateRecord( current );
             return false;
         }
         else
@@ -512,6 +554,19 @@ public class BatchInserterImpl implements BatchInserter
             return unlinkPropertyRecord( current, primitive );
         }
     }
+
+    private void updateRecord( PropertyRecord current )
+    {
+        throw new RuntimeException( "Need to implemelnt this" );
+    }
+
+
+    private PropertyRecord getPropertyRecord( long nextProp )
+    {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
 
     private boolean unlinkPropertyRecord( PropertyRecord propRecord,
                                           PrimitiveRecord primitive )
@@ -530,21 +585,19 @@ public class BatchInserterImpl implements BatchInserter
         }
         if ( prevProp != Record.NO_PREVIOUS_PROPERTY.intValue() )
         {
-            PropertyRecord prevPropRecord = getPropertyStore().getRecord(
-                    prevProp );
+            PropertyRecord prevPropRecord = getPropertyRecord( prevProp );
             assert prevPropRecord.inUse() : prevPropRecord + "->" + propRecord
                                             + " for " + primitive;
             prevPropRecord.setNextProp( nextProp );
-            getPropertyStore().updateRecord( prevPropRecord );
+            updateRecord( prevPropRecord );
         }
         if ( nextProp != Record.NO_NEXT_PROPERTY.intValue() )
         {
-            PropertyRecord nextPropRecord = getPropertyStore().getRecord(
-                    nextProp );
+            PropertyRecord nextPropRecord = getPropertyRecord( nextProp );
             assert nextPropRecord.inUse() : propRecord + "->" + nextPropRecord
                                             + " for " + primitive;
             nextPropRecord.setPrevProp( prevProp );
-            getPropertyStore().updateRecord( nextPropRecord );
+            updateRecord( nextPropRecord );
         }
         propRecord.setInUse( false );
         /*
@@ -554,7 +607,7 @@ public class BatchInserterImpl implements BatchInserter
          */
         propRecord.setPrevProp( Record.NO_PREVIOUS_PROPERTY.intValue() );
         propRecord.setNextProp( Record.NO_NEXT_PROPERTY.intValue() );
-        getPropertyStore().updateRecord( propRecord );
+        updateRecord( propRecord );
         return primitiveChanged;
     }
 
@@ -567,7 +620,7 @@ public class BatchInserterImpl implements BatchInserter
         long nextProp = primitive.getNextProp();
         int index = getOrCreatePropertyKeyId( name );
         PropertyBlock block = new PropertyBlock();
-        getPropertyStore().encodeValue( block, index, value );
+        NeoPropertyStore.encodeValue( block, index, value, neoStores );
         int size = block.getSize();
 
         /*
@@ -584,7 +637,7 @@ public class BatchInserterImpl implements BatchInserter
          */
         while ( !(nextProp == Record.NO_NEXT_PROPERTY.intValue() || (thatHas != null && thatFits != null)) )
         {
-            current = getPropertyStore().getRecord( nextProp );
+            current = getPropertyRecord( nextProp );
             /*
              * current.getPropertyBlock() is cheap but not free. If we already
              * have found thatHas, then we can skip this lookup.
@@ -596,12 +649,13 @@ public class BatchInserterImpl implements BatchInserter
                 PropertyBlock removed = thatHas.removePropertyBlock( index );
                 if ( removed.isLight() )
                 {
-                    getPropertyStore().makeHeavyIfLight( removed );
+                    ensureHeavy( removed );
+                    // getPropertyStore().makeHeavyIfLight( removed );
                 }
                 for ( DynamicRecord dynRec : removed.getValueRecords() )
                 {
                     dynRec.setInUse( false );
-                    thatHas.addDeletedRecord( dynRec );
+                    // thatHas.addDeletedRecord( dynRec );
                 }
                 updatedRecords.add( thatHas );
             }
@@ -627,13 +681,13 @@ public class BatchInserterImpl implements BatchInserter
         if( thatHas != null && thatFits != thatHas )
         {
             PropertyBlock removed = thatHas.removePropertyBlock( index );
-            getPropertyStore().ensureHeavy( removed );
+            ensureHeavy( removed );
             for ( DynamicRecord dynRec : removed.getValueRecords() )
             {
                 dynRec.setInUse( false );
-                thatHas.addDeletedRecord( dynRec );
+                // thatHas.addDeletedRecord( dynRec );
             }
-            getPropertyStore().updateRecord( thatHas );
+            updateRecord( thatHas );
         }
 
         /*
@@ -646,17 +700,16 @@ public class BatchInserterImpl implements BatchInserter
          */
         if ( thatFits == null )
         {
-            thatFits = new PropertyRecord( getPropertyStore().nextId() );
+            thatFits = new PropertyRecord( neoStores.getPropertyStore().getIdGenerator().nextId() );
             thatFits.setInUse( true );
             result = true;
 
             if ( primitive.getNextProp() != Record.NO_NEXT_PROPERTY.intValue() )
             {
-                PropertyRecord first = getPropertyStore().getRecord(
-                        primitive.getNextProp() );
+                PropertyRecord first = getPropertyRecord( primitive.getNextProp() );
                 thatFits.setNextProp( first.getId() );
                 first.setPrevProp( thatFits.getId() );
-                getPropertyStore().updateRecord( first );
+                updateRecord( first );
             }
             primitive.setNextProp( thatFits.getId() );
         }
@@ -668,7 +721,7 @@ public class BatchInserterImpl implements BatchInserter
         // It could lead to freeId being called multiple times for same id
         for ( PropertyRecord updatedRecord : updatedRecords )
         {
-            getPropertyStore().updateRecord( thatFits );
+            updateRecord( thatFits );
         }
 
         return result;
@@ -717,7 +770,7 @@ public class BatchInserterImpl implements BatchInserter
         PropertyRecord current;
         while ( nextProp != Record.NO_NEXT_PROPERTY.intValue() )
         {
-            current = getPropertyStore().getRecord( nextProp );
+            current = getPropertyRecord( nextProp );
             if ( current.getPropertyBlock( propertyKeyId ) != null )
             {
                 return true;
@@ -739,7 +792,7 @@ public class BatchInserterImpl implements BatchInserter
     @Override
     public long createNode( Map<String, Object> properties, Label... labels )
     {
-        return internalCreateNode( getNodeStore().nextId(), properties, labels );
+        return internalCreateNode( neoStores.getNodeStore().getIdGenerator().nextId(), properties, labels );
     }
 
     private long internalCreateNode( long nodeId, Map<String, Object> properties, Label... labels )
@@ -752,15 +805,26 @@ public class BatchInserterImpl implements BatchInserter
 
         setNodeLabels( nodeRecord, labels );
 
-        getNodeStore().updateRecord( nodeRecord );
+        updateRecord( nodeRecord );
         return nodeId;
     }
 
     private void setNodeLabels( NodeRecord nodeRecord, Label... labels )
     {
         NodeLabels nodeLabels = parseLabelsField( nodeRecord );
-        getNodeStore().updateDynamicLabelRecords( nodeLabels.put( getOrCreateLabelIds( labels ), getNodeStore() ) );
+        updateDynamicLabelRecords( nodeLabels.put( getOrCreateLabelIds( labels ), neoStores.getLabelStore() ) );
     }
+
+    private void updateDynamicLabelRecords( Collection<DynamicRecord> records )
+    {
+        byte[] data = new byte[neoStores.getLabelStore().getRecordStore().getRecordSize()];
+        for ( DynamicRecord record : records )
+        {
+            neoStores.getLabelStore().getRecordStore().writeRecord( 
+                    record.getId(), NeoDynamicStore.updateRecord( record, data ) );
+        }
+    }
+
 
     private long[] getOrCreateLabelIds( Label[] labels )
     {
@@ -783,15 +847,14 @@ public class BatchInserterImpl implements BatchInserter
         {
             throw new IllegalArgumentException( "id " + id + " is reserved for internal use" );
         }
-        NodeStore nodeStore = neoStore.getNodeStore();
-        if ( neoStore.getNodeStore().loadLightNode( id ) != null )
+        if ( nodeExists( id ) )
         {
             throw new IllegalArgumentException( "id=" + id + " already in use" );
         }
-        long highId = nodeStore.getHighId();
+        long highId = neoStores.getNodeStore().getIdGenerator().getHighId();
         if ( highId <= id )
         {
-            nodeStore.setHighId( id + 1 );
+            neoStores.getNeoStore().getIdGenerator().setHighId( highId );
         }
         internalCreateNode( id, properties, labels );
     }
@@ -801,7 +864,7 @@ public class BatchInserterImpl implements BatchInserter
     {
         NodeRecord record = getNodeRecord( node );
         setNodeLabels( record, labels );
-        getNodeStore().updateRecord( record );
+        updateRecord( record );
     }
 
     @Override
@@ -812,8 +875,7 @@ public class BatchInserterImpl implements BatchInserter
             @Override
             public Iterator<Label> iterator()
             {
-                NodeStore nodeStore = neoStore.getNodeStore();
-                long[] labels = parseLabelsField( nodeStore.getRecord( node ) ).get( getNodeStore() );
+                long[] labels = parseLabelsField( getNodeRecord( node ) ).get( neoStores.getLabelStore() );
                 return map( labelIdToLabelFunction, asPrimitiveIterator( labels ) );
             }
         };
@@ -828,8 +890,7 @@ public class BatchInserterImpl implements BatchInserter
 
     private boolean nodeHasLabel( long node, int labelId )
     {
-        NodeStore nodeStore = neoStore.getNodeStore();
-        for ( long label : parseLabelsField( nodeStore.getRecord( node ) ).get( getNodeStore() ) )
+        for ( long label : parseLabelsField( getNodeRecord( node ) ).get( neoStores.getLabelStore() ) )
         {
             if ( label == labelId )
             {
@@ -850,15 +911,15 @@ public class BatchInserterImpl implements BatchInserter
         {
             typeId = createNewRelationshipType( type.name() );
         }
-        long id = getRelationshipStore().nextId();
+        long id = neoStores.getRelationshipStore().getIdGenerator().nextId();
         RelationshipRecord record = new RelationshipRecord( id, node1, node2, typeId );
         record.setInUse( true );
         record.setCreated();
         connectRelationship( firstNode, secondNode, record );
-        getNodeStore().updateRecord( firstNode );
-        getNodeStore().updateRecord( secondNode );
+        updateRecord( firstNode );
+        updateRecord( secondNode );
         record.setNextProp( createPropertyChain( properties ) );
-        getRelationshipStore().updateRecord( record );
+        updateRecord( record );
         return id;
     }
 
@@ -879,7 +940,7 @@ public class BatchInserterImpl implements BatchInserter
     {
         if ( node.getNextRel() != Record.NO_NEXT_RELATIONSHIP.intValue() )
         {
-            RelationshipRecord nextRel = getRelationshipStore().getRecord( node.getNextRel() );
+            RelationshipRecord nextRel = getRelationshipRecord( node.getNextRel() );
             boolean changed = false;
             if ( nextRel.getFirstNode() == node.getId() )
             {
@@ -895,7 +956,7 @@ public class BatchInserterImpl implements BatchInserter
             {
                 throw new InvalidRecordException( node + " dont match " + nextRel );
             }
-            getRelationshipStore().updateRecord( nextRel );
+            updateRecord( nextRel );
         }
     }
 
@@ -916,10 +977,10 @@ public class BatchInserterImpl implements BatchInserter
              * expected instead of throwing invalid record exceptions.
              */
             record.setNextProp( Record.NO_NEXT_PROPERTY.intValue() );
-            getNodeStore().updateRecord( record );
+            updateRecord( record );
         }
         record.setNextProp( createPropertyChain( properties ) );
-        getNodeStore().updateRecord( record );
+        updateRecord( record );
     }
 
     @Override
@@ -935,16 +996,17 @@ public class BatchInserterImpl implements BatchInserter
              * here
              */
             record.setNextProp( Record.NO_NEXT_PROPERTY.intValue() );
-            getRelationshipStore().updateRecord( record );
+            updateRecord( record );
         }
         record.setNextProp( createPropertyChain( properties ) );
-        getRelationshipStore().updateRecord( record );
+        updateRecord( record );
     }
 
     @Override
     public boolean nodeExists( long nodeId )
     {
-        return neoStore.getNodeStore().loadLightNode( nodeId ) != null;
+        throw new RuntimeException( "Implement this" );
+        // return neoStore.getNodeStore().loadLightNode( nodeId ) != null;
     }
 
     @Override
@@ -1059,7 +1121,7 @@ public class BatchInserterImpl implements BatchInserter
         {
             throw new RuntimeException( e );
         }
-        neoStore.close();
+        neoStores.close();
 
         try
         {
@@ -1103,9 +1165,9 @@ public class BatchInserterImpl implements BatchInserter
         {
             return Record.NO_NEXT_PROPERTY.intValue();
         }
-        PropertyStore propStore = getPropertyStore();
+        NeoPropertyStore propStore = neoStores.getPropertyStore();
         List<PropertyRecord> propRecords = new ArrayList<>();
-        PropertyRecord currentRecord = new PropertyRecord( propStore.nextId() );
+        PropertyRecord currentRecord = new PropertyRecord( propStore.getIdGenerator().nextId() );
         currentRecord.setInUse( true );
         currentRecord.setCreated();
         propRecords.add( currentRecord );
@@ -1118,13 +1180,13 @@ public class BatchInserterImpl implements BatchInserter
             }
 
             PropertyBlock block = new PropertyBlock();
-            propStore.encodeValue( block, keyId, entry.getValue() );
+            NeoPropertyStore.encodeValue( block, keyId, entry.getValue(), neoStores );
             if ( currentRecord.size() + block.getSize() > PropertyType.getPayloadSize() )
             {
                 // Here it means the current block is done for
                 PropertyRecord prevRecord = currentRecord;
                 // Create new record
-                long propertyId = propStore.nextId();
+                long propertyId = propStore.getIdGenerator().nextId();
                 currentRecord = new PropertyRecord( propertyId );
                 currentRecord.setInUse( true );
                 currentRecord.setCreated();
@@ -1143,7 +1205,7 @@ public class BatchInserterImpl implements BatchInserter
          */
         for ( int i = propRecords.size() - 1; i >= 0; i-- )
         {
-            propStore.updateRecord( propRecords.get( i ) );
+            updateRecord( propRecords.get( i ) );
         }
         /*
          *  0 will always exist, if the map was empty we wouldn't be here
@@ -1154,10 +1216,9 @@ public class BatchInserterImpl implements BatchInserter
 
     private void deletePropertyChain( long nextProp )
     {
-        PropertyStore propStore = getPropertyStore();
         while ( nextProp != Record.NO_NEXT_PROPERTY.intValue() )
         {
-            PropertyRecord propRecord = propStore.getRecord( nextProp );
+            PropertyRecord propRecord = getPropertyRecord( nextProp );
             /*
              *  The only reason to loop over the blocks is to handle the dynamic
              *  records that possibly hang under them. Otherwise, we could just
@@ -1167,133 +1228,109 @@ public class BatchInserterImpl implements BatchInserter
              */
             for ( PropertyBlock propBlock : propRecord.getPropertyBlocks() )
             {
-                propStore.ensureHeavy( propBlock );
+                ensureHeavy( propBlock );
                 for ( DynamicRecord rec : propBlock.getValueRecords() )
                 {
                     rec.setInUse( false );
-                    propRecord.addDeletedRecord( rec );
+                    // propRecord.addDeletedRecord( rec );
                 }
             }
             propRecord.setInUse( false );
             nextProp = propRecord.getNextProp();
-            propStore.updateRecord( propRecord );
+            updateRecord( propRecord );
         }
     }
 
     private Map<String, Object> getPropertyChain( long nextProp )
     {
-        PropertyStore propStore = getPropertyStore();
-        Map<String, Object> properties = new HashMap<>();
-
-        while ( nextProp != Record.NO_NEXT_PROPERTY.intValue() )
-        {
-            PropertyRecord propRecord = propStore.getRecord( nextProp );
-            for ( PropertyBlock propBlock : propRecord.getPropertyBlocks() )
-            {
-                String key = propertyKeyTokens.nameOf( propBlock.getKeyIndexId() );
-                DefinedProperty propertyData = propBlock.newPropertyData( propStore );
-                Object value = propertyData.value() != null ? propertyData.value() :
-                               propBlock.getType().getValue( propBlock, getPropertyStore() );
-                properties.put( key, value );
-            }
-            nextProp = propRecord.getNextProp();
-        }
-        return properties;
+        throw new RuntimeException( "Implement this" );
+//        Map<String, Object> properties = new HashMap<>();
+//
+//        while ( nextProp != Record.NO_NEXT_PROPERTY.intValue() )
+//        {
+//            PropertyRecord propRecord = getPropertyRecord( nextProp );
+//            for ( PropertyBlock propBlock : propRecord.getPropertyBlocks() )
+//            {
+//                String key = propertyKeyTokens.nameOf( propBlock.getKeyIndexId() );
+//                DefinedProperty propertyData = propBlock.newPropertyData( neoStores );
+//                Object value = propertyData.value() != null ? propertyData.value() :
+//                               propBlock.getType().getValue( propBlock, getPropertyStore() );
+//                properties.put( key, value );
+//            }
+//            nextProp = propRecord.getNextProp();
+//        }
+//        return properties;
     }
 
     private int createNewPropertyKeyId( String stringKey )
     {
-        PropertyKeyTokenStore idxStore = getPropertyKeyTokenStore();
-        int keyId = (int) idxStore.nextId();
-        PropertyKeyTokenRecord record = new PropertyKeyTokenRecord( keyId );
-        record.setInUse( true );
-        record.setCreated();
-        Collection<DynamicRecord> keyRecords =
-                idxStore.allocateNameRecords( encodeString( stringKey ) );
-        record.setNameId( (int) first( keyRecords ).getId() );
-        record.addNameRecords( keyRecords );
-        idxStore.updateRecord( record );
-        propertyKeyTokens.addToken( stringKey, keyId );
-        return keyId;
+        throw new RuntimeException( "Implement this" );
+//        NeoTokenStore idxStore = neoStores.getPropertyKeyTokenStore();
+//        int keyId = (int) idxStore.getIdGenerator().nextId();
+//        PropertyKeyTokenRecord record = new PropertyKeyTokenRecord( keyId );
+//        record.setInUse( true );
+//        record.setCreated();
+//        Collection<DynamicRecord> keyRecords =
+//                idxStore.allocateNameRecords( encodeString( stringKey ) );
+//        record.setNameId( (int) first( keyRecords ).getId() );
+//        record.addNameRecords( keyRecords );
+//        idxStore.updateRecord( record );
+//        propertyKeyTokens.addToken( stringKey, keyId );
+//        return keyId;
     }
 
     private int createNewLabelId( String stringKey )
     {
-        LabelTokenStore labelTokenStore = neoStore.getLabelTokenStore();
-        int keyId = (int) labelTokenStore.nextId();
-        LabelTokenRecord record = new LabelTokenRecord( keyId );
-        record.setInUse( true );
-        record.setCreated();
-        Collection<DynamicRecord> keyRecords =
-                labelTokenStore.allocateNameRecords( encodeString( stringKey ) );
-        record.setNameId( (int) first( keyRecords ).getId() );
-        record.addNameRecords( keyRecords );
-        labelTokenStore.updateRecord( record );
-        labelTokens.addToken( stringKey, keyId );
-        return keyId;
+        throw new RuntimeException( "Implement this" );
+//        NeoTokenStore labelTokenStore = neoStores.getLabelTokenStore();
+//        int keyId = (int) labelTokenStore.getIdGenerator().nextId();
+//        LabelTokenRecord record = new LabelTokenRecord( keyId );
+//        record.setInUse( true );
+//        record.setCreated();
+//        Collection<DynamicRecord> keyRecords =
+//                labelTokenStore.allocateNameRecords( encodeString( stringKey ) );
+//        record.setNameId( (int) first( keyRecords ).getId() );
+//        record.addNameRecords( keyRecords );
+//        labelTokenStore.updateRecord( record );
+//        labelTokens.addToken( stringKey, keyId );
+//        return keyId;
     }
 
     private int createNewRelationshipType( String name )
     {
-        RelationshipTypeTokenStore typeStore = getRelationshipTypeStore();
-        int id = (int) typeStore.nextId();
-        RelationshipTypeTokenRecord record = new RelationshipTypeTokenRecord( id );
-        record.setInUse( true );
-        record.setCreated();
-        Collection<DynamicRecord> nameRecords = typeStore.allocateNameRecords( encodeString( name ) );
-        record.setNameId( (int) first( nameRecords ).getId() );
-        record.addNameRecords( nameRecords );
-        typeStore.updateRecord( record );
-        relationshipTypeTokens.addToken( name, id );
-        return id;
+        throw new RuntimeException( "Implement this" );
+//        NeoTokenStore typeStore = neoStores.getRelationshipTypeTokenStore();
+//        int id = (int) typeStore.getIdGenerator().nextId();
+//        RelationshipTypeTokenRecord record = new RelationshipTypeTokenRecord( id );
+//        record.setInUse( true );
+//        record.setCreated();
+//        Collection<DynamicRecord> nameRecords = typeStore.allocateNameRecords( encodeString( name ) );
+//        record.setNameId( (int) first( nameRecords ).getId() );
+//        record.addNameRecords( nameRecords );
+//        typeStore.updateRecord( record );
+//        relationshipTypeTokens.addToken( name, id );
+//        return id;
     }
 
-    private NodeStore getNodeStore()
-    {
-        return neoStore.getNodeStore();
-    }
-
-    private PropertyStore getPropertyStore()
-    {
-        return neoStore.getPropertyStore();
-    }
-
-    private PropertyKeyTokenStore getPropertyKeyTokenStore()
-    {
-        return getPropertyStore().getPropertyKeyTokenStore();
-    }
-
-    private RelationshipStore getRelationshipStore()
-    {
-        return neoStore.getRelationshipStore();
-    }
-
-    private RelationshipTypeTokenStore getRelationshipTypeStore()
-    {
-        return neoStore.getRelationshipTypeStore();
-    }
-
-    private SchemaStore getSchemaStore()
-    {
-        return neoStore.getSchemaStore();
-    }
 
     private NodeRecord getNodeRecord( long id )
     {
-        if ( id < 0 || id >= getNodeStore().getHighId() )
-        {
-            throw new NotFoundException( "id=" + id );
-        }
-        return getNodeStore().getRecord( id );
+        throw new RuntimeException( "Implement this" );
+//        if ( id < 0 || id >= getNodeStore().getHighId() )
+//        {
+//            throw new NotFoundException( "id=" + id );
+//        }
+//        return getNodeStore().getRecord( id );
     }
 
     private RelationshipRecord getRelationshipRecord( long id )
     {
-        if ( id < 0 || id >= getRelationshipStore().getHighId() )
-        {
-            throw new NotFoundException( "id=" + id );
-        }
-        return getRelationshipStore().getRecord( id );
+        throw new RuntimeException( "Implement this" );
+//        if ( id < 0 || id >= getRelationshipStore().getHighId() )
+//        {
+//            throw new NotFoundException( "id=" + id );
+//        }
+//        return getRelationshipStore().getRecord( id );
     }
 
     private File fixPath( File dir, StoreFactory sf )
@@ -1309,10 +1346,10 @@ public class BatchInserterImpl implements BatchInserter
                     + storeDir + "] for Neo4j kernel store." );
         }
 
-        File store = new File( dir, NeoStore.DEFAULT_NAME );
+        File store = new File( dir, "neostore" );
         if ( !fileSystem.fileExists( store ) )
         {
-            sf.createNeoStore( store ).close();
+            sf.createNeoStore( dir.getPath() ).close();
         }
         return store;
     }
@@ -1320,7 +1357,7 @@ public class BatchInserterImpl implements BatchInserter
     @Override
     public String getStoreDir()
     {
-        return storeDir.getPath();
+        return storeDir;
     }
 
     // needed by lucene-index
@@ -1416,9 +1453,9 @@ public class BatchInserterImpl implements BatchInserter
                 return type.cast( new NeoStoreProvider()
                 {
                     @Override
-                    public NeoStore evaluate()
+                    public FlatNeoStores evaluate()
                     {
-                        return neoStore;
+                        return neoStores;
                     }
                 } );
             }

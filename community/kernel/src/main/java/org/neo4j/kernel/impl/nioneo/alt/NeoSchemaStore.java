@@ -62,7 +62,7 @@ public class NeoSchemaStore extends Store
         RecordSerializer serializer = new RecordSerializer();
         serializer = serializer.append( rule );
         return NeoDynamicStore.allocateRecordsFromBytes( serializer.serialize(), 
-                 Arrays.<DynamicRecord>asList( new DynamicRecord( rule.getId(), DynamicRecord.Type.STRING ) ).iterator(),
+                 Arrays.<DynamicRecord>asList( new DynamicRecord( rule.getId(), DynamicRecord.Type.UNKNOWN ) ).iterator(),
                 /*NeoDynamicStore.getRecords( schemaStore, rule.getId(), RecordLoad.NORMAL ).iterator(),*/ recordAllocator );
     }
 

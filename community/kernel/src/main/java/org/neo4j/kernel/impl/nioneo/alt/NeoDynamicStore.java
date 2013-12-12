@@ -169,7 +169,7 @@ public abstract class NeoDynamicStore
         return ( ( buffer.get() & (byte) 0xF0 ) >> 4 ) == Record.IN_USE.byteValue();
     }
 
-    public static void updateRecord( DynamicRecord record, byte[] data )
+    public static byte[] updateRecord( DynamicRecord record, byte[] data )
     {
         ByteBuffer buffer = ByteBuffer.wrap( data );
         if ( record.inUse() )
@@ -200,6 +200,7 @@ public abstract class NeoDynamicStore
         {
             buffer.put( Record.NOT_IN_USE.byteValue() );
         }
+        return data;
     }
 
     

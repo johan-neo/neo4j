@@ -19,25 +19,10 @@
  */
 package org.neo4j.kernel.impl.nioneo.store.old;
 
-import java.io.File;
-import java.io.RandomAccessFile;
-
-import org.junit.Rule;
-import org.junit.Test;
-
-import org.neo4j.test.OtherThreadExecutor;
-import org.neo4j.test.OtherThreadExecutor.WorkerCommand;
-import org.neo4j.test.ResourceCollection;
-import org.neo4j.test.TargetDirectory;
-
-import static java.nio.channels.FileChannel.MapMode.READ_WRITE;
-
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 
 public class MappedPersistenceWindowTest
 {
-    private static final TargetDirectory target = TargetDirectory.forTest( MappedPersistenceWindowTest.class );
+ /*   private static final TargetDirectory target = TargetDirectory.forTest( MappedPersistenceWindowTest.class );
     @Rule
     public final TargetDirectory.TestDirectory directory = target.testDirectory();
     @Rule
@@ -125,5 +110,5 @@ public class MappedPersistenceWindowTest
 
         // then
         assertTrue( wasClosed );
-    }
+    }*/
 }

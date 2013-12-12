@@ -19,29 +19,8 @@
  */
 package org.neo4j.kernel.impl.nioneo.store.old;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.lang.reflect.Method;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.concurrent.ConcurrentHashMap;
-
-import org.junit.After;
-import org.junit.Assert;
-import org.junit.Before;
 import org.junit.Ignore;
-import org.junit.Test;
-
-import org.neo4j.kernel.impl.util.StringLogger;
-
-import static java.util.concurrent.TimeUnit.SECONDS;
-
-import static org.junit.Assert.assertTrue;
+import org.neo4j.graphdb.mockfs.FileSystemGuard.OperationType;
 
 /**
  * Tests or rather measures contention imposed by
@@ -55,7 +34,7 @@ import static org.junit.Assert.assertTrue;
 @Ignore( "Not a proper test really, merely a contention measurement" )
 public class TestPersistenceWindowPoolContention
 {
-    private static final int recordSize = 30;
+/*    private static final int recordSize = 30;
     private static final long mappingSize = giga( 1 );
     
     private long fileSize = mega( 800 );
@@ -238,5 +217,5 @@ public class TestPersistenceWindowPoolContention
         {
             return random.nextFloat() <= percentageReads ? OperationType.READ : OperationType.WRITE;
         }
-    }
+    }*/
 }

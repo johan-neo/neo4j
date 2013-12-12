@@ -19,39 +19,10 @@
  */
 package org.neo4j.kernel.impl.nioneo.store.old;
 
-import java.io.File;
-import java.io.RandomAccessFile;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.mockito.invocation.InvocationOnMock;
-import org.mockito.stubbing.Answer;
-import org.neo4j.kernel.impl.nioneo.store.UnderlyingStorageException;
-import org.neo4j.kernel.impl.util.StringLogger;
-import org.neo4j.test.OtherThreadExecutor;
-import org.neo4j.test.OtherThreadExecutor.WorkerCommand;
-import org.neo4j.test.ResourceCollection;
-import org.neo4j.test.TargetDirectory;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertTrue;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.neo4j.helpers.Exceptions.launderedException;
 
 public class PersistenceWindowPoolTest
 {
-    private static final TargetDirectory target = TargetDirectory.forTest( MappedPersistenceWindowTest.class );
+/*    private static final TargetDirectory target = TargetDirectory.forTest( MappedPersistenceWindowTest.class );
     @Rule
     public final ResourceCollection resources = new ResourceCollection();
     @Rule
@@ -303,4 +274,5 @@ public class PersistenceWindowPoolTest
             assertEquals( (byte)i, buffer.get() );
         }
     }
+*/
 }

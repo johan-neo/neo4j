@@ -51,7 +51,7 @@ public class NeoRelationshipStore extends Store
                 po.fileSystemAbstraction, po.stringLogger, TYPE_DESCRIPTOR, false, RECORD_SIZE );
     }
 
-    public static void updateRecord( RelationshipRecord record,
+    public static byte[] updateRecord( RelationshipRecord record,
         byte[] data, boolean force )
     {
         // registerIdFromUpdateRecord( id );
@@ -100,6 +100,7 @@ public class NeoRelationshipStore extends Store
         {
             buffer.put( Record.NOT_IN_USE.byteValue() );
         }
+        return data;
     }
 
     public static RelationshipRecord getRecord( long id, byte[] data )
