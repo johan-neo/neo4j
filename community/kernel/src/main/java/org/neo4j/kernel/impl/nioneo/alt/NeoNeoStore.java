@@ -98,7 +98,8 @@ public class NeoNeoStore extends Store
 
     public static long getLong( RecordStore recordStore, long record )
     {
-        byte[] data = recordStore.getRecord( record );
+        byte[] data = new byte[recordStore.getRecordSize()];
+        recordStore.getRecord( record, data ); 
         return getLong( data );
     }
     

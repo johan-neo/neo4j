@@ -40,7 +40,7 @@ public class NeoPropertyStringStore extends Store
     public NeoPropertyStringStore( StoreParameter po )
     {
         super( new File( po.path, StoreFactory.PROPERTY_STRINGS_STORE_NAME ), po.config, ID_TYPE, po.idGeneratorFactory, 
-                po.fileSystemAbstraction, po.stringLogger, TYPE_DESCRIPTOR, true, NeoPropertyStore.DEFAULT_DATA_BLOCK_SIZE );
+                po.fileSystemAbstraction, po.stringLogger, TYPE_DESCRIPTOR, true, NeoDynamicStore.getRecordSize( NeoPropertyStore.DEFAULT_DATA_BLOCK_SIZE ) );
     }
     
     public static byte[] encodeString( String string )

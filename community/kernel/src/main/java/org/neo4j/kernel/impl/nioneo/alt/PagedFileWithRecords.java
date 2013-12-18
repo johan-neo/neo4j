@@ -20,6 +20,10 @@
 package org.neo4j.kernel.impl.nioneo.alt;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 
 import org.neo4j.kernel.impl.nioneo.store.UnderlyingStorageException;
 
@@ -33,10 +37,7 @@ public class PagedFileWithRecords implements RecordStore
     private volatile PageElement[] pages;
     private boolean closed = false;
     
-    private long memoryToUse = 0;
-
-    public PagedFileWithRecords( FileWithRecords fwr, int targetPageSize, PageType type, PageSynchronization refSync,
-            long initialMemory )
+    public PagedFileWithRecords( FileWithRecords fwr, int targetPageSize, PageType type, PageSynchronization refSync )
     {
         this.fwr = fwr;
         int recordSize = fwr.getRecordSize();
@@ -50,7 +51,6 @@ public class PagedFileWithRecords implements RecordStore
         this.pageType = type;
         this.pageReferenceSync = refSync;
         this.pages = new PageElement[nrOfPages];
-        this.memoryToUse = initialMemory;
         setupPages();
     }
 
@@ -62,21 +62,21 @@ public class PagedFileWithRecords implements RecordStore
             // if element == 1 pages array length has to be size 2
             expand( (int) ((element+1) * 1.1f) );
         }
-        return pages[element];
+        PageElement pageElement = pages[element];
+        pageElement.getHits().incrementCount( pageElement.isAllocated() );
+        return pageElement;
     }
 
     @Override
-    public byte[] getRecord( long record )
+    public void getRecord( long record, byte[] data )
     {
         PageElement pageElement = getPageElement( record );
-        byte[] data = pageElement.readRecord( record );
-        if ( data == null )
+        if (!pageElement.readRecord( record, data ) )
         {
-            data = fwr.read( record, 1 );
+            fwr.read( record, 1, data );
         }
-        return data;
     }
-
+    
     @Override
     public void writeRecord( long record, byte[] data )
     {
@@ -89,11 +89,11 @@ public class PagedFileWithRecords implements RecordStore
 
     private void setupPages()
     {
-        long memoryUsed = 0;
+        // long memoryUsed = 0;
         for ( int i = 0; i < pages.length; i++ )
         {
-            long startRecord = i * pageSizeRecords;
             Page page = null;
+            /*long startRecord = i * pageSizeRecords;
             if ( memoryUsed + pageSizeBytes <= memoryToUse )
             {
                 try
@@ -109,7 +109,7 @@ public class PagedFileWithRecords implements RecordStore
                     System.out.println( fwr.getName() + " " + e.getMessage() );
                 }
                 memoryUsed += pageSizeBytes;
-            }
+            }*/
             switch ( pageReferenceSync )
             {
             case ATOMIC:
@@ -132,7 +132,7 @@ public class PagedFileWithRecords implements RecordStore
         }
     }
 
-    private Page createPage( long startRecord ) throws UnableToMapPageException
+    private Page createPage( long startRecord )
     {
         try
         {
@@ -155,7 +155,8 @@ public class PagedFileWithRecords implements RecordStore
         catch ( Throwable t )
         {
             // TODO: track amount of errors here and log every X failure
-            throw new UnableToMapPageException( t );
+            System.out.println( t.getMessage() );
+            return null;
         }
     }
 
@@ -178,24 +179,28 @@ public class PagedFileWithRecords implements RecordStore
 
     private synchronized void expand( int nrOfPages )
     {
-        if ( nrOfPages < 1 || nrOfPages < pages.length )
+        if ( nrOfPages < pages.length )
+        {
+            return;
+        }
+        if ( nrOfPages < 1 ) 
         {
             throw new IllegalStateException( "Unable to expand, to many pages? current page count=" + pages.length + " new page count=" + nrOfPages );
         }
         PageElement[] newPages = new PageElement[nrOfPages];
-        long memoryUsed = 0;
+        // long memoryUsed = 0;
         for ( int i = 0; i < pages.length; i++ )
         {
-            if ( pages[i].isAllocated() )
-            {
-                memoryUsed += pageSizeBytes;
-            }
+//            if ( pages[i].isAllocated() )
+//            {
+//                memoryUsed += pageSizeBytes;
+//            }
             newPages[i] = pages[i];
         }
         for ( int i = pages.length; i < nrOfPages; i++ )
         {
-            long startRecord = i * pageSizeRecords;
             Page page = null;
+/*            long startRecord = i * pageSizeRecords;
             if ( memoryUsed + pageSizeBytes <= memoryToUse )
             {
                 try
@@ -211,7 +216,7 @@ public class PagedFileWithRecords implements RecordStore
                     System.out.println( fwr.getName() + " " + e.getMessage() );
                 }
                 memoryUsed += pageSizeBytes;
-            }
+            }*/
             switch ( pageReferenceSync )
             {
             case ATOMIC:
@@ -232,23 +237,9 @@ public class PagedFileWithRecords implements RecordStore
         return fwr.getNrOfRecords();
     }
 
-    @Override
-    public synchronized void allocatePages( long amountBytes )
-    {
-        checkClosed();
-        memoryToUse += amountBytes;
-        throw new UnsupportedOperationException( "Not implemented yet" );
-    }
-
-    @Override
-    public synchronized void freePages( long amountBytes )
-    {
-        checkClosed();
-        throw new UnsupportedOperationException( "Not implemented yet" );
-        // memoryToUse -= amountBytes;
-    }
-
-    @Override
+    
+    
+     @Override
     public synchronized void writeOutDirtyPages()
     {
         checkClosed();
@@ -279,5 +270,167 @@ public class PagedFileWithRecords implements RecordStore
             throw new UnderlyingStorageException( "Closed store " + fwr.getName() );
         }
     }
+    
+    @Override
+    public HitStat sweep( Sweeper sweeper )
+    {
+        if ( closed ) 
+        {
+            return new HitStat( 0, 0, 0, 0 );
+        }
+        long memoryUsed = 0;
+        long memoryNeeded = 0;
+        PageElement[] currentPages = pages;
+        long missCount = 0;
+        long hitCount = 0;
+        List<SortPageElement> pagesToFree = new ArrayList<SortPageElement>();
+        List<SortPageElement> pagesToAllocate = new ArrayList<SortPageElement>();
+        
+        for ( int i = 0; i < currentPages.length; i++  )
+        {
+            PageElement pageElement = currentPages[i];
+            if ( pageElement.isAllocated() ) 
+            {
+                int count = pageElement.getHits().getCount();
+                hitCount += count;
+                if ( count > 0 )
+                {
+                    memoryNeeded += pageSizeBytes;
+                }
+                memoryUsed += pageSizeBytes;
+                pagesToFree.add( new SortPageElement(pageElement, pageElement.getHits().getCount(), i ) );
+            }
+            else
+            {
+                int count = pageElement.getHits().getCount();
+                missCount += count;
+                if ( count > 0 )
+                {
+                    memoryNeeded += pageSizeBytes;
+                }
+                pagesToAllocate.add( new SortPageElement( pageElement, pageElement.getHits().getCount(), i ) );
+            }
+            
+            pageElement.getHits().decrementCount( pageElement.isAllocated() );
+        }
+        HitStat stat = new HitStat( hitCount, missCount, memoryUsed, memoryNeeded );
+        long memoryDelta = sweeper.getMemoryDelta( stat );
+        
+        pageInAndOut( pagesToFree, pagesToAllocate, memoryDelta );
+        return stat;
+    }
 
+    private void pageInAndOut( List<SortPageElement> pagesToFree, List<SortPageElement> pagesToAllocate,
+            long memoryDelta )
+    {
+        Collections.sort( pagesToFree, new Comparator<SortPageElement>()
+        {
+            @Override
+            public int compare( SortPageElement o1, SortPageElement o2 )
+            {
+                return o1.getHit() - o2.getHit();
+            }
+            
+        } );
+        Collections.sort( pagesToAllocate, new Comparator<SortPageElement>()
+        {
+            @Override
+            public int compare( SortPageElement o1, SortPageElement o2 )
+            {
+                return o2.getHit() - o1.getHit();
+            }
+            
+        } );
+        int pagesAllocatedCount = 0;
+        int pagesFreedCount = 0;
+        if ( memoryDelta < 0 )
+        {
+            while ( memoryDelta < 0 && pagesFreedCount < pagesToFree.size() )
+            {
+                pagesToFree.get( pagesFreedCount++ ).getPage().free();
+                memoryDelta += pageSizeBytes;
+            }
+        }
+        else if ( memoryDelta > 0 )
+        {
+            while ( memoryDelta > 0 && pagesAllocatedCount < pagesToAllocate.size() )
+            {
+                SortPageElement sortPageElement = pagesToAllocate.get( pagesAllocatedCount++ );
+                int startRecord = sortPageElement.index * pageSizeRecords;
+                PageElement pageElement = sortPageElement.pageElement;
+                Page newPage = createPage( startRecord );
+                if ( newPage == null )
+                {
+                    // failed to allocate
+                    return;
+                }
+                if ( pageElement.allocate( newPage ) )
+                {
+                    memoryDelta -= pageSizeBytes;
+                }
+            }
+        }
+        else
+        {
+            while ( pagesFreedCount < pagesToFree.size() && pagesAllocatedCount < pagesToAllocate.size() )
+            {
+                SortPageElement toFree = pagesToFree.get(  pagesFreedCount++ ); 
+                SortPageElement toAllocate = pagesToAllocate.get( pagesAllocatedCount++ );
+                int toFreeScore = toFree.getHit() * 2;
+                if ( toFreeScore < 0 )
+                {
+                    toFreeScore = Integer.MAX_VALUE;
+                }
+                int toAllocateScore = toAllocate.getHit();
+                if ( toAllocateScore < 0 )
+                {
+                    toAllocateScore = Integer.MAX_VALUE;
+                }
+                if ( toFree.getHit() > toAllocate.getHit() )
+                {
+                    break;
+                }
+            }
+        }
+    }
+    
+    private static class SortPageElement
+    {
+        private final PageElement pageElement;
+        private final int hit;
+        private final int index;
+        
+        public SortPageElement( PageElement pageElement, int hit, int index )
+        {
+            this.pageElement = pageElement;
+            this.hit = hit;
+            this.index = index;
+        }
+        
+        PageElement getPage()
+        {
+            return pageElement;
+        }
+        
+        int getHit()
+        {
+            return hit;
+        }
+        
+        @Override
+        public boolean equals( Object o )
+        {
+            if ( o instanceof SortPageElement )
+            {
+                return ((SortPageElement) o).getHit() == getHit();
+            }
+            return false;
+        }
+    }
+
+    @Override
+    public long getStoreSizeInBytes()
+    {
+        return pages.length * pageSizeBytes;
+    }
 }

@@ -198,13 +198,15 @@ public class SchemaStorage implements SchemaRuleAccess
             private long currentId = 1; /*record 0 contains the block size*/
             private final byte[] scratchData = newRecordBuffer();
 
+            private byte[] data = new byte[schemaStore.getRecordStore().getRecordSize()];
+            
             @Override
             protected SchemaRule fetchNextOrNull()
             {
                 while ( currentId <= highestId )
                 {
                     long id = currentId++;
-                    byte[] data = schemaStore.getRecordStore().getRecord( id );
+                    schemaStore.getRecordStore().getRecord( id, data );
                     DynamicRecord record = NeoDynamicStore.getRecord( id, data, RecordLoad.FORCE, DynamicRecord.Type.UNKNOWN );
                     if ( record.inUse() && record.isStartRecord() )
                     {

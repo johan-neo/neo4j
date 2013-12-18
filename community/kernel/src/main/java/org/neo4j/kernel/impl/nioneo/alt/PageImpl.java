@@ -32,13 +32,12 @@ class PageImpl extends AbstractPage
         this.buffer = buffer;
     }
 
-    public byte[] readRecord( long record )
+    public void readRecord( long record, byte[] recordData )
     {
-        byte[] recordData = new byte[recordSize()];
+        assert recordData.length == recordSize();
         ByteBuffer duplicate = buffer.duplicate();
         duplicate.position( (int) ((record - startRecord()) * recordSize()) );
         duplicate.get( recordData );
-        return recordData;
     }
 
     public void writeRecord( long record, byte[] data )

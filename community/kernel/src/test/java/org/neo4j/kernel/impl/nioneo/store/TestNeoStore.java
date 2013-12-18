@@ -435,10 +435,12 @@ public class TestNeoStore
         PropertyReceiver receiver = newPropertyReceiver( props );
         xaCon.getWriteTransaction().nodeLoadProperties( node, false, receiver );
         int count = 0;
+        byte[] pData = new byte[pStore.getRecordSize()];
         for ( int keyId : props.keySet() )
         {
             long id = props.get( keyId ).other();
-            PropertyRecord record = NeoPropertyStore.getRecord( id, pStore.getRecord( id ) );
+            pStore.getRecord( id, pData );
+            PropertyRecord record = NeoPropertyStore.getRecord( id, pData );
             PropertyBlock block = record.getPropertyBlock( props.get( keyId ).first().propertyKeyId() );
             DefinedProperty data = block.newPropertyData( neoStores );
             if ( data.propertyKeyId() == prop1.propertyKeyId() )
@@ -521,10 +523,12 @@ public class TestNeoStore
         ArrayMap<Integer, Pair<DefinedProperty,Long>> props = new ArrayMap<>();
         xaCon.getWriteTransaction().nodeLoadProperties( node, false, newPropertyReceiver( props ) );
         int count = 0;
+        byte[] pData = new byte[pStore.getRecordSize()];
         for ( int keyId : props.keySet() )
         {
             long id = props.get( keyId ).other();
-            PropertyRecord record = NeoPropertyStore.getRecord( id, pStore.getRecord( id ) );
+            pStore.getRecord( id, pData );
+            PropertyRecord record = NeoPropertyStore.getRecord( id, pData );
             PropertyBlock block = record.getPropertyBlock( props.get( keyId ).first().propertyKeyId() );
             DefinedProperty data = block.newPropertyData( neoStores );
             if ( data.propertyKeyId() == prop1.propertyKeyId() )
@@ -594,10 +598,12 @@ public class TestNeoStore
         ArrayMap<Integer, Pair<DefinedProperty,Long>> props = new ArrayMap<>();
         xaCon.getWriteTransaction().relLoadProperties( rel, false, newPropertyReceiver( props ) );
         int count = 0;
+        byte[] pData = new byte[pStore.getRecordSize()];
         for ( int keyId : props.keySet() )
         {
             long id = props.get( keyId ).other();
-            PropertyRecord record = NeoPropertyStore.getRecord( id, pStore.getRecord( id ) );
+            pStore.getRecord( id, pData );
+            PropertyRecord record = NeoPropertyStore.getRecord( id, pData );
             PropertyBlock block = record.getPropertyBlock( props.get( keyId ).first().propertyKeyId() );
             DefinedProperty data = block.newPropertyData( neoStores );
             if ( data.propertyKeyId() == prop1.propertyKeyId() )
@@ -641,10 +647,12 @@ public class TestNeoStore
         ArrayMap<Integer, Pair<DefinedProperty,Long>> props = new ArrayMap<>();
         xaCon.getWriteTransaction().relLoadProperties( rel, false, newPropertyReceiver( props ) );
         int count = 0;
+        byte[] pData = new byte[pStore.getRecordSize()];
         for ( int keyId : props.keySet() )
         {
             long id = props.get( keyId ).other();
-            PropertyRecord record = NeoPropertyStore.getRecord( id, pStore.getRecord( id ) );
+            pStore.getRecord( id, pData );
+            PropertyRecord record = NeoPropertyStore.getRecord( id, pData );
             PropertyBlock block = record.getPropertyBlock( props.get( keyId ).first().propertyKeyId() );
             DefinedProperty data = block.newPropertyData( neoStores );
             if ( data.propertyKeyId() == prop1.propertyKeyId() )
@@ -720,10 +728,12 @@ public class TestNeoStore
         ArrayMap<Integer, Pair<DefinedProperty,Long>> props = new ArrayMap<>();
         xaCon.getWriteTransaction().relLoadProperties( rel, false, newPropertyReceiver( props ) );
         int count = 0;
+        byte[] pData = new byte[pStore.getRecordSize()];
         for ( int keyId : props.keySet() )
         {
             long id = props.get( keyId ).other();
-            PropertyRecord record = NeoPropertyStore.getRecord( id, pStore.getRecord( id ) );
+            pStore.getRecord( id, pData );
+            PropertyRecord record = NeoPropertyStore.getRecord( id, pData );
             PropertyBlock block = record.getPropertyBlock( props.get( keyId ).first().propertyKeyId() );
             DefinedProperty data = block.newPropertyData( neoStores );
             if ( data.propertyKeyId() == prop1.propertyKeyId() )
@@ -787,10 +797,12 @@ public class TestNeoStore
         ArrayMap<Integer, Pair<DefinedProperty,Long>> props = new ArrayMap<>();
         xaCon.getWriteTransaction().relLoadProperties( rel, false, newPropertyReceiver( props ) );
         int count = 0;
+        byte[] pData = new byte[pStore.getRecordSize()];
         for ( int keyId : props.keySet() )
         {
             long id = props.get( keyId ).other();
-            PropertyRecord record = NeoPropertyStore.getRecord( id, pStore.getRecord( id ) );
+            pStore.getRecord( id, pData );
+            PropertyRecord record = NeoPropertyStore.getRecord( id, pData );
             PropertyBlock block = record.getPropertyBlock( props.get( keyId ).first().propertyKeyId() );
             DefinedProperty data = block.newPropertyData( neoStores );
             if ( data.propertyKeyId() == prop1.propertyKeyId() )
@@ -842,10 +854,12 @@ public class TestNeoStore
         ArrayMap<Integer, Pair<DefinedProperty,Long>> props = new ArrayMap<>();
         xaCon.getWriteTransaction().nodeLoadProperties( node, false, newPropertyReceiver( props ) );
         int count = 0;
+        byte[] pData = new byte[pStore.getRecordSize()];
         for ( int keyId : props.keySet() )
         {
             long id = props.get( keyId ).other();
-            PropertyRecord record = NeoPropertyStore.getRecord( id, pStore.getRecord( id ) );
+            pStore.getRecord( id, pData );
+            PropertyRecord record = NeoPropertyStore.getRecord( id, pData );
             PropertyBlock block = record.getPropertyBlock( props.get( keyId ).first().propertyKeyId() );
             DefinedProperty data = block.newPropertyData( neoStores );
             if ( data.propertyKeyId() == prop1.propertyKeyId() )
@@ -890,10 +904,12 @@ public class TestNeoStore
         ArrayMap<Integer, Pair<DefinedProperty,Long>> props = new ArrayMap<>();
         xaCon.getWriteTransaction().nodeLoadProperties( node, false, newPropertyReceiver( props ) );
         int count = 0;
+        byte[] pData = new byte[pStore.getRecordSize()];
         for ( int keyId : props.keySet() )
         {
             long id = props.get( keyId ).other();
-            PropertyRecord record = NeoPropertyStore.getRecord( id, pStore.getRecord( id ) );
+            pStore.getRecord( id, pData );
+            PropertyRecord record = NeoPropertyStore.getRecord( id, pData );
             PropertyBlock block = record.getPropertyBlock( props.get( keyId ).first().propertyKeyId() );
             DefinedProperty data = block.newPropertyData( neoStores );
             if ( data.propertyKeyId() == prop1.propertyKeyId() )

@@ -54,7 +54,7 @@ public class NeoSchemaStore extends Store
     public NeoSchemaStore( StoreParameter po )
     {
         super( new File( po.path, StoreFactory.SCHEMA_STORE_NAME ), po.config, ID_TYPE, po.idGeneratorFactory, 
-                po.fileSystemAbstraction, po.stringLogger, TYPE_DESCRIPTOR, true, BLOCK_SIZE );
+                po.fileSystemAbstraction, po.stringLogger, TYPE_DESCRIPTOR, true, NeoDynamicStore.getRecordSize( BLOCK_SIZE ) );
     }
 
     public static Collection<DynamicRecord> allocateFrom( SchemaRule rule, RecordStore schemaStore, DynamicRecordAllocator recordAllocator )
@@ -74,14 +74,15 @@ public class NeoSchemaStore extends Store
             private final long highestId = schemaStore.getIdGenerator().getHighId();
             private long currentId = 1; /*record 0 contains the block size*/
             private final byte[] scratchData = new byte[schemaStore.getRecordStore().getRecordSize()*4];
-
+            private byte[] data = new byte[schemaStore.getRecordStore().getRecordSize()];
+            
             @Override
             protected SchemaRule fetchNextOrNull()
             {
                 while ( currentId <= highestId )
                 {
                     long id = currentId++;
-                    byte[] data = schemaStore.getRecordStore().getRecord( id );
+                    schemaStore.getRecordStore().getRecord( id, data );
                     DynamicRecord record = NeoDynamicStore.getRecord( id, data, RecordLoad.FORCE, DynamicRecord.Type.STRING );
                     if ( record.inUse() && record.isStartRecord() )
                     {

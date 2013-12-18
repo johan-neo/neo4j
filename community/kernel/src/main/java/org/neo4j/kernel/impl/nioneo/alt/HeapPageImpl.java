@@ -29,11 +29,10 @@ class HeapPageImpl extends AbstractPage
         this.data = data;
     }
     
-    public byte[] readRecord( long record )
+    public void readRecord( long record, byte[] recordData )
     {
-        byte[] recordData = new byte[recordSize()];
+        assert recordData.length == recordSize();
         System.arraycopy( data, (int) ((record - startRecord()) * recordSize()), recordData, 0, recordSize() );
-        return recordData;
     }
 
     public void writeRecord( long record, byte[] data )

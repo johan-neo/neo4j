@@ -431,13 +431,13 @@ public abstract class Command extends XaCommand
             
             Collection<DynamicRecord> toUpdate = new ArrayList<>( after.getDynamicLabelRecords() );
             addRemoved( toUpdate );
+            byte[] dynamicData = new byte[ labelStore.getRecordStore().getRecordSize() ];
             for ( DynamicRecord dynamicRecord : toUpdate )
             {
-                byte[] dynamicData = new byte[ labelStore.getRecordStore().getRecordSize() ];
                 NeoDynamicStore.updateRecord( dynamicRecord, dynamicData );
                 DynamicRecord test = NeoDynamicStore.getRecord( dynamicRecord.getId(), dynamicData, RecordLoad.FORCE, DynamicRecord.Type.ARRAY );
                 labelStore.getRecordStore().writeRecord( dynamicRecord.getId(), dynamicData );
-                dynamicData = labelStore.getRecordStore().getRecord( dynamicRecord.getId() );
+                labelStore.getRecordStore().getRecord( dynamicRecord.getId(), dynamicData );
                 DynamicRecord test2 = NeoDynamicStore.getRecord( dynamicRecord.getId(), dynamicData, RecordLoad.FORCE, DynamicRecord.Type.ARRAY );
                 System.out.println( "" );
             }

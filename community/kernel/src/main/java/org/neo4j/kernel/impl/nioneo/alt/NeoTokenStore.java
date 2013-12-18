@@ -59,8 +59,8 @@ public class NeoTokenStore extends Store
         LinkedList<Token> recordList = new LinkedList<>();
         for ( int i = 0; i < maxCount; i++ )
         {
-            byte[] data;
-            data = tokenStore.getRecord( i );
+            byte[] data = new byte[tokenStore.getRecordSize()];
+            tokenStore.getRecord( i, data );
             ByteBuffer buffer = ByteBuffer.wrap( data );
             boolean inUse = buffer.get() == Record.IN_USE.byteValue();
             if ( !inUse )
@@ -83,7 +83,8 @@ public class NeoTokenStore extends Store
 
     public static Token getToken( RecordStore tokenStore, RecordStore tokenStringStore, int id, boolean force )
     {
-        byte[] data = tokenStore.getRecord( id );
+        byte[] data = new byte[tokenStore.getRecordSize()];
+        tokenStore.getRecord( id, data );
         ByteBuffer buffer = ByteBuffer.wrap( data );
         boolean inUse = buffer.get() == Record.IN_USE.byteValue();
         if ( !inUse && !force )

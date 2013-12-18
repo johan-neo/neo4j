@@ -49,13 +49,14 @@ public class Store
         this.idGenerator = storeLoader.getIdGenerator();
         FileWithRecords fwr = new FileWithRecords( fileName.getName(), storeLoader.getFileChannel(),
                 storeLoader.getRecordSize() );
+        
         // TODO: add to Configuration
         int targetPageSize = 4 * 1024 * 1024;
         PageType type = PageType.MEMORY_MAPPED;
         PageSynchronization refSync = PageSynchronization.ATOMIC;
-        long initialMemory = 1 * 1024 * 1024 * 1024;
         //////////////////////
-        this.recordStore = new PagedFileWithRecords( fwr, targetPageSize, type, refSync, initialMemory );
+        
+        this.recordStore = new PagedFileWithRecords( fwr, targetPageSize, type, refSync );
     }
 
     public void close()

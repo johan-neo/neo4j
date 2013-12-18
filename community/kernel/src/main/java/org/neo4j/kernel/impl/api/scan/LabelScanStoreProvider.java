@@ -131,12 +131,15 @@ public class LabelScanStoreProvider extends LifecycleAdapter implements Comparab
                     private final long highNodeId = neoStores.getNodeStore().getIdGenerator().getHighId();
                     private long current;
 
+                    private byte[] data = new byte[neoStores.getNodeStore().getRecordStore().getRecordSize()];
+                    
                     @Override
                     protected NodeLabelUpdate fetchNextOrNull()
                     {
                         while ( current <= highNodeId )
                         {
-                            NodeRecord node = NeoNodeStore.getRecord( current, neoStores.getNodeStore().getRecordStore().getRecord( current ) );
+                            neoStores.getNodeStore().getRecordStore().getRecord( current, data );
+                            NodeRecord node = NeoNodeStore.getRecord( current, data );
                             current++;
                             if ( node.inUse() )
                             {

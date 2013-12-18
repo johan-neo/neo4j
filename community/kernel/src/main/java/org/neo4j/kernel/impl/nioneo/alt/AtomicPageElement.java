@@ -19,61 +19,69 @@
  */
 package org.neo4j.kernel.impl.nioneo.alt;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 class AtomicPageElement implements PageElement
 {
+    final AtomicInteger nextVersion = new AtomicInteger();
+    final AtomicInteger currentVersion = new AtomicInteger();
+    final AtomicBoolean spinLockWriterWriting = new AtomicBoolean( false );
+    
     final AtomicReference<Page> page;
+    
     volatile boolean isDirty = false;
-
+    private Hits hits = new Hits();
+    
     AtomicPageElement( Page page )
     {
         this.page = new AtomicReference<Page>( page );
     }
 
-    public byte[] readRecord( long record )
+    public boolean readRecord( long record, byte[] data )
     {
-        // no guard against concurrent writes on same record use:
-        // return page.get().readRecord( record );
-        
-        // re-read any read that happened concurrently with a write
-        byte[] data;
-        Page pageReadFrom;
+        int current; 
+        boolean toReturn = false;
         do
         {
-            pageReadFrom = page.get();
-            if ( pageReadFrom != null )
+            current = currentVersion.get();
+            Page pageToReadFrom = page.get();
+            if ( pageToReadFrom != null )
             {
-                data = pageReadFrom.readRecord( record );
+                pageToReadFrom.readRecord( record, data );
+                toReturn = true;
             }
-            else
-            {
-                return null;
-            }
-        }
-        while ( pageReadFrom != page.get() );
-        return data;
+        } while ( current != nextVersion.get() );
+        return toReturn;
     }
 
     public boolean writeRecord( long record, byte[] data )
     {
-        Page oldPage, newPage;
-        do
+        while ( !spinLockWriterWriting.compareAndSet( false, true ) );
+        try
         {
-            oldPage = page.get();
-            if ( oldPage != null )
+            int versionToSet;
+            boolean wroteToPage;
+            do
             {
-                newPage = oldPage.copy();
-                newPage.writeRecord( record, data );
-                isDirty = true;
-            }
-            else
-            {
-                return false;
-            }
+                wroteToPage = false;
+                versionToSet = nextVersion.incrementAndGet();
+                Page realPage = page.get();
+                if ( realPage != null )
+                {
+                    realPage.writeRecord( record, data );
+                    isDirty = true;
+                    wroteToPage = true;
+                }
+                currentVersion.set( versionToSet );
+            } while ( nextVersion.get() != versionToSet );
+            return wroteToPage;
         }
-        while ( !page.compareAndSet( oldPage, newPage ) );
-        return true;
+        finally
+        {
+            spinLockWriterWriting.set( false );
+        }
     }
 
     @Override
@@ -112,8 +120,21 @@ class AtomicPageElement implements PageElement
     }
 
     @Override
+    public boolean allocate( Page newPage )
+    {
+        return page.compareAndSet( null, newPage );
+    }
+    
+    
+    @Override
     public boolean isAllocated()
     {
         return page.get() != null;
+    }
+
+    @Override
+    public Hits getHits()
+    {
+        return hits;
     }
 }

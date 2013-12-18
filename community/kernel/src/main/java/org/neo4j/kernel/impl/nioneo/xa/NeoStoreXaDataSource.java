@@ -74,6 +74,7 @@ import org.neo4j.kernel.impl.locking.ReentrantLockService;
 import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
 import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
 import org.neo4j.kernel.impl.nioneo.alt.NeoSchemaStore;
+import org.neo4j.kernel.impl.nioneo.alt.RecordStore;
 import org.neo4j.kernel.impl.nioneo.store.IdGenerator;
 import org.neo4j.kernel.impl.nioneo.store.IndexRule;
 import org.neo4j.kernel.impl.nioneo.store.PropertyKeyTokenRecord;
@@ -550,10 +551,12 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
         @Override
         public long incrementAndGetPreviousLogVersion()
         {
-            byte[] data = neoStores.getNeoStore().getRecordStore().getRecord( NeoNeoStore.LOG_VERSION_POSITION );
+            RecordStore neoStore = neoStores.getNeoStore().getRecordStore();
+            byte[] data = new byte[ neoStore.getRecordSize()];
+            neoStore.getRecord( NeoNeoStore.LOG_VERSION_POSITION, data  );
             long currentVersion = NeoNeoStore.getLong( data );
             NeoNeoStore.updateLong( data, currentVersion + 1 );
-            neoStores.getNeoStore().getRecordStore().writeRecord( NeoNeoStore.LOG_VERSION_POSITION, data );
+            neoStore.writeRecord( NeoNeoStore.LOG_VERSION_POSITION, data );
             return currentVersion;
         }
 
@@ -637,10 +640,12 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
 
     public long incrementAndGetLogVersion()
     {
-        byte[] data = neoStores.getNeoStore().getRecordStore().getRecord( NeoNeoStore.LOG_VERSION_POSITION );
+        RecordStore neoStore = neoStores.getNeoStore().getRecordStore();
+        byte[] data = new byte[neoStore.getRecordSize()];
+        neoStore.getRecord( NeoNeoStore.LOG_VERSION_POSITION, data );
         long currentVersion = NeoNeoStore.getLong( data );
         NeoNeoStore.updateLong( data, currentVersion + 1 );
-        neoStores.getNeoStore().getRecordStore().writeRecord( NeoNeoStore.LOG_VERSION_POSITION, data );
+        neoStore.writeRecord( NeoNeoStore.LOG_VERSION_POSITION, data );
         return currentVersion;
     }
 

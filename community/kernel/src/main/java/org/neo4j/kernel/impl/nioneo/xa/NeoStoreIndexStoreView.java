@@ -176,8 +176,10 @@ public class NeoStoreIndexStoreView implements IndexStoreView
     @Override
     public Iterable<NodePropertyUpdate> nodeAsUpdates( long nodeId )
     {
-        NodeRecord node = NeoNodeStore.getRecord( nodeId, 
-                neoStores.getNodeStore().getRecordStore().getRecord( nodeId ), RecordLoad.FORCE ); 
+        RecordStore nodeStore = neoStores.getNodeStore().getRecordStore();
+        byte[] data = new byte[nodeStore.getRecordSize()];
+        nodeStore.getRecord( nodeId, data );
+        NodeRecord node = NeoNodeStore.getRecord( nodeId, data, RecordLoad.FORCE ); 
 
         if ( !node.inUse() )
         {
@@ -346,13 +348,14 @@ public class NeoStoreIndexStoreView implements IndexStoreView
         {
             PrimitiveLongIterator nodeIds = new StoreIdIterator( neoStores.getNodeStore().getRecordStore() );
             continueScanning = true;
+            byte[] data = new byte[neoStores.getNodeStore().getRecordStore().getRecordSize()];
             while ( continueScanning && nodeIds.hasNext() )
             {
                 long id = nodeIds.next();
                 RESULT result = null;
                 try ( Lock ignored = locks.acquireNodeLock( id, LockService.LockType.READ_LOCK ) )
                 {
-                    byte[] data = neoStores.getNodeStore().getRecordStore().getRecord( id );
+                    neoStores.getNodeStore().getRecordStore().getRecord( id, data );
                     NodeRecord record = NeoNodeStore.getRecord( id, data, RecordLoad.FORCE );
                     if ( record.inUse() )
                     {

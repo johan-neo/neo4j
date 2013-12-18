@@ -63,6 +63,7 @@ import org.neo4j.kernel.impl.nioneo.alt.NeoNodeStore;
 import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStore;
 import org.neo4j.kernel.impl.nioneo.alt.NeoRelationshipStore;
 import org.neo4j.kernel.impl.nioneo.alt.NeoSchemaStore;
+import org.neo4j.kernel.impl.nioneo.alt.RecordStore;
 import org.neo4j.kernel.impl.nioneo.store.IndexRule;
 import org.neo4j.kernel.impl.nioneo.store.InvalidRecordException;
 import org.neo4j.kernel.impl.nioneo.store.NeoStoreRecord;
@@ -164,7 +165,9 @@ public class DiskLayer
     {
         try
         {
-            byte[] data = neoStores.getNodeStore().getRecordStore().getRecord( nodeId );
+            RecordStore nodeStore = neoStores.getNodeStore().getRecordStore();
+            byte[] data = new byte[nodeStore.getRecordSize()];
+            nodeStore.getRecord( nodeId, data );
             NodeRecord nodeRecord = NeoNodeStore.getRecord( nodeId, data );
             final long[] labels = parseLabelsField( nodeRecord ).get( neoStores.getLabelStore() );
             return new PrimitiveIntIterator()
@@ -408,7 +411,9 @@ public class DiskLayer
     {
         try
         {
-            byte[] data = neoStores.getNodeStore().getRecordStore().getRecord( nodeId );
+            RecordStore nodeStore = neoStores.getNodeStore().getRecordStore();
+            byte[] data = new byte[nodeStore.getRecordSize()];
+            neoStores.getNodeStore().getRecordStore().getRecord( nodeId, data );
             return loadAllPropertiesOf( NeoNodeStore.getRecord( nodeId, data ) );
         }
         catch ( InvalidRecordException e )
@@ -423,7 +428,10 @@ public class DiskLayer
     {
         try
         {
-            byte[] data = neoStores.getRelationshipStore().getRecordStore().getRecord( relationshipId );
+            RecordStore relStore = neoStores.getRelationshipStore().getRecordStore();
+            
+            byte[] data = new byte[relStore.getRecordSize()];  
+            neoStores.getRelationshipStore().getRecordStore().getRecord( relationshipId, data);
             return loadAllPropertiesOf( NeoRelationshipStore.getRecord( relationshipId, data ) );
         }
         catch ( InvalidRecordException e )

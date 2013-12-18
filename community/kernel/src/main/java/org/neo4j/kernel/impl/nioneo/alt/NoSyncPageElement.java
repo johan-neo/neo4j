@@ -22,6 +22,8 @@ package org.neo4j.kernel.impl.nioneo.alt;
 class NoSyncPageElement implements PageElement
 {
     private Page page;
+    private Hits hits = new Hits(); 
+    
     // non volatile because we do not want that
     private boolean isDirty;
 
@@ -30,13 +32,14 @@ class NoSyncPageElement implements PageElement
         this.page = page;
     }
 
-    public byte[] readRecord( long record )
+    public boolean readRecord( long record, byte[] data )
     {
         if ( page != null )
         {
-            return page.readRecord( record );
+            page.readRecord( record, data );
+            return true;
         }
-        return null;
+        return false;
     }
 
     public boolean writeRecord( long record, byte[] data )
@@ -77,5 +80,18 @@ class NoSyncPageElement implements PageElement
     public boolean isAllocated()
     {
         return page != null;
+    }
+    
+    @Override
+    public Hits getHits()
+    {
+        return hits;
+    }
+
+    @Override
+    public boolean allocate( Page page )
+    {
+        this.page = page;
+        return true;
     }
 }

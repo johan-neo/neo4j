@@ -25,9 +25,9 @@ public interface Page
     int pageSize();
     int recordSize();
     
-    byte[] readRecord( long record );
+    void readRecord( long record, byte[] data );
     void writeRecord( long record, byte[] data );
     
-    Page copy();
+//    Page copy();
     void force();
 }

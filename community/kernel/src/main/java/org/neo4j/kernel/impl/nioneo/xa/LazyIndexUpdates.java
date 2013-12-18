@@ -40,6 +40,7 @@ import org.neo4j.kernel.impl.core.IteratingPropertyReceiver;
 import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
 import org.neo4j.kernel.impl.nioneo.alt.NeoNodeStore;
 import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStore;
+import org.neo4j.kernel.impl.nioneo.alt.RecordStore;
 import org.neo4j.kernel.impl.nioneo.store.NodeRecord;
 import org.neo4j.kernel.impl.nioneo.store.PropertyBlock;
 import org.neo4j.kernel.impl.nioneo.store.PropertyRecord;
@@ -100,6 +101,7 @@ class LazyIndexUpdates implements IndexUpdates
     private void gatherUpdatesFromPropertyCommands( Collection<NodePropertyUpdate> updates,
                                                     Map<Pair<Long, Integer>, NodePropertyUpdate> propertyLookup )
     {
+        byte[] data = new byte[neoStores.getNodeStore().getRecordStore().getRecordSize()];
         for ( PropertyCommand propertyCommand : propCommands )
         {
             PropertyRecord after = propertyCommand.getAfter();
@@ -132,8 +134,8 @@ class LazyIndexUpdates implements IndexUpdates
                  * if this happens and we're in recovery mode that the node in question will be deleted
                  * in an upcoming transaction, so just skip this update.
                  */
-                NodeRecord nodeRecord = NeoNodeStore.getRecord( after.getNodeId(), 
-                        neoStores.getNodeStore().getRecordStore().getRecord( after.getNodeId() ) ); 
+                neoStores.getNodeStore().getRecordStore().getRecord( after.getNodeId(), data );
+                NodeRecord nodeRecord = NeoNodeStore.getRecord( after.getNodeId(), data ); 
 
                 nodeLabelsBefore = nodeLabelsAfter = parseLabelsField( nodeRecord ).get( neoStores.getLabelStore() );
             }
@@ -192,8 +194,10 @@ class LazyIndexUpdates implements IndexUpdates
     private Iterator<DefinedProperty> nodeFullyLoadProperties( long nodeId )
     {
         
-        NodeRecord nodeRecord = NeoNodeStore.getRecord( nodeId, 
-                neoStores.getNodeStore().getRecordStore().getRecord( nodeId ) ); 
+        RecordStore nodeStore = neoStores.getNodeStore().getRecordStore();
+        byte[] data = new byte[nodeStore.getRecordSize()];
+        nodeStore.getRecord( nodeId, data );
+        NodeRecord nodeRecord = NeoNodeStore.getRecord( nodeId, data ); 
         IteratingPropertyReceiver receiver = new IteratingPropertyReceiver();
         Collection<PropertyRecord> chain = 
                 NeoPropertyStore.getPropertyRecordChain( neoStores.getPropertyStore().getRecordStore(), nodeRecord.getNextProp() );

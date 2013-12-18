@@ -51,7 +51,7 @@ public class NeoLabelStore extends Store
     public NeoLabelStore( StoreParameter po )
     {
         super( new File( po.path, StoreFactory.NODE_LABELS_STORE_NAME ), po.config, ID_TYPE, po.idGeneratorFactory, 
-                po.fileSystemAbstraction, po.stringLogger, TYPE_DESCRIPTOR, true, DEFAULT_DATA_BLOCK_SIZE );
+                po.fileSystemAbstraction, po.stringLogger, TYPE_DESCRIPTOR, true, NeoDynamicStore.getRecordSize( DEFAULT_DATA_BLOCK_SIZE ) );
     }
 
     static long parseLabelsBody( long labelsField )

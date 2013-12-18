@@ -76,6 +76,7 @@ import org.neo4j.kernel.impl.nioneo.alt.NeoSchemaStore;
 import org.neo4j.kernel.impl.nioneo.alt.NeoPropertyStringStore;
 import org.neo4j.kernel.impl.nioneo.alt.NeoTokenStore;
 import org.neo4j.kernel.impl.nioneo.alt.NewDynamicRecordAllocator;
+import org.neo4j.kernel.impl.nioneo.alt.RecordStore;
 import org.neo4j.kernel.impl.nioneo.store.DynamicRecord;
 import org.neo4j.kernel.impl.nioneo.store.IndexRule;
 import org.neo4j.kernel.impl.nioneo.store.InvalidRecordException;
@@ -144,7 +145,10 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
                 @Override
                 public NodeRecord load( Long key, Void additionalData )
                 {
-                    return NeoNodeStore.getRecord( key, neoStores.getNodeStore().getRecordStore().getRecord( key ) );
+                    RecordStore nodeStore = neoStores.getNodeStore().getRecordStore();
+                    byte[] data = new byte[nodeStore.getRecordSize()]; 
+                    nodeStore.getRecord( key, data );
+                    return NeoNodeStore.getRecord( key, data );
                 }
 
                 @Override
@@ -181,7 +185,10 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
                 @Override
                 public PropertyRecord load( Long key, PrimitiveRecord additionalData )
                 {
-                    PropertyRecord record = NeoPropertyStore.getRecord( key, neoStores.getPropertyStore().getRecordStore().getRecord( key ), RecordLoad.NORMAL );
+                    RecordStore propertyStore = neoStores.getPropertyStore().getRecordStore();
+                    byte[] data = new byte[propertyStore.getRecordSize()];
+                    propertyStore.getRecord( key, data );
+                    PropertyRecord record = NeoPropertyStore.getRecord( key, data, RecordLoad.NORMAL );
                     setOwner( record, additionalData );
                     return record;
                 }
@@ -221,7 +228,9 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
                 @Override
                 public RelationshipRecord load( Long key, Void additionalData )
                 {
-                    byte[] recordData = neoStores.getRelationshipStore().getRecordStore().getRecord( key );
+                    RecordStore relationshipStore = neoStores.getRelationshipStore().getRecordStore();
+                    byte[] recordData = new byte[ relationshipStore.getRecordSize()];
+                    relationshipStore.getRecord( key, recordData );
                     return NeoRelationshipStore.getRecord( key, recordData, RecordLoad.NORMAL );
                 }
 
@@ -2205,8 +2214,10 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
     public PrimitiveLongIterator getLabelsForNode( long nodeId )
     {
         // Don't consider changes in this transaction
-        NodeRecord node = NeoNodeStore.getRecord( nodeId, neoStores.getNodeStore().getRecordStore().getRecord( nodeId ) );
-                // getNodeStore().getRecord( nodeId );
+        RecordStore nodeStore = neoStores.getNodeStore().getRecordStore();
+        byte[] data = new byte[nodeStore.getRecordSize()];
+        nodeStore.getRecord( nodeId, data );
+        NodeRecord node = NeoNodeStore.getRecord( nodeId, data );
         return asPrimitiveIterator( parseLabelsField( node ).get( neoStores.getLabelStore() ) );
     }
 
@@ -2236,12 +2247,13 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
         Map<DirectionWrapper, Iterable<RelationshipRecord>> result = new EnumMap<>( DirectionWrapper.class );
         result.put( DirectionWrapper.OUTGOING, out );
         result.put( DirectionWrapper.INCOMING, in );
+        RecordStore relationshipStore = neoStores.getRelationshipStore().getRecordStore();
+        byte[] data = new byte[relationshipStore.getRecordSize()];
         for ( int i = 0; i < grabSize &&
                 position != Record.NO_NEXT_RELATIONSHIP.intValue(); i++ )
         {
-
-            RelationshipRecord relRecord = NeoRelationshipStore.getRecord( position, 
-                    neoStores.getRelationshipStore().getRecordStore().getRecord( position ), RecordLoad.NORMAL );
+            relationshipStore.getRecord( position, data );
+            RelationshipRecord relRecord = NeoRelationshipStore.getRecord( position, data, RecordLoad.NORMAL );
             if ( relRecord == null )
             {
                 // return what we got so far

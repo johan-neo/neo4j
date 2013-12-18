@@ -316,9 +316,10 @@ public abstract class NeoDynamicStore
     {
         List<DynamicRecord> recordList = new LinkedList<>();
         long blockId = startBlockId;
+        byte[] data = new byte[store.getRecordSize()];
         while ( blockId != Record.NO_NEXT_BLOCK.intValue() )
         {
-            byte[] data = store.getRecord( blockId );
+            store.getRecord( blockId, data );
             DynamicRecord record = getRecord( blockId, data, loadFlag, type );
             if ( !record.inUse() )
             {
@@ -346,7 +347,8 @@ public abstract class NeoDynamicStore
         }
 
         long blockId = record.getId();
-        byte[] recordData = store.getRecord( blockId );
+        byte[] recordData = new byte[store.getRecordSize()];
+        store.getRecord( blockId, recordData );
         ByteBuffer buf = ByteBuffer.wrap( recordData );
         // NOTE: skip of header in offset
         buf.position( BLOCK_HEADER_SIZE );

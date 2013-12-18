@@ -164,7 +164,8 @@ public class WriteTransactionCommandOrderingTest
                 store, mock( CacheAccessBackDoor.class ), mock( IndexingService.class ),
                 WriteTransactionTest.NO_LABEL_SCAN_STORE, mock( IntegrityValidator.class ),
                 mock( KernelTransactionImplementation.class ), mock( LockService.class, RETURNS_MOCKS ) );
-        byte[] data = store.getNeoStore().getRecordStore().getRecord( NeoNeoStore.LATEST_COMMITTED_TX_POSITION );
+        byte[] data = new byte[store.getNeoStore().getRecordStore().getRecordSize()];
+        store.getNeoStore().getRecordStore().getRecord( NeoNeoStore.LATEST_COMMITTED_TX_POSITION, data );
         long txId = NeoNeoStore.getLong( data );
         tx.setCommitTxId( txId + 1 );
         return tx;

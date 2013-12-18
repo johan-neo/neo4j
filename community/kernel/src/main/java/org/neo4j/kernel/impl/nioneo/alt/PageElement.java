@@ -21,7 +21,7 @@ package org.neo4j.kernel.impl.nioneo.alt;
 
 public interface PageElement
 {
-    byte[] readRecord( long record );
+    boolean readRecord( long record, byte[] data );
 
     boolean writeRecord( long record, byte[] data );
     
@@ -29,4 +29,8 @@ public interface PageElement
     boolean free();
 
     boolean isAllocated();
+
+    Hits getHits();
+
+    boolean allocate( Page page );
 }

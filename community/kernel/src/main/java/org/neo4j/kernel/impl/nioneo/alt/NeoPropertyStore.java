@@ -323,9 +323,10 @@ public class NeoPropertyStore extends Store
         {
             return null;
         }
+        byte[] data = new byte[propertyStore.getRecordSize()];
         while ( nextProp != Record.NO_NEXT_PROPERTY.intValue() )
         {
-            byte[] data = propertyStore.getRecord( nextProp );
+            propertyStore.getRecord( nextProp, data );
             PropertyRecord propRecord = getRecord( nextProp, data, RecordLoad.NORMAL );
             toReturn.add(propRecord);
             nextProp = propRecord.getNextProp();

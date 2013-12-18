@@ -20,6 +20,9 @@
 package org.neo4j.kernel.impl.nioneo.alt;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 
 import org.neo4j.kernel.IdGeneratorFactory;
 import org.neo4j.kernel.IdType;
@@ -52,7 +55,7 @@ public class FlatNeoStores
     private final NeoTokenStore labelToken;
     private final NeoTokenNameStore labelTokenName;
     
-    
+    private final SweeperThread sweeper;
     
     public FlatNeoStores( String path, Config config, IdGeneratorFactory idGeneratorFactory, FileSystemAbstraction fileSystemAbstraction,
             StringLogger stringLogger )
@@ -80,10 +83,28 @@ public class FlatNeoStores
         this.relationshipTypeTokenName = new NeoTokenNameStore( sp, StoreFactory.RELATIONSHIP_TYPE_TOKEN_NAMES_STORE_NAME, IdType.RELATIONSHIP_TYPE_TOKEN_NAME, NeoTokenNameStore.TYPE_DESCRIPTOR );
         this.labelToken = new NeoTokenStore( sp, StoreFactory.LABEL_TOKEN_STORE_NAME, IdType.LABEL_TOKEN, NeoTokenStore.LABEL_TOKEN_TYPE_DESCRIPTOR, NeoTokenStore.LABEL_TOKEN_RECORD_SIZE );
         this.labelTokenName = new NeoTokenNameStore( sp, StoreFactory.LABEL_TOKEN_NAMES_STORE_NAME, IdType.LABEL_TOKEN_NAME, NeoTokenNameStore.TYPE_DESCRIPTOR );
+
+        //// TODO: Add to config ////
+        long initialMemory = 1 * 1024 * 1024 * 1024;
+        /////////////////////////////
+        
+        Collection<RecordStore> stores = new ArrayList<RecordStore>();
+                Collections.addAll( stores, 
+                        nodeStore.getRecordStore(), 
+                        relationshipStore.getRecordStore(), 
+                        propertyStore.getRecordStore(), 
+                        stringStore.getRecordStore(), 
+                        arrayStore.getRecordStore(), 
+                        labelStore.getRecordStore(), 
+                        schemaStore.getRecordStore() );
+        
+        sweeper = new SweeperThread( initialMemory, stores );
+        sweeper.start();
     }
     
     public void close()
     {
+        sweeper.stopRunning();
         neoStore.close();
         nodeStore.close();
         relationshipStore.close();

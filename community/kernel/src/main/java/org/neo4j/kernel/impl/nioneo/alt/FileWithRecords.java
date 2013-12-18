@@ -74,7 +74,15 @@ public class FileWithRecords
         return data;
     }
 
-    public void read( long fromRecord, int nrOfRecords, ByteBuffer intoBuffer )
+    public void read( long fromRecord, int nrOfRecords, byte[] data )
+    {
+        int length = nrOfRecords * recordSize;
+        assert data.length == length;
+        ByteBuffer buffer = ByteBuffer.wrap( data );
+        read( fromRecord, nrOfRecords, buffer );
+    }
+
+    public synchronized void read( long fromRecord, int nrOfRecords, ByteBuffer intoBuffer )
     {
         if ( nrOfRecords < 1 )
         {
@@ -137,7 +145,7 @@ public class FileWithRecords
         write( startRecord, buffer );
     }
 
-    public void write( long startRecord, ByteBuffer fromBuffer )
+    public synchronized void write( long startRecord, ByteBuffer fromBuffer )
     {
         long startPos = startRecord * recordSize;
         int length = fromBuffer.remaining();

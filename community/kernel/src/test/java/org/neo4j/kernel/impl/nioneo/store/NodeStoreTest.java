@@ -122,7 +122,9 @@ public class NodeStoreTest
 
         // WHEN
         // -- reading that record back
-        NodeRecord readRecord = NeoNodeStore.getRecord( nodeId, nodeStore.getRecord( nodeId ) );
+        byte[] data = new byte[nodeStore.getRecordSize()];
+        nodeStore.getRecord( nodeId, data );
+        NodeRecord readRecord = NeoNodeStore.getRecord( nodeId, data );
 
         // THEN
         // -- the label field must be the same
