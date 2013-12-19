@@ -25,8 +25,8 @@ import java.util.Map;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
-
 import org.neo4j.graphdb.Direction;
 import org.neo4j.graphdb.DynamicRelationshipType;
 import org.neo4j.graphdb.Node;
@@ -45,7 +45,6 @@ import org.neo4j.kernel.impl.transaction.xaframework.TransactionInterceptorProvi
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
-
 import static org.neo4j.graphdb.factory.GraphDatabaseSettings.use_memory_mapped_buffers;
 import static org.neo4j.helpers.collection.IteratorUtil.count;
 import static org.neo4j.helpers.collection.IteratorUtil.firstOrNull;
@@ -55,6 +54,7 @@ import static org.neo4j.helpers.collection.MapUtil.stringMap;
 import static org.neo4j.kernel.impl.AbstractNeo4jTestCase.deleteFileOrDirectory;
 import static org.neo4j.kernel.impl.core.BigStoreIT.assertProperties;
 
+@Ignore
 public class BigJumpingStoreIT
 {
     private static class TestDatabase extends InternalAbstractGraphDatabase

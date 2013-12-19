@@ -2234,7 +2234,7 @@ public class WriteTransaction extends XaTransaction implements NeoStoreTransacti
 
         records.addAll(        
                 NeoSchemaStore.allocateFrom( indexRule, neoStores.getSchemaStore().getRecordStore(), 
-                new NewDynamicRecordAllocator( neoStores.getSchemaStore(), DynamicRecord.Type.STRING ) ) );
+                new NewDynamicRecordAllocator( neoStores.getSchemaStore(), DynamicRecord.Type.UNKNOWN ) ) );
     }
 
     public Pair<Map<DirectionWrapper, Iterable<RelationshipRecord>>, Long> getMoreRelationships(

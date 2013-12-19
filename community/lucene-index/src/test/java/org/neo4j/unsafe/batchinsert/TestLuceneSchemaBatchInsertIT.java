@@ -41,8 +41,8 @@ import org.neo4j.kernel.api.impl.index.DirectoryFactory;
 import org.neo4j.kernel.api.impl.index.LuceneSchemaIndexProvider;
 import org.neo4j.kernel.api.index.InternalIndexState;
 import org.neo4j.kernel.configuration.Config;
-import org.neo4j.kernel.impl.nioneo.store.DefaultWindowPoolFactory;
-import org.neo4j.kernel.impl.nioneo.store.NeoStore;
+import org.neo4j.kernel.impl.nioneo.alt.FlatNeoStores;
+import org.neo4j.kernel.impl.nioneo.alt.NeoSchemaStore;
 import org.neo4j.kernel.impl.nioneo.store.SchemaRule;
 import org.neo4j.kernel.impl.nioneo.store.SchemaRule.Kind;
 import org.neo4j.kernel.impl.nioneo.store.StoreFactory;
@@ -68,9 +68,9 @@ public class TestLuceneSchemaBatchInsertIT
         LifeSupport life = new LifeSupport();
         LuceneSchemaIndexProvider provider = life.add( new LuceneSchemaIndexProvider( DirectoryFactory.PERSISTENT, config ) );
         StoreFactory storeFactory = new StoreFactory( config, new DefaultIdGeneratorFactory(),
-                new DefaultWindowPoolFactory(), new DefaultFileSystemAbstraction(), StringLogger.DEV_NULL,
+                new DefaultFileSystemAbstraction(), StringLogger.DEV_NULL,
                 new DefaultTxHook() );
-        NeoStore neoStore = storeFactory.newNeoStore( new File( storeDir, NeoStore.DEFAULT_NAME ) );
+        FlatNeoStores neoStore = storeFactory.openNeoStore( storeDir );
         life.start();
         SchemaRule rule = single( filter( new Predicate<SchemaRule>()
         {
@@ -79,7 +79,7 @@ public class TestLuceneSchemaBatchInsertIT
             {
                 return item.getKind() == Kind.INDEX_RULE;
             }
-        }, neoStore.getSchemaStore() ) );
+        }, NeoSchemaStore.loadAllSchemaRules( neoStore.getSchemaStore() ) ) );
         InternalIndexState initialState = provider.getInitialState( rule.getId() );
         assertEquals( InternalIndexState.ONLINE, initialState );
         

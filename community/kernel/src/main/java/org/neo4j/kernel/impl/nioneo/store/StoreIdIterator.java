@@ -22,16 +22,17 @@ package org.neo4j.kernel.impl.nioneo.store;
 import java.util.NoSuchElementException;
 
 import org.neo4j.kernel.impl.nioneo.alt.RecordStore;
+import org.neo4j.kernel.impl.nioneo.alt.Store;
 import org.neo4j.kernel.impl.util.PrimitiveLongIterator;
 
 import static java.lang.String.format;
 
 public class StoreIdIterator implements PrimitiveLongIterator
 {
-    private final RecordStore store;
+    private final Store store;
     private long highId, id;
 
-    public StoreIdIterator( RecordStore store )
+    public StoreIdIterator( Store store )
     {
         this.store = store;
     }
@@ -49,7 +50,7 @@ public class StoreIdIterator implements PrimitiveLongIterator
         {
             return true;
         }
-        highId = store.getHighestPossibleIdInUse();
+        highId = store.getIdGenerator().getHighId();
         return id < highId;
     }
 

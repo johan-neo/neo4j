@@ -180,7 +180,6 @@ public class PropertyPhysicalToLogicalConverterTest
     {
         StoreFactory storeFactory = new StoreFactory( new Config(), new DefaultIdGeneratorFactory(),
                 fs.get(), StringLogger.DEV_NULL, new DefaultTxHook() );
-        File storeFile = new File( "neostore" );
         stores = storeFactory.openNeoStore( "" ); //, storeFile ); 
         converter = new PropertyPhysicalToLogicalConverter( stores.getStringStore(), 
                 stores.getArrayStore() );

@@ -51,7 +51,7 @@ public class Store
                 storeLoader.getRecordSize() );
         
         // TODO: add to Configuration
-        int targetPageSize = 4 * 1024 * 1024;
+        int targetPageSize = 16 * 1024;
         PageType type = PageType.MEMORY_MAPPED;
         PageSynchronization refSync = PageSynchronization.ATOMIC;
         //////////////////////

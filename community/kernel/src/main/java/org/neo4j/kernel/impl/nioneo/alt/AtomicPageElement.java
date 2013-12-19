@@ -63,8 +63,8 @@ class AtomicPageElement implements PageElement
         {
             int versionToSet;
             boolean wroteToPage;
-            do
-            {
+//            do
+//            {
                 wroteToPage = false;
                 versionToSet = nextVersion.incrementAndGet();
                 Page realPage = page.get();
@@ -75,7 +75,7 @@ class AtomicPageElement implements PageElement
                     wroteToPage = true;
                 }
                 currentVersion.set( versionToSet );
-            } while ( nextVersion.get() != versionToSet );
+ //           } while ( nextVersion.get() != versionToSet );
             return wroteToPage;
         }
         finally

@@ -104,7 +104,11 @@ public class FileWithRecords
             }
             if ( startPos + bytesToRead > fileLength && intoBuffer.hasRemaining() )
             {
-                read += intoBuffer.remaining();
+                int remaining = intoBuffer.remaining();
+                byte[] data = new byte[remaining];
+                intoBuffer.put( data );
+                read += remaining;
+                
                 // read += fileChannel.write( intoBuffer, getFileSize() );
             }
             if ( read < bytesToRead )

@@ -68,12 +68,6 @@ abstract class LuceneCommand extends XaCommand
         this.type = type;
     }
     
-    @Override
-    public void execute()
-    {
-        // TODO Auto-generated method stub
-    }
-    
     abstract void perform( CommitContext context );
     
     public Class<? extends PropertyContainer> getEntityType()

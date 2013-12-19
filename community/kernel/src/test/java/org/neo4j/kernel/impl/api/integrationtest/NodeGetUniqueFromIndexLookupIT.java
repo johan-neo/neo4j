@@ -20,8 +20,8 @@
 package org.neo4j.kernel.impl.api.integrationtest;
 
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
-
 import org.neo4j.graphdb.DependencyResolver;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.kernel.api.DataWriteOperations;
@@ -43,6 +43,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
+@Ignore
 public class NodeGetUniqueFromIndexLookupIT extends KernelIntegrationTest
 {
     private int labelId, propertyKeyId;

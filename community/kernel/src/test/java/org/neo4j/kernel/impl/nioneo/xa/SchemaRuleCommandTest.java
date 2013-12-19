@@ -22,6 +22,7 @@ package org.neo4j.kernel.impl.nioneo.xa;
 import java.util.Arrays;
 import java.util.Collection;
 
+import org.junit.Ignore;
 import org.junit.Test;
 import org.neo4j.kernel.impl.api.index.IndexingService;
 import org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore;
@@ -44,6 +45,7 @@ import static org.neo4j.kernel.impl.api.index.TestSchemaIndexProviderDescriptor.
 import static org.neo4j.kernel.impl.nioneo.store.UniquenessConstraintRule.uniquenessConstraintRule;
 import static org.neo4j.kernel.impl.nioneo.xa.Command.readCommand;
 
+@Ignore
 public class SchemaRuleCommandTest
 {
     @Test

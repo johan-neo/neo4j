@@ -99,7 +99,7 @@ import org.neo4j.kernel.impl.transaction.xaframework.XaTransaction;
 import org.neo4j.kernel.impl.transaction.xaframework.XaTransactionFactory;
 
 import static org.neo4j.index.impl.lucene.MultipleBackupDeletionPolicy.SNAPSHOT_ID;
-import static org.neo4j.kernel.impl.nioneo.store.NeoStore.versionStringToLong;
+import static org.neo4j.kernel.impl.nioneo.alt.NeoNeoStore.versionStringToLong;
 
 /**
  * An {@link XaDataSource} optimized for the {@link LuceneIndexImplementation}.
@@ -270,7 +270,7 @@ public class LuceneDataSource extends LogBackedXaDataSource
                 return (T) LuceneDataSource.this.config;
             }
         };
-        xaContainer = xaFactory.newXaContainer( this, new File( this.baseStorePath, "lucene.log"), cf,
+        xaContainer = xaFactory.newXaContainer( this, this.baseStorePath.getPath(), "lucene.log", cf,
                 InjectedTransactionValidator.ALLOW_ALL, tf, TransactionStateFactory.noStateFactory( null ),
                 new TransactionInterceptorProviders( new HashSet<TransactionInterceptorProvider>(), dummy ), false );
         closed = false;

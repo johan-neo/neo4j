@@ -58,7 +58,7 @@ public class XaFactory
         this.pruneStrategy = pruneStrategy;
     }
 
-    public XaContainer newXaContainer( XaDataSource xaDataSource, String path, XaCommandFactory cf,
+    public XaContainer newXaContainer( XaDataSource xaDataSource, String path, String logName, XaCommandFactory cf,
                                        InjectedTransactionValidator injectedTxValidator, XaTransactionFactory tf,
                                        TransactionStateFactory stateFactory, TransactionInterceptorProviders providers,
                                        boolean readOnly )
@@ -70,7 +70,7 @@ public class XaFactory
                     + "TransactionFactory[" + tf + "]" );
         }
 
-        File logicalLog = new File( path, XaLogicalLog.DEFAULT_FILE_PREFIX );
+        File logicalLog = new File( path, logName );
 
         // TODO The dependencies between XaRM, LogicalLog and XaTF should be resolved to avoid the setter
         XaResourceManager rm = new XaResourceManager( xaDataSource, tf, txIdGenerator, txManager, recoveryVerifier, logicalLog.getName() );

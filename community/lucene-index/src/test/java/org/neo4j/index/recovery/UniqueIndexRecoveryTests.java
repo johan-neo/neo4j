@@ -251,7 +251,7 @@ public class UniqueIndexRecoveryTests
     private void flushAll()
     {
         db.getDependencyResolver().resolveDependency(
-                XaDataSourceManager.class ).getNeoStoreDataSource().getNeoStore().flushAll();
+                XaDataSourceManager.class ).getNeoStoreDataSource().getNeoStores().flushAll();
         db.getDependencyResolver().resolveDependency(
                 IndexingService.class ).flushAll();
     }

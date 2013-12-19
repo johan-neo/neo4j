@@ -95,6 +95,7 @@ import org.neo4j.kernel.impl.transaction.xaframework.XaCommandFactory;
 import org.neo4j.kernel.impl.transaction.xaframework.XaConnection;
 import org.neo4j.kernel.impl.transaction.xaframework.XaContainer;
 import org.neo4j.kernel.impl.transaction.xaframework.XaFactory;
+import org.neo4j.kernel.impl.transaction.xaframework.XaLogicalLog;
 import org.neo4j.kernel.impl.transaction.xaframework.XaResource;
 import org.neo4j.kernel.impl.transaction.xaframework.XaTransaction;
 import org.neo4j.kernel.impl.transaction.xaframework.XaTransactionFactory;
@@ -359,7 +360,7 @@ public class NeoStoreXaDataSource extends LogBackedXaDataSource implements NeoSt
             integrityValidator = new IntegrityValidator( neoStores, indexingService );
 
             xaContainer = xaFactory.newXaContainer(this, storeDir.getPath(),
-                    new CommandFactory(),
+                    XaLogicalLog.DEFAULT_FILE_PREFIX, new CommandFactory(),
                     new NeoStoreInjectedTransactionValidator(integrityValidator), tf,
                     stateFactory, providers, readOnly  );
 

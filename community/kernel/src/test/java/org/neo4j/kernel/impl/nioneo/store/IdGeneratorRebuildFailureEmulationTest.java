@@ -25,6 +25,7 @@ import java.util.Map;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -58,6 +59,7 @@ import org.neo4j.tooling.GlobalGraphOperations;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
+@Ignore
 @RunWith(Suite.class)
 @SuiteClasses({IdGeneratorRebuildFailureEmulationTest.FailureBeforeRebuild.class,
         IdGeneratorRebuildFailureEmulationTest.FailureDuringRebuild.class})

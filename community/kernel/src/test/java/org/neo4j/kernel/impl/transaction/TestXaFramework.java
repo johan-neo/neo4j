@@ -267,7 +267,7 @@ public class TestXaFramework extends AbstractNeo4jTestCase
                 };
 
                 map.put( "store_dir", path().getPath() );
-                xaContainer = xaFactory.newXaContainer( this, resourceFile().getPath(),
+                xaContainer = xaFactory.newXaContainer( this, resourceFile().getPath(), "dummy", 
                         new DummyCommandFactory(),
                         ALLOW_ALL,
                         new DummyTransactionFactory(), stateFactory, new TransactionInterceptorProviders(

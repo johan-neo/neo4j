@@ -42,11 +42,19 @@ public class TestPageCache
         fileSize = (long) Math.pow( 4, r.nextInt( 8 ) ) * 1024;
         
         file = new File( "test-page-cache" );
+        if ( file.exists() )
+        {
+            file.delete();
+        }
         rf = new RandomAccessFile( file, "rw" );
         channel = rf.getChannel();
-        channel.truncate( fileSize );
+        channel.write( ByteBuffer.wrap( new byte[1] ), fileSize - 1 );
         FileWithRecords fwr = new FileWithRecords( "test-page-cache", channel, recordSize );
         nrOfRecords = (int) fwr.getNrOfRecords();
+        if ( nrOfRecords < 1 )
+        {
+            System.out.println( "WTF " + fwr.getNrOfRecords() );
+        }
         store = new PagedFileWithRecords( fwr, targetPageSize, PageType.MEMORY_MAPPED, PageSynchronization.ATOMIC );
         
         store.sweep( new Sweeper() {

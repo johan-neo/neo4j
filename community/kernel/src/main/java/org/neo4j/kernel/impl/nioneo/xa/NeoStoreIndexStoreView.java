@@ -346,7 +346,7 @@ public class NeoStoreIndexStoreView implements IndexStoreView
         @Override
         public void run() throws FAILURE
         {
-            PrimitiveLongIterator nodeIds = new StoreIdIterator( neoStores.getNodeStore().getRecordStore() );
+            PrimitiveLongIterator nodeIds = new StoreIdIterator( neoStores.getNodeStore() );
             continueScanning = true;
             byte[] data = new byte[neoStores.getNodeStore().getRecordStore().getRecordSize()];
             while ( continueScanning && nodeIds.hasNext() )

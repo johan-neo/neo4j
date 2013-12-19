@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.junit.Ignore;
 import org.junit.Test;
 import org.neo4j.kernel.impl.api.KernelTransactionImplementation;
 import org.neo4j.kernel.impl.api.index.IndexingService;
@@ -44,6 +45,7 @@ import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
+@Ignore
 public class WriteTransactionCommandOrderingTest
 {
     private final AtomicReference<List<String>> currentRecording = new AtomicReference<>();

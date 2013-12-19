@@ -83,7 +83,7 @@ public class NeoSchemaStore extends Store
                 {
                     long id = currentId++;
                     schemaStore.getRecordStore().getRecord( id, data );
-                    DynamicRecord record = NeoDynamicStore.getRecord( id, data, RecordLoad.FORCE, DynamicRecord.Type.STRING );
+                    DynamicRecord record = NeoDynamicStore.getRecord( id, data, RecordLoad.FORCE, DynamicRecord.Type.UNKNOWN );
                     if ( record.inUse() && record.isStartRecord() )
                     {
                         try
@@ -104,7 +104,7 @@ public class NeoSchemaStore extends Store
     
     private static SchemaRule getSchemaRule( long id, byte[] buffer, RecordStore schemaStore ) throws MalformedSchemaRuleException
     {
-        return readSchemaRule( id, NeoDynamicStore.getRecords( schemaStore, id, RecordLoad.NORMAL, DynamicRecord.Type.STRING ), buffer );
+        return readSchemaRule( id, NeoDynamicStore.getRecords( schemaStore, id, RecordLoad.NORMAL, DynamicRecord.Type.UNKNOWN ), buffer );
     }
 
 //    private SchemaRule forceGetSchemaRule( long id, byte[] buffer ) throws MalformedSchemaRuleException

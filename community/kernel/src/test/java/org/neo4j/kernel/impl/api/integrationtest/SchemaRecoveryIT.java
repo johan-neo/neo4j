@@ -21,9 +21,9 @@ package org.neo4j.kernel.impl.api.integrationtest;
 
 import java.util.List;
 
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
-
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Transaction;
 import org.neo4j.graphdb.factory.GraphDatabaseFactory;
@@ -33,10 +33,10 @@ import org.neo4j.test.TargetDirectory;
 import org.neo4j.test.subprocess.SubProcess;
 
 import static org.junit.Assert.assertEquals;
-
 import static org.neo4j.graphdb.DynamicLabel.label;
 import static org.neo4j.helpers.collection.IteratorUtil.asList;
 
+@Ignore
 public class SchemaRecoveryIT
 {
     @Test
