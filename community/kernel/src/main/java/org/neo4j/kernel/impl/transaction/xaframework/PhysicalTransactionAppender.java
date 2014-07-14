@@ -20,7 +20,9 @@
 package org.neo4j.kernel.impl.transaction.xaframework;
 
 import java.io.IOException;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.neo4j.helpers.FutureAdapter;
 import org.neo4j.kernel.impl.nioneo.store.TransactionIdStore;
@@ -36,25 +38,28 @@ public class PhysicalTransactionAppender implements TransactionAppender
     private final TransactionIdStore transactionIdStore;
     private final TransactionLogWriter transactionLogWriter;
     private final LogPositionMarker positionMarker = new LogPositionMarker();
-
+    
+    private final boolean piggybackWrites;
+    private final AtomicReference<CountDownLatch> piggybackLatch = new AtomicReference<>();
+    
     public PhysicalTransactionAppender( LogFile logFile, TxIdGenerator txIdGenerator,
-            TransactionMetadataCache transactionMetadataCache, TransactionIdStore transactionIdStore )
+            TransactionMetadataCache transactionMetadataCache, TransactionIdStore transactionIdStore, boolean piggybackWrites )
     {
         this.logFile = logFile;
         this.transactionIdStore = transactionIdStore;
+        this.piggybackWrites = piggybackWrites;
         this.channel = logFile.getWriter();
         this.txIdGenerator = txIdGenerator;
         this.transactionMetadataCache = transactionMetadataCache;
-
         LogEntryWriterv1 logEntryWriter = new LogEntryWriterv1( channel, new CommandWriter( channel ) );
         this.transactionLogWriter = new TransactionLogWriter( logEntryWriter );
+        this.piggybackLatch.set( new CountDownLatch( 1 ) );
     }
-
+    
     private void append( TransactionRepresentation transaction, long transactionId ) throws IOException
     {
         channel.getCurrentPosition( positionMarker );
         LogPosition logPosition = positionMarker.newPosition();
-
         transactionLogWriter.append( transaction, transactionId );
 
         transactionMetadataCache.cacheTransactionMetadata( transactionId, logPosition, transaction.getMasterId(),
@@ -65,19 +70,112 @@ public class PhysicalTransactionAppender implements TransactionAppender
     }
 
     @Override
-    public synchronized Future<Long> append( TransactionRepresentation transaction ) throws IOException
+    public Future<Long> append( TransactionRepresentation transaction ) throws IOException
     {
         // We put log rotation check outside the private append method since it must happen before
         // we generate the next transaction id
-        logFile.checkRotation();
-        long transactionId = txIdGenerator.generate( transaction );
-        append( transaction, transactionId );
+        long transactionId;
+        // Split synchronization in case of piggyback writes
+        synchronized ( this )
+        {
+            if ( logFile.needsRotation() )
+            {
+                channel.force();
+                logFile.checkRotation();
+            }
+            transactionId = txIdGenerator.generate( transaction );
+            append( transaction, transactionId );
+            ((PhysicalWritableLogChannel) channel).emptyBufferIntoChannelAndClearIt();
+        }
+        if ( piggybackWrites )
+        {
+            awaitFlush();
+        }
+        else
+        {
+            ((PhysicalWritableLogChannel) channel).forceUnderlying();
+        }
         return FutureAdapter.present( transactionId );
     }
 
+    private void awaitFlush() throws IOException
+    {
+        try
+        {
+            CountDownLatch current;
+            do 
+            {
+                current = piggybackLatch.get();
+                if ( current != null )
+                {
+                    current.await();
+                    return;
+                }
+                piggybackLatch.compareAndSet( null, new CountDownLatch( 1 ) );
+                synchronized ( channel )
+                {
+                    channel.notify();
+                }
+            } while ( current == null );
+        }
+        catch ( InterruptedException e )
+        {
+            throw new IOException( "Interrupted while waiting for flush", e );
+        }
+    }
+    
+    // only called by the single batched writer thread
+    void flushAndRelease() throws IOException
+    {
+        CountDownLatch currentLatch = piggybackLatch.get();
+        if ( currentLatch == null )
+        {
+            synchronized ( channel )
+            {
+                try
+                {
+                    channel.wait();
+                }
+                catch ( InterruptedException e )
+                {
+                    // TODO: add logging 
+                    e.printStackTrace();
+                    Thread.interrupted();
+                }
+            }
+        }
+        
+        if ( piggybackLatch.compareAndSet( currentLatch, null ) )
+        {
+            ((PhysicalWritableLogChannel) channel).forceUnderlying();
+            if ( currentLatch != null )
+            {
+                currentLatch.countDown();
+            }
+        }
+    }
+    
+    // only called by the single batched writer thread on shutdown
+    void releaseAll()
+    {
+        synchronized ( channel )
+        {
+            channel.notify();
+        }
+        CountDownLatch currentLatch = piggybackLatch.get();
+        if ( currentLatch == null )
+        {
+            currentLatch = new CountDownLatch( 1 );
+            if ( !piggybackLatch.compareAndSet( null, currentLatch ) )
+            {
+                currentLatch = piggybackLatch.get();
+            }
+        }
+        currentLatch.countDown();
+    }
+
     @Override
-    public synchronized boolean append( CommittedTransactionRepresentation transaction )
-            throws IOException
+    public synchronized boolean append( CommittedTransactionRepresentation transaction ) throws IOException
     {
         logFile.checkRotation();
         long txId = transaction.getCommitEntry().getTxId();
@@ -90,8 +188,8 @@ public class PhysicalTransactionAppender implements TransactionAppender
         }
         else if ( lastCommittedTxId + 1 < txId )
         {
-            throw new IOException( "Tried to apply transaction with txId=" + txId +
-                    " but last committed txId=" + lastCommittedTxId );
+            throw new IOException( "Tried to apply transaction with txId=" + txId + " but last committed txId="
+                    + lastCommittedTxId );
         }
         return false;
     }

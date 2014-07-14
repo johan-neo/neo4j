@@ -479,14 +479,17 @@ public class NeoStoreXaDataSource implements NeoStoreProvider, Lifecycle, LogRot
             RecoveryVisitor recoveryVisitor = new RecoveryVisitor( neoStore, storeApplier, recoveredCount );
             Visitor<ReadableLogChannel, IOException> logFileRecoverer =
                     new LogFileRecoverer( logEntryReader, recoveryVisitor );
+
+            boolean piggybackWrites = config.get( GraphDatabaseSettings.piggyback_writes );
+            
             logFile = dependencies.satisfyDependency( new PhysicalLogFile( fs, logFiles,
                     config.get( GraphDatabaseSettings.logical_log_rotation_threshold ), logPruneStrategy, neoStore,
                     neoStore, new PhysicalLogFile.LoggingMonitor( logging.getMessagesLog( getClass() ) ),
-                    this, transactionMetadataCache, logFileRecoverer ) );
+                    this, transactionMetadataCache, logFileRecoverer, piggybackWrites ) );
 
             final LogicalTransactionStore logicalTransactionStore = dependencies.satisfyDependency(
                     LogicalTransactionStore.class, new PhysicalLogicalTransactionStore( logFile, txIdGenerator,
-                            transactionMetadataCache, logEntryReader, neoStore ));
+                            transactionMetadataCache, logEntryReader, neoStore, piggybackWrites ));
 
             Provider<TransactionCommitProcess> commitProcesProvider = new Provider<TransactionCommitProcess>()
             {

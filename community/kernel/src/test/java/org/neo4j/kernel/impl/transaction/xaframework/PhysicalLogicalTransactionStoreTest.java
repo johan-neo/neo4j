@@ -75,10 +75,10 @@ public class PhysicalLogicalTransactionStoreTest
         Monitor monitor = new Monitors().newMonitor( PhysicalLogFile.Monitor.class );
         LogFile logFile = life.add( new PhysicalLogFile( fs, logFiles, 1000, NO_PRUNING,
                 transactionIdStore, mock( LogVersionRepository.class), monitor, logRotationControl,
-                positionCache, noRecoveryAsserter() ) );
+                positionCache, noRecoveryAsserter(), false ) );
         TxIdGenerator txIdGenerator = new DefaultTxIdGenerator( singletonProvider( transactionIdStore ) );
         life.add( new PhysicalLogicalTransactionStore( logFile, txIdGenerator, positionCache,
-                new VersionAwareLogEntryReader( CommandReaderFactory.DEFAULT ), transactionIdStore ) );
+                new VersionAwareLogEntryReader( CommandReaderFactory.DEFAULT ), transactionIdStore, false ) );
 
         try
         {
@@ -107,7 +107,7 @@ public class PhysicalLogicalTransactionStoreTest
         Monitor monitor = new Monitors().newMonitor( PhysicalLogFile.Monitor.class );
         LogFile logFile = life.add( new PhysicalLogFile( fs, logFiles, 1000, NO_PRUNING,
                 transactionIdStore, mock( LogVersionRepository.class), monitor, logRotationControl,
-                positionCache, emptyRecoveryVisitor() ));
+                positionCache, emptyRecoveryVisitor(), false ));
 
         life.start();
         try
@@ -139,10 +139,10 @@ public class PhysicalLogicalTransactionStoreTest
                 recoveredTransactions.incrementAndGet();
                 return true;
             }
-        } ) ) );
+        } ), false ) );
 
         life.add( new PhysicalLogicalTransactionStore( logFile, txIdGenerator, positionCache, new VersionAwareLogEntryReader(
-                CommandReaderFactory.DEFAULT ), transactionIdStore ) );
+                CommandReaderFactory.DEFAULT ), transactionIdStore, false ) );
 
         // WHEN
         try
@@ -174,7 +174,7 @@ public class PhysicalLogicalTransactionStoreTest
         Monitor monitor = new Monitors().newMonitor( PhysicalLogFile.Monitor.class );
         LogFile logFile = life.add( new PhysicalLogFile( fs, logFiles, 1000, NO_PRUNING,
                 transactionIdStore, mock( LogVersionRepository.class), monitor, logRotationControl,
-                positionCache, emptyRecoveryVisitor() ) );
+                positionCache, emptyRecoveryVisitor(), false ) );
 
         life.start();
         try
@@ -206,10 +206,10 @@ public class PhysicalLogicalTransactionStoreTest
                 recoveredTransactions.incrementAndGet();
                 return true;
             }
-        } )));
+        } ), false ));
 
         LogicalTransactionStore store = life.add( new PhysicalLogicalTransactionStore( logFile, txIdGenerator,
-                positionCache, new VersionAwareLogEntryReader( CommandReaderFactory.DEFAULT ), transactionIdStore ) );
+                positionCache, new VersionAwareLogEntryReader( CommandReaderFactory.DEFAULT ), transactionIdStore, false ) );
 
         // WHEN
         life.start();
@@ -232,7 +232,7 @@ public class PhysicalLogicalTransactionStoreTest
                                            long latestCommittedTxWhenStarted ) throws IOException
     {
         TransactionAppender appender = new PhysicalTransactionAppender(
-                logFile, txIdGenerator, positionCache, transactionIdStore );
+                logFile, txIdGenerator, positionCache, transactionIdStore, false );
         PhysicalTransactionRepresentation transaction =
                 new PhysicalTransactionRepresentation( singleCreateNodeCommand() );
         transaction.setHeader( additionalHeader, masterId, authorId, timeWritten, latestCommittedTxWhenStarted );

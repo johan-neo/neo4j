@@ -49,5 +49,7 @@ public interface LogFile extends Lifecycle
 
     void accept( LogHeaderVisitor visitor ) throws IOException;
 
+    boolean needsRotation() throws IOException;
+    
     void checkRotation() throws IOException;
 }
