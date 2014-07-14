@@ -53,7 +53,7 @@ public class PhysicalTransactionAppenderTest
         TransactionMetadataCache positionCache = new TransactionMetadataCache( 10, 100 );
         TransactionIdStore transactionIdStore = mock( TransactionIdStore.class );
         TransactionAppender appender = new PhysicalTransactionAppender(
-                logFile, txIdGenerator, positionCache, transactionIdStore );
+                logFile, txIdGenerator, positionCache, transactionIdStore, false );
 
         // WHEN
         PhysicalTransactionRepresentation transaction = new PhysicalTransactionRepresentation(
@@ -89,7 +89,7 @@ public class PhysicalTransactionAppenderTest
         TransactionMetadataCache positionCache = new TransactionMetadataCache( 10, 100 );
         TransactionIdStore transactionIdStore = mock( TransactionIdStore.class );
         TransactionAppender appender = new PhysicalTransactionAppender(
-                logFile, txIdGenerator, positionCache, transactionIdStore );
+                logFile, txIdGenerator, positionCache, transactionIdStore, true );
 
 
         // WHEN
@@ -134,7 +134,7 @@ public class PhysicalTransactionAppenderTest
         TransactionMetadataCache positionCache = new TransactionMetadataCache( 10, 100 );
         TransactionIdStore transactionIdStore = mock( TransactionIdStore.class );
         TransactionAppender appender = new PhysicalTransactionAppender(
-                logFile, txIdGenerator, positionCache, transactionIdStore );
+                logFile, txIdGenerator, positionCache, transactionIdStore, true );
 
         // WHEN
         final byte[] additionalHeader = new byte[]{1, 2, 5};

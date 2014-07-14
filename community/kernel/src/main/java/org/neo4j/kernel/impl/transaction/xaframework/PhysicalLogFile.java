@@ -55,11 +55,12 @@ public class PhysicalLogFile extends LifecycleAdapter implements LogFile
     private final LogVersionRepository logVersionRepository;
     private PhysicalLogVersionedStoreChannel channel;
     private final LogVersionBridge readerLogVersionBridge;
+    private final boolean piggybackWrites;
 
     public PhysicalLogFile( FileSystemAbstraction fileSystem, PhysicalLogFiles logFiles, long rotateAtSize,
             LogPruneStrategy pruneStrategy, TransactionIdStore transactionIdStore,
             LogVersionRepository logVersionRepository, Monitor monitor, LogRotationControl logRotationControl,
-            TransactionMetadataCache transactionMetadataCache, Visitor<ReadableLogChannel, IOException> recoveredDataVisitor )
+            TransactionMetadataCache transactionMetadataCache, Visitor<ReadableLogChannel, IOException> recoveredDataVisitor, boolean piggybackWrites )
     {
         this.fileSystem = fileSystem;
         this.rotateAtSize = rotateAtSize;
@@ -72,6 +73,7 @@ public class PhysicalLogFile extends LifecycleAdapter implements LogFile
         this.recoveredDataVisitor = recoveredDataVisitor;
         this.logFiles = logFiles;
         this.readerLogVersionBridge = new ReaderLogVersionBridge( fileSystem, logFiles );
+        this.piggybackWrites = piggybackWrites;
     }
 
     @Override
@@ -140,6 +142,12 @@ public class PhysicalLogFile extends LifecycleAdapter implements LogFile
         }
     }
 
+    @Override
+    public boolean needsRotation() throws IOException
+    {
+        return channel.position() >= rotateAtSize;
+    }
+    
     @Override
     public void checkRotation() throws IOException
     {

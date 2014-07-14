@@ -165,6 +165,9 @@ public abstract class GraphDatabaseSettings
                   "Default is 25M" )
     public static final Setting<Long> logical_log_rotation_threshold = setting( "logical_log_rotation_threshold", BYTES, "25M" );
 
+    @Description("If set to true physical log tries to batch several write transactions together on a single flush." )
+    public static final Setting<Boolean> piggyback_writes = setting("piggyback_writes", BOOLEAN, TRUE );
+    
     @Description("Use a quick approach for rebuilding the ID generators. This give quicker recovery time, " +
             "but will limit the ability to reuse the space of deleted entities.")
     public static final Setting<Boolean> rebuild_idgenerators_fast = setting("rebuild_idgenerators_fast", BOOLEAN, TRUE );

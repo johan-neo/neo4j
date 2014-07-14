@@ -137,7 +137,7 @@ public class StoreCopyClient
             LogFile logFile = life.add( new PhysicalLogFile( fs, logFiles, Long.MAX_VALUE /*don't rotate*/,
                     NO_PRUNING, new ReadOnlyTransactionIdStore( fs, storeDir ), logVersionRepository,
                     PhysicalLogFile.NO_MONITOR, LogRotationControl.NO_ROTATION_CONTROL,
-                    transactionMetadataCache, new NoRecoveryAssertingVisitor() ) );
+                    transactionMetadataCache, new NoRecoveryAssertingVisitor(), false ) );
             life.start();
 
             // Just write all transactions to the active log version. Remember that this is after a store copy
