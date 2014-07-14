@@ -55,7 +55,7 @@ public class PhysicalLogFileTest
         PhysicalLogFiles logFiles = new PhysicalLogFiles( directory.directory(), name, fs );
         LogFile logFile = life.add(new PhysicalLogFile( fs, logFiles, 1000, LogPruneStrategyFactory.NO_PRUNING,
                 transactionIdStore, logVersionRepository, mock( Monitor.class ), logRotationControl,
-                new TransactionMetadataCache( 10, 100 ), NO_RECOVERY_EXPECTED ));
+                new TransactionMetadataCache( 10, 100 ), NO_RECOVERY_EXPECTED, false ));
 
         // WHEN
         life.start();
@@ -79,7 +79,7 @@ public class PhysicalLogFileTest
         LogFile logFile = life.add( new PhysicalLogFile( fs, logFiles, 1000,
                 LogPruneStrategyFactory.NO_PRUNING,
                 transactionIdStore, logVersionRepository, mock( Monitor.class ), logRotationControl,
-                new TransactionMetadataCache( 10, 100 ), NO_RECOVERY_EXPECTED ) );
+                new TransactionMetadataCache( 10, 100 ), NO_RECOVERY_EXPECTED, false ) );
 
         // WHEN
         try
@@ -118,7 +118,7 @@ public class PhysicalLogFileTest
         PhysicalLogFiles logFiles = new PhysicalLogFiles( directory.directory(), name, fs );
         LogFile logFile = life.add( new PhysicalLogFile( fs, logFiles, 50, LogPruneStrategyFactory.NO_PRUNING,
                 transactionIdStore, logVersionRepository, mock( Monitor.class ), logRotationControl,
-                new TransactionMetadataCache( 10, 100 ), NO_RECOVERY_EXPECTED ) );
+                new TransactionMetadataCache( 10, 100 ), NO_RECOVERY_EXPECTED, false ) );
 
         // WHEN
         life.start();
@@ -202,7 +202,7 @@ public class PhysicalLogFileTest
                                 }
                                 return true;
                             }
-                        } ) );
+                        }, false ) );
         try
         {
             life.start();

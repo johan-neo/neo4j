@@ -19,10 +19,12 @@
  */
 package org.neo4j.kernel.impl.transaction.xaframework;
 
+import static java.lang.Math.min;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import static java.lang.Math.min;
+import org.neo4j.io.fs.StoreChannel;
 
 public class PhysicalWritableLogChannel implements WritableLogChannel
 {
@@ -38,6 +40,11 @@ public class PhysicalWritableLogChannel implements WritableLogChannel
     public void force() throws IOException
     {
         emptyBufferIntoChannelAndClearIt();
+        forceUnderlying();
+    }
+    
+    void forceUnderlying() throws IOException
+    {
         channel.force( false );
     }
 
@@ -46,7 +53,7 @@ public class PhysicalWritableLogChannel implements WritableLogChannel
         this.channel = channel;
     }
 
-    private void emptyBufferIntoChannelAndClearIt() throws IOException
+    void emptyBufferIntoChannelAndClearIt() throws IOException
     {
         buffer.flip();
         channel.write( buffer );

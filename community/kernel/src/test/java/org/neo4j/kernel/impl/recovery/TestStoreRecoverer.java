@@ -113,14 +113,14 @@ public class TestStoreRecoverer
         LogFile logFile = life.add( new PhysicalLogFile( fileSystem, logFiles, 1000,
                 LogPruneStrategyFactory.NO_PRUNING, transactionIdStore,
                 new DeadSimpleLogVersionRepository( util.getLogVersion() ), mock( PhysicalLogFile.Monitor.class ),
-                mock( LogRotationControl.class ), positionCache, mock( Visitor.class ) ) );
+                mock( LogRotationControl.class ), positionCache, mock( Visitor.class ), false ) );
         life.start();
 
         try
         {
             TransactionAppender appender = new PhysicalTransactionAppender( logFile,
                     new DefaultTxIdGenerator( Providers.<TransactionIdStore>singletonProvider( transactionIdStore ) ),
-                    positionCache, transactionIdStore );
+                    positionCache, transactionIdStore, false );
             appender.append( singleNodeTransaction() );
         }
         finally

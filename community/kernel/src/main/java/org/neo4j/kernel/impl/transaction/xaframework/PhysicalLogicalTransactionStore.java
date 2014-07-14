@@ -38,24 +38,52 @@ public class PhysicalLogicalTransactionStore extends LifecycleAdapter implements
     private final LogFile logFile;
     private final TransactionMetadataCache transactionMetadataCache;
     private final TxIdGenerator txIdGenerator;
-    private TransactionAppender appender;
+    private PhysicalTransactionAppender appender;
     private final TransactionIdStore transactionIdStore;
+    
+    private PhysicalLogPiggybackWriterThread piggybackWriteThread;
+    private boolean piggybackWrites;
 
     public PhysicalLogicalTransactionStore( LogFile logFile, TxIdGenerator txIdGenerator,
             TransactionMetadataCache transactionMetadataCache,
-            TransactionIdStore transactionIdStore )
+            TransactionIdStore transactionIdStore, boolean piggybackWrites )
     {
         this.logFile = logFile;
         this.txIdGenerator = txIdGenerator;
         this.transactionMetadataCache = transactionMetadataCache;
         this.transactionIdStore = transactionIdStore;
+        this.piggybackWrites = piggybackWrites;
     }
-
+    
     @Override
     public void init() throws Throwable
     {
         this.appender = new PhysicalTransactionAppender( logFile, txIdGenerator, transactionMetadataCache,
-                transactionIdStore );
+                transactionIdStore, piggybackWrites );
+        if ( piggybackWrites )
+        {
+            piggybackWriteThread = new PhysicalLogPiggybackWriterThread( appender );
+            piggybackWriteThread.start();
+        }
+    }
+    
+    @Override
+    public void stop()
+    {
+        if ( piggybackWrites )
+        {
+            piggybackWriteThread.stopRunningBatchThread();
+            appender.releaseAll();
+            try
+            {
+                piggybackWriteThread.join();
+            }
+            catch ( InterruptedException e )
+            {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
+        }
     }
 
     @Override

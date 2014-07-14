@@ -54,7 +54,7 @@ public class ReadOnlyTransactionStore extends LifecycleAdapter implements Logica
             {
                 return true;
             }
-        } ));
+        }, false ));
 
         physicalStore = life.add( new PhysicalLogicalTransactionStore( logFile, new TxIdGenerator()
         {
@@ -63,7 +63,7 @@ public class ReadOnlyTransactionStore extends LifecycleAdapter implements Logica
             {
                 throw new UnsupportedOperationException(  );
             }
-        }, transactionMetadataCache, transactionIdStore ) );
+        }, transactionMetadataCache, transactionIdStore, false ) );
     }
 
     @Override

@@ -467,14 +467,17 @@ public class NeoStoreXaDataSource implements NeoStoreProvider, Lifecycle, LogRot
             RecoveryVisitor recoveryVisitor = new RecoveryVisitor( neoStore, storeApplier, recoveredCount );
             Visitor<ReadableLogChannel, IOException> logFileRecoverer =
                     new LogFileRecoverer( new VersionAwareLogEntryReader(), recoveryVisitor );
+
+            boolean piggybackWrites = config.get( GraphDatabaseSettings.piggyback_writes );
+            
             logFile = dependencies.satisfyDependency( new PhysicalLogFile( fs, logFiles,
                     config.get( GraphDatabaseSettings.logical_log_rotation_threshold ), logPruneStrategy, neoStore,
                     neoStore, new PhysicalLogFile.LoggingMonitor( logging.getMessagesLog( getClass() ) ),
-                    this, transactionMetadataCache, logFileRecoverer ) );
+                    this, transactionMetadataCache, logFileRecoverer, piggybackWrites ) );
 
             final LogicalTransactionStore logicalTransactionStore = dependencies.satisfyDependency(
                     LogicalTransactionStore.class, new PhysicalLogicalTransactionStore( logFile, txIdGenerator,
-                            transactionMetadataCache, neoStore ));
+                            transactionMetadataCache, neoStore, piggybackWrites ));
 
             TransactionCommitProcess transactionCommitProcess = dependencies.satisfyDependency( TransactionCommitProcess.class,
                                         commitProcessFactory.create( logicalTransactionStore, kernelHealth,
@@ -495,8 +498,8 @@ public class NeoStoreXaDataSource implements NeoStoreProvider, Lifecycle, LogRot
             };
 
             ConstraintIndexCreator constraintIndexCreator = new ConstraintIndexCreator( kernelProvider, indexingService);
-
             LegacyIndexStore legacyIndexStore = new LegacyIndexStore( config, indexConfigStore, kernelProvider,
+
                     legacyIndexProviderLookup );
 
             StatementOperationParts statementOperations = buildStatementOperations( storeLayer, legacyPropertyTrackers,
