@@ -73,7 +73,7 @@ public class PhysicalLogicalTransactionStore extends LifecycleAdapter implements
         if ( piggybackWrites )
         {
             piggybackWriteThread.stopRunningBatchThread();
-            appender.releaseAll();
+            appender.notifyPiggybackThread();
             try
             {
                 piggybackWriteThread.join();
@@ -83,6 +83,7 @@ public class PhysicalLogicalTransactionStore extends LifecycleAdapter implements
                 // TODO Auto-generated catch block
                 e.printStackTrace();
             }
+            appender.releaseAll();
         }
     }
 

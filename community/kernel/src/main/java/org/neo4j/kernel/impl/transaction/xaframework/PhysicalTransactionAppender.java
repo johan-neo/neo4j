@@ -65,8 +65,6 @@ public class PhysicalTransactionAppender implements TransactionAppender
         transactionMetadataCache.cacheTransactionMetadata( transactionId, logPosition, transaction.getMasterId(),
                 transaction.getAuthorId(), LogEntryStart.checksum( transaction.additionalHeader(),
                         transaction.getMasterId(), transaction.getAuthorId() ) );
-
-        channel.force();
     }
 
     @Override
@@ -102,21 +100,18 @@ public class PhysicalTransactionAppender implements TransactionAppender
     {
         try
         {
-            CountDownLatch current;
-            do 
+            CountDownLatch current = piggybackLatch.get();
+            if ( current != null )
             {
-                current = piggybackLatch.get();
-                if ( current != null )
-                {
-                    current.await();
-                    return;
-                }
-                piggybackLatch.compareAndSet( null, new CountDownLatch( 1 ) );
-                synchronized ( channel )
-                {
-                    channel.notify();
-                }
-            } while ( current == null );
+                current.await();
+                return;
+            }
+            CountDownLatch newLatch = new CountDownLatch( 1 );
+            if ( piggybackLatch.compareAndSet( null, newLatch ) )
+            {
+                notifyPiggybackThread();
+            }
+            awaitFlush();
         }
         catch ( InterruptedException e )
         {
@@ -124,44 +119,44 @@ public class PhysicalTransactionAppender implements TransactionAppender
         }
     }
     
-    // only called by the single batched writer thread
+    // only called by the single piggyback writer thread
     void flushAndRelease() throws IOException
     {
-        CountDownLatch currentLatch = piggybackLatch.get();
-        if ( currentLatch == null )
+        synchronized( channel )
         {
-            synchronized ( channel )
-            {
-                try
-                {
-                    channel.wait();
-                }
-                catch ( InterruptedException e )
-                {
-                    // TODO: add logging 
-                    e.printStackTrace();
-                    Thread.interrupted();
-                }
-            }
+           if ( piggybackLatch.get() == null )
+           {
+               try
+               {
+                   channel.wait();
+               }
+               catch ( InterruptedException e )
+               {
+                   e.printStackTrace();
+                   Thread.interrupted();
+               }
+           }
         }
-        
-        if ( piggybackLatch.compareAndSet( currentLatch, null ) )
+        CountDownLatch current = piggybackLatch.get();
+        if ( current != null ) // can be null on shutdown when no more transactions available
         {
             ((PhysicalWritableLogChannel) channel).forceUnderlying();
-            if ( currentLatch != null )
-            {
-                currentLatch.countDown();
-            }
+            current.countDown();
+            piggybackLatch.set( null );
         }
     }
     
-    // only called by the single batched writer thread on shutdown
-    void releaseAll()
+    void notifyPiggybackThread()
     {
         synchronized ( channel )
         {
             channel.notify();
         }
+    }
+    
+    // only called on shutdown after piggyback thread has been stopped
+    void releaseAll()
+    {
         CountDownLatch currentLatch = piggybackLatch.get();
         if ( currentLatch == null )
         {
